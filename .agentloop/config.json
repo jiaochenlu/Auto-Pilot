@@ -34,6 +34,16 @@
         "acceptEdits"
       ],
       "stdin_file": "{prompt_file}"
+    },
+    "copilot": {
+      "adapter": "command",
+      "command": "C:\\Program Files\\GitHub CLI\\gh.EXE",
+      "args": [
+        "copilot",
+        "suggest",
+        "--file",
+        "{prompt_file}"
+      ]
     }
   },
   "roles": {

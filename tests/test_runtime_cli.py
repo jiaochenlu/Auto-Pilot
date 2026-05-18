@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from agentloop.cli import main
 
@@ -163,6 +164,84 @@ class RuntimeCliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 2)
             self.assertIn("Unknown preset: missing", stderr.getvalue())
+
+    def test_runtime_detect_adds_found_runtimes_without_assigning_roles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            detected = {
+                "claude-code": {
+                    "adapter": "command",
+                    "command": r"C:\Tools\claude.exe",
+                    "args": ["--print", "--permission-mode", "acceptEdits"],
+                    "stdin_file": "{prompt_file}",
+                },
+                "codex": {
+                    "adapter": "command",
+                    "command": r"C:\Tools\codex.exe",
+                    "args": ["exec", "--skip-git-repo-check", "--sandbox", "workspace-write", "-"],
+                    "stdin_file": "{prompt_file}",
+                },
+            }
+            with redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+
+            output = io.StringIO()
+            with patch("agentloop.config.detect_runtime_definitions", return_value=detected):
+                with redirect_stdout(output):
+                    exit_code = main(["--root", str(root), "runtime", "detect"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("claude-code: installed", output.getvalue())
+            config = json.loads((root / ".agentloop" / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["runtimes"]["claude-code"]["command"], r"C:\Tools\claude.exe")
+            self.assertEqual(config["runtimes"]["codex"]["stdin_file"], "{prompt_file}")
+            self.assertTrue(all(role["runtime"] == "manual" for role in config["roles"].values()))
+
+    def test_runtime_detect_skips_existing_without_replace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            detected = {
+                "claude-code": {
+                    "adapter": "command",
+                    "command": r"C:\Tools\claude.exe",
+                    "args": ["--print"],
+                    "stdin_file": "{prompt_file}",
+                }
+            }
+            with redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                main(["--root", str(root), "runtime", "add-command", "claude-code", "--command", "existing"])
+
+            output = io.StringIO()
+            with patch("agentloop.config.detect_runtime_definitions", return_value=detected):
+                with redirect_stdout(output):
+                    exit_code = main(["--root", str(root), "runtime", "detect"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("skipped existing", output.getvalue())
+            config = json.loads((root / ".agentloop" / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["runtimes"]["claude-code"]["command"], "existing")
+
+    def test_init_can_detect_runtimes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            detected = {
+                "copilot": {
+                    "adapter": "command",
+                    "command": r"C:\Tools\gh.exe",
+                    "args": ["copilot", "suggest", "--file", "{prompt_file}"],
+                }
+            }
+
+            output = io.StringIO()
+            with patch("agentloop.config.detect_runtime_definitions", return_value=detected):
+                with redirect_stdout(output):
+                    exit_code = main(["--root", str(root), "init", "--detect-runtimes"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Runtime detection", output.getvalue())
+            config = json.loads((root / ".agentloop" / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["runtimes"]["copilot"]["command"], r"C:\Tools\gh.exe")
 
 
 if __name__ == "__main__":

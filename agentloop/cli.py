@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
-from .config import add_command_runtime, add_preset_runtime, assign_all_runtime, assign_runtime, list_runtimes, set_default_runtime
+from .config import add_command_runtime, add_preset_runtime, assign_all_runtime, assign_runtime, detect_runtimes, list_runtimes, set_default_runtime
 from .locks import LockHeld, lock_path, task_lock
 from .models import default_state, next_action
 from .tasks import (
@@ -71,7 +71,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("init", help="Initialize .agentloop in the workspace.")
+    init_parser = subparsers.add_parser("init", help="Initialize .agentloop in the workspace.")
+    init_parser.add_argument("--detect-runtimes", action="store_true", help="Detect local Codex/Claude/Copilot runtimes after init.")
+    init_parser.add_argument("--replace-runtimes", action="store_true", help="Replace existing detected runtime entries during --detect-runtimes.")
     status_parser = subparsers.add_parser("status", help="Show task status.")
     _add_task_id_argument(status_parser)
 
@@ -137,6 +139,8 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_subparsers = runtime_parser.add_subparsers(dest="runtime_command", required=True)
 
     runtime_subparsers.add_parser("list", help="List configured runtimes and role assignments.")
+    detect_parser = runtime_subparsers.add_parser("detect", help="Detect local Codex/Claude/Copilot runtime commands.")
+    detect_parser.add_argument("--replace", action="store_true", help="Replace existing detected runtime entries.")
 
     add_command_parser = runtime_subparsers.add_parser("add-command", help="Add a command-based runtime.")
     add_command_parser.add_argument("name", help="Runtime name.")
@@ -180,7 +184,26 @@ def _resolve_task_arg(args: argparse.Namespace) -> str | None:
 # ---------- simple commands ----------
 
 
-def cmd_init(root: Path) -> int:
+def print_detect_summary(result: dict[str, Any]) -> None:
+    detected = result.get("detected", {})
+    installed = set(result.get("installed", []) or [])
+    skipped = set(result.get("skipped", []) or [])
+    print("Runtime detection:")
+    if not detected:
+        print("  detected: none")
+        print("  next: use `python -m agentloop runtime add-command ...` to configure a runtime manually")
+        return
+    for name, runtime in sorted(detected.items()):
+        status = "installed" if name in installed else "skipped"
+        if name in skipped:
+            status = "skipped existing"
+        print(f"  - {name}: {status} command={runtime.get('command')}")
+    print("  next:")
+    print("    python -m agentloop runtime assign-all <runtime>")
+    print("    python -m agentloop runtime verify <runtime> --timeout-seconds 120")
+
+
+def cmd_init(root: Path, detect: bool = False, replace_runtimes: bool = False) -> int:
     result = init_workspace(root)
     print("AgentLoop initialized.")
     if result["created"]:
@@ -191,6 +214,8 @@ def cmd_init(root: Path) -> int:
         print("Already existed:")
         for item in result["skipped"]:
             print(f"  - {item}")
+    if detect:
+        print_detect_summary(detect_runtimes(root, replace=replace_runtimes))
     return 0
 
 
@@ -571,6 +596,11 @@ def cmd_runtime_list(root: Path) -> int:
     return 0
 
 
+def cmd_runtime_detect(root: Path, replace: bool) -> int:
+    print_detect_summary(detect_runtimes(root, replace=replace))
+    return 0
+
+
 def cmd_runtime_add_command(root: Path, args: argparse.Namespace) -> int:
     runtime_args = list(args.arg or [])
     if args.args:
@@ -670,7 +700,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         if args.command == "init":
-            return cmd_init(root)
+            return cmd_init(root, detect=args.detect_runtimes, replace_runtimes=args.replace_runtimes)
         if args.command == "status":
             return cmd_status(root, _resolve_task_arg(args))
         if args.command == "tasks":
@@ -712,6 +742,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "runtime":
             if args.runtime_command == "list":
                 return cmd_runtime_list(root)
+            if args.runtime_command == "detect":
+                return cmd_runtime_detect(root, args.replace)
             if args.runtime_command == "add-command":
                 return cmd_runtime_add_command(root, args)
             if args.runtime_command == "add-preset":

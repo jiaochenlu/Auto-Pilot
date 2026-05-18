@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -34,12 +36,115 @@ RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
 }
 
 
+def command_runtime(command: str, args: list[str], stdin_file: str | None = None) -> dict[str, Any]:
+    runtime: dict[str, Any] = {
+        "adapter": "command",
+        "command": command,
+        "args": args,
+    }
+    if stdin_file:
+        runtime["stdin_file"] = stdin_file
+    return runtime
+
+
+def existing_file(path: str | Path | None) -> str | None:
+    if not path:
+        return None
+    candidate = Path(path)
+    return str(candidate) if candidate.exists() and candidate.is_file() else None
+
+
+def first_existing(paths: list[str | Path]) -> str | None:
+    for path in paths:
+        found = existing_file(path)
+        if found:
+            return found
+    return None
+
+
+def detect_claude_command() -> str | None:
+    found = shutil.which("claude") or shutil.which("claude.exe") or shutil.which("claude.cmd")
+    if found:
+        return found
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        return None
+    return first_existing(
+        [
+            Path(appdata) / "npm" / "claude.cmd",
+            Path(appdata) / "npm" / "claude.exe",
+            Path(appdata) / "npm" / "node_modules" / "@anthropic-ai" / "claude-code" / "bin" / "claude.exe",
+        ]
+    )
+
+
+def detect_codex_command() -> str | None:
+    found = shutil.which("codex") or shutil.which("codex.exe") or shutil.which("codex.cmd")
+    if found:
+        return found
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        return None
+    npm = Path(appdata) / "npm"
+    direct = first_existing([npm / "codex.cmd", npm / "codex.exe"])
+    if direct:
+        return direct
+    vendor_root = npm / "node_modules" / "@openai" / "codex"
+    if not vendor_root.exists():
+        return None
+    for candidate in vendor_root.rglob("codex.exe"):
+        return str(candidate)
+    return None
+
+
+def detect_copilot_command() -> str | None:
+    return shutil.which("gh") or shutil.which("gh.exe") or shutil.which("gh.cmd")
+
+
+def detect_runtime_definitions() -> dict[str, dict[str, Any]]:
+    detected: dict[str, dict[str, Any]] = {}
+    claude = detect_claude_command()
+    if claude:
+        detected["claude-code"] = command_runtime(
+            claude,
+            ["--print", "--permission-mode", "acceptEdits"],
+            stdin_file="{prompt_file}",
+        )
+    codex = detect_codex_command()
+    if codex:
+        detected["codex"] = command_runtime(
+            codex,
+            ["exec", "--skip-git-repo-check", "--sandbox", "workspace-write", "-"],
+            stdin_file="{prompt_file}",
+        )
+    copilot = detect_copilot_command()
+    if copilot:
+        detected["copilot"] = command_runtime(copilot, ["copilot", "suggest", "--file", "{prompt_file}"])
+    return detected
+
+
 def save_config(root: Path, config: dict[str, Any]) -> None:
     write_json(config_path(root), config)
 
 
 def list_runtimes(root: Path) -> dict[str, Any]:
     return load_config(root)
+
+
+def detect_runtimes(root: Path, replace: bool = False) -> dict[str, Any]:
+    config = load_config(root)
+    runtimes = config.setdefault("runtimes", {})
+    detected = detect_runtime_definitions()
+    installed: list[str] = []
+    skipped: list[str] = []
+    for name, runtime in detected.items():
+        if name in runtimes and not replace:
+            skipped.append(name)
+            continue
+        runtimes[name] = runtime
+        installed.append(name)
+    save_config(root, config)
+    return {"config": config, "detected": detected, "installed": installed, "skipped": skipped}
 
 
 def add_command_runtime(

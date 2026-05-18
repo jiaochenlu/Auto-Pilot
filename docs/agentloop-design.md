@@ -1,5 +1,7 @@
 # AgentLoop Local Orchestrator Design
 
+User-facing CLI instructions are maintained in [AgentLoop User Guide](agentloop-user-guide.md).
+
 ## 1. Background
 
 AgentLoop is a local, standalone agent orchestration capability. It is inspired by Mars-style task, session, and role orchestration, but it must not depend on Mars, Mars MCP, or any Mars runtime.
