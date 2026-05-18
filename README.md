@@ -12,6 +12,12 @@ It is agent-agnostic. You can use Claude Code, Codex, GitHub Copilot CLI, or a m
 
 **Runtime == Coding agent run**
 
+## Capability Map
+
+![AutoPilot AgentLoop capability map](docs/assets/autopilot-capability-map.png)
+
+AgentLoop keeps orchestration local: task state, runtime config, generated artifacts, review decisions, and iteration history all stay in `.agentloop/`.
+
 ## Quick Start
 
 Run these commands from the repository root.
@@ -172,4 +178,6 @@ python -m agentloop tasks delete-all
 ## Full Documentation
 
 See [docs/agentloop-user-guide.md](docs/agentloop-user-guide.md) for the complete user guide, including runtime presets, per-task overrides, task locks, batch operations, and the detailed lifecycle.
+
+
 
