@@ -1,0 +1,6 @@
+Final report written to `.agentloop/tasks/20260518-093703-agentloop/artifacts/final-report.md`.
+
+**Summary**
+- Review: **APPROVED**, 0 medium/high comments, all 13 ACs passed.
+- Delivered: per-task `state.json` as source of truth, multi-task concurrency, per-task file locks, `--task-id` selectors with single-active fallback, per-task `config.json` with documented precedence, `tasks` CLI subgroup with batch `approve/cancel/run` and `config show/set/unset/clear`, lazy migration, docs §23.
+- **One pre-merge action**: run `python -m pytest tests/test_multitask.py -v` locally — the harness blocked pytest in both tester and reviewer turns, so ACs were verified by code inspection rather than a live green run.

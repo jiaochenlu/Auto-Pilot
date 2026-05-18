@@ -1,0 +1,10 @@
+Wrote analysis, acceptance.md, and acceptance.json under `.agentloop/tasks/20260518-093703-agentloop/artifacts/`.
+
+Key shape of the proposal:
+- **Lifecycle refactor (AC-1..4):** make per-task `state.json` the source of truth, drop the "one active task" gate, add `--task-id` to all lifecycle commands with a single-active fallback.
+- **Concurrency (AC-5..6):** per-task lock file + namespace test runs under `.agentloop/runs/<task_id>/<iteration>/` to fix the existing race in `runner.py`.
+- **Per-task config (AC-7..8):** new `.agentloop/tasks/<id>/config.json` overrides on top of global config, with a CLI to set/show.
+- **Batch ops (AC-9..10):** `--all` / `--status` / repeated `--task-id` for both lifecycle and config; per-task failures don't abort the batch.
+- **Migration + docs (AC-11..12):** keep existing workspaces working.
+
+Two open questions worth answering before approval — they affect scope: (Q3) which config fields should be per-task overridable, and (Q7) all-in-one delivery vs. staged. Please review and then run `python -m agentloop approve`.

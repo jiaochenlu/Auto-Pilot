@@ -1,0 +1,11 @@
+Review written: **APPROVED** — `.agentloop/tasks/20260518-093703-agentloop/artifacts/review-001.json`.
+
+All 13 acceptance criteria verified by code + artifact inspection:
+- Per-task state authoritative; global state.json reduced to a backwards-compatible mirror/pointer (AC-1, AC-12).
+- Multi-task concurrent `start`, explicit `--task-id`/positional selectors, and single/many resolver semantics (AC-2/3/4).
+- `runs/<task_id>/<iteration>/` namespacing in `runner.run_test_commands` + `adapters.run_role`; per-task locks via `O_CREAT|O_EXCL` with PID liveness and stale reclaim (AC-5/6).
+- Per-task `config.json` overlay with documented precedence covering `test_commands`, `max_iterations`, `default_runtime`, `roles.<role>.runtime` (AC-7/8).
+- Batch `approve`/`cancel`/`run` and `config set/unset/clear` with `--task-id`/`--all`/`--status` selectors, isolating per-task failures (AC-9/10).
+- `docs/agentloop-design.md` §23 covers storage, concurrency, precedence, and the full CLI surface (AC-11).
+
+One low-severity note: pytest could not be executed inside the harness, so the suite is verified by inspection rather than a live green run — requester should run `python -m pytest tests/test_multitask.py -v` before merge. `open_medium_high_count = 0`.
