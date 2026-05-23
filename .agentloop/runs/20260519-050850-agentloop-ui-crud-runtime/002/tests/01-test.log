@@ -1,0 +1,19 @@
+COMMAND
+python -m unittest discover -s tests
+
+STDOUT
+
+
+STDERR
+.....................................................127.0.0.1 - "GET / HTTP/1.1" 200 -
+127.0.0.1 - "POST /api/tasks HTTP/1.1" 201 -
+127.0.0.1 - "GET /api/tasks HTTP/1.1" 200 -
+127.0.0.1 - "PATCH /api/tasks/20260519-054121-manage-ui-tasks/config HTTP/1.1" 200 -
+127.0.0.1 - "DELETE /api/tasks/20260519-054121-manage-ui-tasks HTTP/1.1" 400 -
+127.0.0.1 - "DELETE /api/tasks/20260519-054121-manage-ui-tasks HTTP/1.1" 200 -
+.....
+----------------------------------------------------------------------
+Ran 58 tests in 21.389s
+
+OK
+

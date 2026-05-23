@@ -105,6 +105,29 @@ class PhaseTwoCliTests(unittest.TestCase):
             self.assertEqual(state["acceptance_criteria"][0]["id"], "AC-CUSTOM")
             self.assertEqual(state["acceptance_criteria"][0]["description"], "doctor reports PASS and FAIL checks")
 
+    def test_start_marks_performance_regression_as_automated_test(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with redirect_stdout(io.StringIO()):
+                main(["--root", str(root), "init"])
+                exit_code = main(
+                    [
+                        "--root",
+                        str(root),
+                        "start",
+                        "Fix the performance regression in tests/test_loop/duplicate_transactions.py. The function produces correct results but is too slow on large inputs.",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            state = json.loads((root / ".agentloop" / "state.json").read_text(encoding="utf-8"))
+            verifications = {item["verification"] for item in state["acceptance_criteria"]}
+            self.assertIn("automated_test", verifications)
+
+            analyst_prompt = (root / ".agentloop" / "prompts" / "analyst.md").read_text(encoding="utf-8")
+            self.assertIn("Verification Plan", analyst_prompt)
+            self.assertIn("regression test file or command", analyst_prompt)
+
     def test_approve_requires_waiting_for_alignment(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

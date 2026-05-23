@@ -1,0 +1,7 @@
+已完成设计文档，写入指定路径：
+
+[design.md](</Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/design.md>)
+
+文档已更新为 **Iteration 2**，基于当前已落地的 `AgentLoop Task Console` 架构继续设计，重点明确了下一步需要闭合的 AC-9：测试 runtime 返回需要结构化展示 `command`、`exit_code`、`duration_ms` 和 bounded log content。
+
+我也确认了没有写到 `.agentloop/artifacts/`，目标文件存在且路径正确。

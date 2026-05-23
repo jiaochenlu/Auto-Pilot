@@ -1,0 +1,22 @@
+{
+  "roles": {
+    "analyst": {
+      "runtime": "claude-code"
+    },
+    "architect": {
+      "runtime": "claude-code"
+    },
+    "implementer": {
+      "runtime": "claude-code"
+    },
+    "tester": {
+      "runtime": "codex"
+    },
+    "reviewer": {
+      "runtime": "claude-code"
+    },
+    "integrator": {
+      "runtime": "codex"
+    }
+  }
+}

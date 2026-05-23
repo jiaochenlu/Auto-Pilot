@@ -1,0 +1,96 @@
+{
+  "decision": "CHANGES_REQUIRED",
+  "summary": "The AgentLoop Task Console implementation covers task CRUD, task list/detail data, lifecycle actions, config updates, artifacts, and agent runtime logs, with focused and full test suites passing. One required acceptance criterion remains unmet: local test command output is surfaced only as bounded log content, not as structured command, exit code, and duration fields required by AC-9.",
+  "open_medium_high_count": 1,
+  "comments": [
+    {
+      "id": "R-1",
+      "severity": "medium",
+      "area": "runtime-test-output",
+      "text": "AC-9 requires the UI to show local test command output including command, exit code, duration, and log content. latest_runtime_summary currently returns each test as {name, log} from .agentloop/runs/<task_id>/<iteration>/tests/*.log, and renderRuntime displays the log path/content only. The command may be embedded in the log text, but exit code and duration are not exposed or rendered for test logs.",
+      "required_action": "Expose structured test result metadata for the latest iteration, including command, exit_code, duration_ms, and bounded log content, and update UI rendering/tests to assert those fields.",
+      "status": "open",
+      "locations": [
+        "agentloop/api.py:198",
+        "agentloop/ui_static/app.js:158",
+        "agentloop/runner.py:47"
+      ]
+    }
+  ],
+  "acceptance_results": [
+    {
+      "criteria_id": "AC-1",
+      "status": "passed",
+      "evidence": "Functional tests cover task list data, current-task marking, malformed task handling, and HTTP GET /api/tasks; source review confirms list renders id, title, status, phase, iteration progress, updated time, and current marker."
+    },
+    {
+      "criteria_id": "AC-2",
+      "status": "passed",
+      "evidence": "test_create_task_uses_workflow_artifacts and HTTP integration test verify POST /api/tasks creates a task through start_task and produces analysis.md, acceptance.md, and acceptance.json."
+    },
+    {
+      "criteria_id": "AC-3",
+      "status": "passed",
+      "evidence": "build_task_detail returns title/request, status, current phase, iteration/max_iterations, approval flag, phases, acceptance criteria, artifacts, config, actions, runtime, and errors; source review confirms UI detail tabs render these sections."
+    },
+    {
+      "criteria_id": "AC-4",
+      "status": "passed",
+      "evidence": "test_patch_config_and_delete_task and HTTP integration test verify max_iterations and test_commands persist to per-task config.json through validation-backed config patching."
+    },
+    {
+      "criteria_id": "AC-5",
+      "status": "passed",
+      "evidence": "test_patch_config_and_delete_task and HTTP integration test verify deletion requires exact confirmation, removes the task directory, and rejects incorrect confirmation."
+    },
+    {
+      "criteria_id": "AC-6",
+      "status": "passed",
+      "evidence": "test_actions_reflect_status verifies approve and run action availability changes by task status; source review confirms approve, run, cancel, delete, and config actions include enabled/reason states and lock handling."
+    },
+    {
+      "criteria_id": "AC-7",
+      "status": "passed",
+      "evidence": "Lifecycle mutation endpoints return fresh task detail, and the UI reloads task list/detail after approve/run/cancel; tests cover action state transition after approve."
+    },
+    {
+      "criteria_id": "AC-8",
+      "status": "passed",
+      "evidence": "test_detail_includes_artifacts_runtime_and_test_logs verifies latest runtime iteration and agent stdout content; source review confirms role, runtime, command, exit_code, duration_ms, artifacts, stdout, and stderr are returned and rendered for agent runtime entries."
+    },
+    {
+      "criteria_id": "AC-9",
+      "status": "failed",
+      "evidence": "The implementation reads latest test log files and displays bounded log content, but does not return or render structured command, exit_code, or duration_ms for local test commands. Existing tests only assert command text embedded in the log content."
+    },
+    {
+      "criteria_id": "AC-10",
+      "status": "passed",
+      "evidence": "Malformed state handling is tested; bounded_text caps artifact/log reads; missing agent logs return clear missing/error payloads; artifact paths are constrained."
+    },
+    {
+      "criteria_id": "AC-11",
+      "status": "passed",
+      "evidence": "tests/test_ui_api.py uses TemporaryDirectory workspaces and the executed focused suite passed with exit_code 0."
+    },
+    {
+      "criteria_id": "AC-12",
+      "status": "passed",
+      "evidence": "Manual source review of index.html/app.js/styles.css confirms the first screen is a task-management console with CRUD, lifecycle, progress, config, artifacts, and runtime output controls rather than a marketing page."
+    }
+  ],
+  "test_results": [
+    {
+      "command": "python -m unittest tests.test_ui_api -v",
+      "exit_code": 0,
+      "duration_ms": 2057,
+      "summary": "Ran 6 tests; OK. Covered UI/API task list, creation, detail runtime/log data, config patching, deletion, action states, and HTTP/static endpoints."
+    },
+    {
+      "command": "python -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "duration_ms": 24172,
+      "summary": "Ran 56 tests; OK. Full repository test suite passed."
+    }
+  ]
+}

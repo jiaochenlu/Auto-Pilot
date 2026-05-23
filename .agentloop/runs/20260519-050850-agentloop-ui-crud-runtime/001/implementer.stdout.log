@@ -1,0 +1,23 @@
+已实现 AgentLoop 本地任务管理 UI，并已启动服务：
+
+`http://127.0.0.1:8765`
+
+主要改动：
+
+- 新增 JSON API/view-model 层：[api.py](C:/Users/chenlujiao/OneDrive%20-%20Microsoft/Documents/AutoPilot/agentloop/api.py)
+- 新增安全日志/artifact 读取：[logs.py](C:/Users/chenlujiao/OneDrive%20-%20Microsoft/Documents/AutoPilot/agentloop/logs.py)
+- 新增本地 HTTP UI server：[ui.py](C:/Users/chenlujiao/OneDrive%20-%20Microsoft/Documents/AutoPilot/agentloop/ui.py)
+- 新增静态任务控制台：[ui_static](C:/Users/chenlujiao/OneDrive%20-%20Microsoft/Documents/AutoPilot/agentloop/ui_static)
+- `python -m agentloop ui --host 127.0.0.1 --port 8765 --open` CLI 已接入：[cli.py](C:/Users/chenlujiao/OneDrive%20-%20Microsoft/Documents/AutoPilot/agentloop/cli.py)
+- 新增原子化 per-task config patch helper：[tasks.py](C:/Users/chenlujiao/OneDrive%20-%20Microsoft/Documents/AutoPilot/agentloop/tasks.py)
+- 新增 API 测试：[test_ui_api.py](C:/Users/chenlujiao/OneDrive%20-%20Microsoft/Documents/AutoPilot/tests/test_ui_api.py)
+
+功能覆盖：任务列表、创建任务、详情查看、artifact 预览、`max_iterations`/`test_commands` 配置更新、删除确认、approve/run/cancel 生命周期动作、runtime stdout/stderr 和测试日志展示。
+
+验证结果：
+
+- `python -m unittest tests.test_ui_api`：通过
+- `python -m unittest discover -s tests`：55 个测试通过
+- HTTP smoke：`/api/tasks` 和首页 HTML 均能正常返回
+
+工作区说明：运行验证时生成/更新了 `__pycache__` 文件；当前命令策略阻止了清理删除命令，所以这些缓存文件仍显示在 `git status` 中。

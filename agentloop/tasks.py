@@ -174,6 +174,16 @@ def save_task_config(root: Path, task_id: str, config: dict[str, Any]) -> None:
         path.unlink()
 
 
+def save_task_config_patch(root: Path, task_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    """Atomically merge and validate a top-level per-task config patch."""
+
+    override = load_task_config(root, task_id)
+    merged = {**override, **patch}
+    _validate_patch(merged, load_config(root))
+    save_task_config(root, task_id, merged)
+    return merged
+
+
 def clear_task_config(root: Path, task_id: str) -> None:
     path = task_config_path(root, task_id)
     if path.exists():

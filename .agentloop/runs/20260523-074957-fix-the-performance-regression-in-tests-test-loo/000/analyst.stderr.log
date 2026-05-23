@@ -1,0 +1,796 @@
+OpenAI Codex v0.130.0
+--------
+workdir: C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+model: gpt-5.5
+provider: agent-maestro
+approval: never
+sandbox: workspace-write [workdir, C:\Users\chenlujiao\.codex\memories]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e53cf-f3df-7c81-9e67-63388c4fc63a
+--------
+user
+# Analyst Prompt
+
+Task request:
+Fix the performance regression in tests/test_loop/duplicate_transactions.py.
+
+The function find_duplicate_transaction_ids currently produces correct results but is too slow on large inputs.
+
+Analyze this specific task. Do not use generic AgentLoop acceptance criteria unless they are directly required by the task.
+
+Required outputs:
+- Write task-specific analysis to `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md`. Include goal, non-goals, assumptions, risks, and open questions.
+- Include a `Verification Plan` section in the analysis. For bug, regression, performance, or code-change tasks, name the focused tests or test files that should prove the fix.
+- Write human-readable task-specific acceptance criteria to `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md`.
+- Write structured acceptance criteria JSON to `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json`.
+
+The JSON must be an object with `acceptance_criteria`, an array of objects containing: id, description, verification, required, status, evidence. Use status `pending`.
+For bug, regression, performance, slow, timeout, or code-change tasks, include at least one required criterion with verification `automated_test`; its evidence should name the expected regression test file or command.
+Stop after producing these files; execution starts only after requester approval.
+
+2026-05-23T07:50:06.021280Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Client(HttpRequest(HttpRequest("http/request failed: error sending request for url (http://127.0.0.1:3737/mcp)")))
+codex
+I’ll inspect the target test file and surrounding repo structure, then write only the requested analysis and acceptance artifacts. No implementation or test execution beyond lightweight reads.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw -LiteralPath 'tests/test_loop/duplicate_transactions.py'" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-ChildItem -Force -LiteralPath '.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts'" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'rg -n "find_duplicate_transaction_ids|duplicate_transactions" .' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1104ms:
+"""Small performance-regression exercise for agentloop testing."""
+
+
+def find_duplicate_transaction_ids(transactions):
+    """Return IDs for transactions that share the same account, merchant, and amount.
+
+    The result must preserve the original input order. A transaction is considered
+    a duplicate when at least one other transaction has the same duplicate key.
+    """
+    duplicate_ids = []
+
+    for index, transaction in enumerate(transactions):
+        key = _duplicate_key(transaction)
+        has_match = False
+
+        for other_index, other in enumerate(transactions):
+            if index == other_index:
+                continue
+            if _duplicate_key(other) == key:
+                has_match = True
+                break
+
+        if has_match:
+            duplicate_ids.append(transaction["transaction_id"])
+
+    return duplicate_ids
+
+
+def _duplicate_key(transaction):
+    return (
+        transaction["account_id"],
+        transaction["merchant"],
+        transaction["amount_cents"],
+    )
+
+
+ succeeded in 1130ms:
+2026-05-23T07:50:14.608793Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.5 seconds
+Output:
+[31;1mrg: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m [36;1mrg[0m -n "find_duplicate_transaction_ids|duplicate_transactions" .[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m ~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mThe term 'rg' is not recognized as a name of a cmdlet, function, script file, or executable program.[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1mCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.[0m
+
+ exited 1 in 1522ms:
+[31;1mrg: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m [36;1mrg[0m -n "find_duplicate_transaction_ids|duplicate_transactions" .[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m ~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mThe term 'rg' is not recognized as a name of a cmdlet, function, script file, or executable program.[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1mCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.[0m
+
+codex
+The target function is a quadratic duplicate scan: it recomputes the key for each pair, which explains the large-input slowdown. I’m checking whether there are existing focused tests so the verification plan names concrete files or commands.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch '"'\\\\.git\\\\' } | Select-String -Pattern 'find_duplicate_transaction_ids|duplicate_transactions' -List | ForEach-Object { "'$_.Path }' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-ChildItem -Recurse -File -LiteralPath 'tests' | Select-Object -ExpandProperty FullName" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'Get-ChildItem -Force' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1221ms:
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_adapters.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_multitask.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_phase1.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_phase2.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_phase3.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_quality.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_runtime_cli.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_ui_api.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_verify.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_loop\duplicate_transactions.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_loop\__pycache__\duplicate_transactions.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_loop\__pycache__\test_duplicate_transactions.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_adapters.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_multitask.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_phase1.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_phase2.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_phase3.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_quality.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_runtime_cli.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_ui_api.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_verify.cpython-311.pyc
+
+ succeeded in 1226ms:
+
+    Directory: C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+
+[32;1mMode   [0m[32;1m              LastWriteTime[0m [32;1;3m        Length[0m[32;1m Name[0m
+[32;1m----   [0m [32;1m             -------------[0m [32;1m        ------[0m [32;1m----[0m
+l-r--           5/23/2026  3:32 PM                [44;1m.agentloop[0m
+l-rh-           5/21/2026  1:50 PM                [44;1m.git[0m
+l-r--           5/21/2026  5:27 PM                [44;1magentloop[0m
+l-r--           5/18/2026  6:36 PM                [44;1mdocs[0m
+l-r--           5/23/2026  3:06 PM                [44;1mtests[0m
+la---           5/18/2026  6:36 PM           5370 README.md
+
+
+ succeeded in 1695ms:
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\analyst.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_phase2.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_loop\duplicate_transactions.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_loop\__pycache__\duplicate_transactions.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_loop\__pycache__\test_duplicate_transactions.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_phase2.cpython-311.pyc
+
+codex
+There are no visible source tests in `tests/test_loop` besides the helper module, but bytecode indicates a focused `test_duplicate_transactions` may have existed or been generated before. I’ll name the expected focused pytest path/command in the artifacts and keep the criteria tied to this function’s behavior and performance.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-ChildItem -Recurse -File -LiteralPath '.agentloop/tasks' -Filter 'acceptance.json' | Select-Object -First 5 -ExpandProperty FullName" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-ChildItem -Recurse -File -LiteralPath '.agentloop/tasks' -Filter 'analysis.md' | Select-Object -First 5 -ExpandProperty FullName" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1225ms:
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\artifacts\acceptance.json
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260519-050850-agentloop-ui-crud-runtime\artifacts\acceptance.json
+
+ succeeded in 1251ms:
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\artifacts\analysis.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260519-050850-agentloop-ui-crud-runtime\artifacts\analysis.md
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw -LiteralPath '.agentloop/tasks/20260518-093703-agentloop/artifacts/analysis.md'" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw -LiteralPath '.agentloop/tasks/20260518-093703-agentloop/artifacts/acceptance.json'" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw -LiteralPath '.agentloop/tasks/20260518-093703-agentloop/artifacts/acceptance.md'" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1266ms:
+# Task Analysis
+
+## Raw Request
+
+重新审视一下当前 agentloop 的任务的生命周期管理，考虑多多任务并发的情况，实现更好的单任务配置和单任务管理，也允许用户进行批量配置和批量管理。
+
+## Current Behavior (as observed in code)
+
+- Single active task. `agentloop/workspace.py` keeps one global `.agentloop/state.json`; `start_task` refuses unless status is in `{CREATED, CANCELLED, DONE}` (`workflow.py:411`). Only one task can be in `WAITING_FOR_ALIGNMENT / DESIGNING / ... / REVIEWING` at any moment.
+- Task lifecycle commands (`start`, `approve`, `cancel`, `run`) all act on the implicit current task — none of them accept a `task_id`.
+- Per-task artifacts already live in `.agentloop/tasks/<task_id>/artifacts/` and a per-task `state.json` snapshot is written on save (`workspace.save_state`), so per-task storage is partly in place but not the source of truth.
+- Configuration is global only. `.agentloop/config.json` holds one `runtimes`/`roles`/`test_commands`/`max_iterations` set shared by every task. There is no per-task override.
+- `agentloop tasks list/delete/delete-all` exists for inventory, but batch operations on lifecycle (start/approve/cancel/run several at once) or batch config edits do not exist.
+- `run_one_iteration` mutates the global state file, so two concurrent runs would race on `.agentloop/state.json` and on the un-namespaced `.agentloop/runs/<iteration>/tests/` directory (`runner.py:13`).
+
+## Goal
+
+Redesign the task lifecycle so multiple AgentLoop tasks can coexist and progress independently, with first-class per-task configuration and management, plus batch operations layered on top.
+
+Concretely:
+
+1. Make the per-task directory the source of truth for state; remove the "one active task" constraint.
+2. Add a per-task config layer (overrides on runtimes/roles/test_commands/max_iterations) that falls back to global defaults.
+3. Make every lifecycle CLI command address tasks by `task_id` (with a sensible default when there is exactly one active task, for backwards compatibility).
+4. Support safe concurrent execution of `run` for different tasks (per-task lock; per-task `runs/` namespace).
+5. Add batch commands for both management (`tasks approve|cancel|run --all|--filter`) and configuration (`tasks config set ...`, `--all` / multi-id).
+
+## Non-Goals
+
+- Distributed execution or running tasks on remote machines.
+- A new GUI or web dashboard.
+- Rewriting the runtime adapters (`adapters.py`) or the review-gate logic (`quality.py`).
+- Changing artifact schemas (`acceptance.json`, review JSON) or the phase model.
+- Cross-task dependency graphs / task chaining.
+
+## Assumptions
+
+- Existing single-task workspaces must keep working: after upgrade, `agentloop status / approve / run` with no `task_id` should still target the existing task if there is exactly one active one.
+- Concurrency is in-process and same-machine (Python threads or separate `agentloop run <id>` processes), not a job queue.
+- Per-task locks can be file-based under `.agentloop/locks/<task_id>.lock`; the directory is already created by `ensure_workspace`.
+- Manual runtime stays the default; nothing here forces a real coding agent.
+- Acceptable to deprecate (but not yet remove) the implicit "current task" pointer in `.agentloop/state.json`; we can keep it as a convenience pointer.
+
+## Risks
+
+- **State migration.** Existing workspaces have data in the global `state.json` but possibly no per-task snapshot for older tasks. Need a one-shot migration path or a tolerant loader.
+- **Race conditions.** Two `run` invocations on the same task must not interleave phase writes; locks must be acquired before any state mutation, not just at the CLI boundary.
+- **Test command isolation.** `runner.run_test_commands` writes to `.agentloop/runs/<iteration>/tests/`, which collides across tasks. Needs `.agentloop/runs/<task_id>/<iteration>/`.
+- **Config precedence confusion.** Per-task overrides plus global defaults plus role-level runtime assignment is three layers; needs a clearly documented merge order to avoid surprising users.
+- **Batch blast radius.** `tasks run --all` or `tasks cancel --all` are destructive-feeling; need dry-run / confirmation, and per-task failures must not abort the whole batch.
+- **CLI compatibility.** Changing argument shapes (e.g. requiring `task_id`) breaks scripts. Prefer additive flags with a single-active-task fallback.
+
+## Open Questions
+
+1. **Default active task.** When only one task is active, should bare `agentloop run` keep working, or should we always require `--task-id` / a `agentloop use <id>` selector?
+2. **Concurrency model.** Is the expectation that users launch multiple `agentloop run <id>` processes themselves, or do we want a built-in `agentloop tasks run --all --parallel N` that spawns workers?
+3. **Per-task config surface.** Which fields should be per-task overridable — just `test_commands` and `max_iterations`, or also `roles` runtime assignment and `default_runtime`?
+4. **Batch filter language.** For batch ops, is filtering by status (`--status WAITING_FOR_ALIGNMENT`) enough, or do we need tag/label support on tasks?
+5. **Migration.** Should the first `agentloop` invocation after upgrade auto-migrate the global `state.json` into the matching per-task directory, or require an explicit `agentloop tasks migrate`?
+6. **Lock semantics.** If a lock file is stale (process crashed), do we auto-break it, require `--force`, or expose `agentloop tasks unlock <id>`?
+7. **Scope of this task.** Does the requester want all of: lifecycle refactor + per-task config + batch ops in one shot, or should we land them in stages (and if staged, which stage first)?
+
+
+ succeeded in 1267ms:
+{
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "description": "Per-task state is the source of truth: .agentloop/tasks/<task_id>/state.json is read/written directly by all lifecycle operations; the global .agentloop/state.json no longer gates whether a new task can be started.",
+      "verification": "functional_review",
+      "required": true,
+      "status": "pending",
+      "evidence": "code inspection of workspace.py and workflow.start_task"
+    },
+    {
+      "id": "AC-2",
+      "description": "agentloop start can be invoked while another task is in any non-terminal state (e.g. WAITING_FOR_ALIGNMENT or DESIGNING); the new task is created without error and both tasks appear in agentloop tasks list with their independent statuses.",
+      "verification": "automated_test",
+      "required": true,
+      "status": "pending",
+      "evidence": "pytest covering two-concurrent-starts scenario"
+    },
+    {
+      "id": "AC-3",
+      "description": "Lifecycle commands accept a --task-id <id> (or positional <id>) selector for agentloop approve, cancel, run, status, and act on that task only, regardless of which task is current.",
+      "verification": "automated_test",
+      "required": true,
+      "status": "pending",
+      "evidence": "pytest covering each command with explicit task_id"
+    },
+    {
+      "id": "AC-4",
+      "description": "When exactly one task is active, lifecycle commands without --task-id keep working against that task (backwards compatibility); when zero or multiple are active, the CLI errors with a message that lists candidate task_ids.",
+      "verification": "automated_test",
+      "required": true,
+      "status": "pending",
+      "evidence": "pytest for zero/one/many active-task cases"
+    },
+    {
+      "id": "AC-5",
+      "description": "Two agentloop run invocations against different task_ids can execute without corrupting each other's state.json, artifacts, or runs/ logs. Test command output is namespaced under .agentloop/runs/<task_id>/<iteration>/.",
+      "verification": "automated_test",
+      "required": true,
+      "status": "pending",
+      "evidence": "pytest spawning two concurrent runs against manual runtime"
+    },
+    {
+      "id": "AC-6",
+      "description": "A per-task lock prevents two concurrent run invocations on the same task_id from interleaving; the second invocation either waits or fails fast with a clear 'task is locked by pid X' error.",
+      "verification": "automated_test",
+      "required": true,
+      "status": "pending",
+      "evidence": "pytest acquiring lock then attempting second run"
+    },
+    {
+      "id": "AC-7",
+      "description": "Per-task config overrides exist: .agentloop/tasks/<task_id>/config.json may override test_commands, max_iterations, and role->runtime assignments. Merge order is documented: per-task override > global config > built-in default.",
+      "verification": "functional_review",
+      "required": true,
+      "status": "pending",
+      "evidence": "code and docs for per-task config loader"
+    },
+    {
+      "id": "AC-8",
+      "description": "A CLI surface for single-task configuration exists (e.g. agentloop tasks config set/show <task_id>), and changes are reflected on the next agentloop run <task_id>.",
+      "verification": "automated_test",
+      "required": true,
+      "status": "pending",
+      "evidence": "pytest setting a per-task override and observing effect"
+    },
+    {
+      "id": "AC-9",
+      "description": "Batch lifecycle commands exist for at least approve, cancel, run. They accept explicit ids (--task-id repeatable), --all, or --status filtering. Per-task failures are reported individually and do not abort the remaining batch.",
+      "verification": "automated_test",
+      "required": true,
+      "status": "pending",
+      "evidence": "pytest covering batch with one failing task"
+    },
+    {
+      "id": "AC-10",
+      "description": "Batch configuration commands exist: a single tasks config set invocation can target multiple task_ids (--task-id repeated, --all, or --status) and apply the same override to each.",
+      "verification": "automated_test",
+      "required": true,
+      "status": "pending",
+      "evidence": "pytest applying override to multiple tasks"
+    },
+    {
+      "id": "AC-11",
+      "description": "Documentation (docs/agentloop-design.md or a new doc) is updated to describe the new multi-task lifecycle, per-task config precedence, batch operations, and concurrency/locking model.",
+      "verification": "functional_review",
+      "required": true,
+      "status": "pending",
+      "evidence": "doc diff review"
+    },
+    {
+      "id": "AC-12",
+      "description": "Existing single-task workspaces continue to work after upgrade: either via automatic migration on first command, or via a documented agentloop tasks migrate command. No data loss for the existing task.",
+      "verification": "functional_review",
+      "required": true,
+      "status": "pending",
+      "evidence": "manual upgrade walkthrough on a sample workspace"
+    },
+    {
+      "id": "AC-13",
+      "description": "Requester reviews and approves the task-specific analysis and acceptance criteria before execution starts.",
+      "verification": "human_review",
+      "required": true,
+      "status": "pending",
+      "evidence": ".agentloop/tasks/20260518-093703-agentloop/artifacts/analysis.md"
+    }
+  ]
+}
+
+
+ succeeded in 1298ms:
+# Acceptance Criteria
+
+## Task
+
+重新审视 agentloop 任务生命周期管理，支持多任务并发、单任务级别的配置/管理，以及批量配置/管理。
+
+## Draft Criteria
+
+| ID | Required | Verification | Criterion | Status | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| AC-1 | yes | functional_review | Per-task state is the source of truth: `.agentloop/tasks/<task_id>/state.json` is read/written directly by all lifecycle operations; the global `.agentloop/state.json` no longer gates whether a new task can be started. | pending | code inspection of workspace.py + workflow.start_task |
+| AC-2 | yes | automated_test | `agentloop start` can be invoked while another task is in any non-terminal state (e.g. `WAITING_FOR_ALIGNMENT` or `DESIGNING`); the new task is created without error and both tasks appear in `agentloop tasks list` with their independent statuses. | pending | new pytest covering two-concurrent-starts scenario |
+| AC-3 | yes | automated_test | Lifecycle commands accept a `--task-id <id>` (or positional `<id>`) selector — `agentloop approve`, `agentloop cancel`, `agentloop run`, `agentloop status` — and act on that task only, regardless of which task is the "current" one. | pending | pytest covering each command with explicit task_id |
+| AC-4 | yes | automated_test | When exactly one task is active, lifecycle commands without `--task-id` keep working against that task (backwards compatibility); when zero or multiple are active, the CLI errors with a message that lists candidate task_ids. | pending | pytest for zero/one/many active-task cases |
+| AC-5 | yes | automated_test | Two `agentloop run <task_id_a>` and `agentloop run <task_id_b>` invocations against different tasks can execute without corrupting each other's `state.json`, artifacts, or `runs/` logs. Test command output is namespaced under `.agentloop/runs/<task_id>/<iteration>/`. | pending | pytest spawning two concurrent runs against manual runtime |
+| AC-6 | yes | automated_test | A per-task lock prevents two concurrent `run` invocations on the same `task_id` from interleaving; the second invocation either waits or fails fast with a clear "task is locked by pid X" error. | pending | pytest acquiring lock then attempting second run |
+| AC-7 | yes | functional_review | Per-task config overrides exist: `.agentloop/tasks/<task_id>/config.json` (or equivalent) may override `test_commands`, `max_iterations`, and role→runtime assignments. Merge order is documented: per-task override > global config > built-in default. | pending | code + docs for per-task config loader |
+| AC-8 | yes | automated_test | A CLI surface for single-task configuration exists, e.g. `agentloop tasks config set <task_id> <key> <value>` and `agentloop tasks config show <task_id>`, and changes are reflected on the next `agentloop run <task_id>`. | pending | pytest setting a per-task override and observing effect |
+| AC-9 | yes | automated_test | Batch lifecycle commands exist for at least: approve, cancel, run. They accept either explicit ids (`--task-id` repeatable), `--all`, or `--status <STATUS>` filtering. Per-task failures are reported individually and do not abort the remaining batch. | pending | pytest covering batch with one failing task |
+| AC-10 | yes | automated_test | Batch configuration commands exist: a single `tasks config set` invocation can target multiple task_ids (`--task-id` repeated, `--all`, or `--status`) and apply the same override to each. | pending | pytest applying override to multiple tasks |
+| AC-11 | yes | functional_review | Documentation (`docs/agentloop-design.md` or a new doc) is updated to describe the new multi-task lifecycle, per-task config precedence, batch operations, and concurrency/locking model. | pending | doc diff review |
+| AC-12 | yes | functional_review | Existing single-task workspaces continue to work after upgrade: either via automatic migration on first command, or via a documented `agentloop tasks migrate` command. No data loss for the existing task. | pending | manual upgrade walkthrough on a sample workspace |
+| AC-13 | yes | human_review | Requester reviews and approves the task-specific analysis and acceptance criteria before execution starts. | pending | .agentloop/tasks/20260518-093703-agentloop/artifacts/analysis.md |
+
+## Approval Instruction
+
+Review this file together with `.agentloop/tasks/20260518-093703-agentloop/artifacts/analysis.md`. The open questions there (especially Q3 on which config fields are per-task overridable, and Q7 on staged vs. single-shot delivery) materially affect the scope above — please respond to them at approval time so the criteria can be tightened or trimmed.
+
+If the scope is correct, run:
+
+```powershell
+python -m agentloop approve
+```
+
+
+codex
+I found the existing artifact style. I’m writing a narrower set now: this task is only about `find_duplicate_transaction_ids`, preserving duplicate semantics while removing the performance regression.
+apply patch
+patch: completed
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260523-074957-fix-the-performance-regression-in-tests-test-loo\artifacts\acceptance.json
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260523-074957-fix-the-performance-regression-in-tests-test-loo\artifacts\acceptance.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260523-074957-fix-the-performance-regression-in-tests-test-loo\artifacts\analysis.md
+diff --git a/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5f0a3b5740a609b4b90ccae74a1c364e1c212b90
+--- /dev/null
++++ b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json
+@@ -0,0 +1,52 @@
++{
++  "acceptance_criteria": [
++    {
++      "id": "AC-1",
++      "description": "find_duplicate_transaction_ids returns the same duplicate transaction IDs as the current implementation for representative inputs: no duplicates, one duplicate group, multiple duplicate groups, and duplicate groups where the first occurrence must be included.",
++      "verification": "automated_test",
++      "required": true,
++      "status": "pending",
++      "evidence": "python -m pytest tests/test_loop/test_duplicate_transactions.py"
++    },
++    {
++      "id": "AC-2",
++      "description": "Returned transaction IDs preserve original input order.",
++      "verification": "automated_test",
++      "required": true,
++      "status": "pending",
++      "evidence": "python -m pytest tests/test_loop/test_duplicate_transactions.py"
++    },
++    {
++      "id": "AC-3",
++      "description": "A large-input regression test proves the function handles many transactions without the previous nested-scan slowdown.",
++      "verification": "automated_test",
++      "required": true,
++      "status": "pending",
++      "evidence": "python -m pytest tests/test_loop/test_duplicate_transactions.py"
++    },
++    {
++      "id": "AC-4",
++      "description": "The implementation avoids the O(n^2) pairwise scan and uses a linear-time approach such as counting duplicate keys before filtering IDs in input order.",
++      "verification": "functional_review",
++      "required": true,
++      "status": "pending",
++      "evidence": "code review of tests/test_loop/duplicate_transactions.py"
++    },
++    {
++      "id": "AC-5",
++      "description": "The duplicate key remains exactly (account_id, merchant, amount_cents) and the function continues to expect the existing transaction dictionary shape.",
++      "verification": "functional_review",
++      "required": true,
++      "status": "pending",
++      "evidence": "code review of _duplicate_key usage in tests/test_loop/duplicate_transactions.py"
++    },
++    {
++      "id": "AC-6",
++      "description": "Requester reviews and approves this task-specific analysis and acceptance criteria before execution starts.",
++      "verification": "human_review",
++      "required": true,
++      "status": "pending",
++      "evidence": ".agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md"
++    }
++  ]
++}
+diff --git a/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6101b73ddc78cb6b6b2f3d53e134e1f3e836b58d
+--- /dev/null
++++ b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md
+@@ -0,0 +1,20 @@
++# Acceptance Criteria
++
++## Task
++
++Fix the performance regression in `tests/test_loop/duplicate_transactions.py` for `find_duplicate_transaction_ids`.
++
++## Criteria
++
++| ID | Required | Verification | Criterion | Status | Evidence |
++| --- | --- | --- | --- | --- | --- |
++| AC-1 | yes | automated_test | `find_duplicate_transaction_ids` returns the same duplicate transaction IDs as the current implementation for representative inputs: no duplicates, one duplicate group, multiple duplicate groups, and duplicate groups where the first occurrence must be included. | pending | `python -m pytest tests/test_loop/test_duplicate_transactions.py` |
++| AC-2 | yes | automated_test | Returned transaction IDs preserve original input order. | pending | `python -m pytest tests/test_loop/test_duplicate_transactions.py` |
++| AC-3 | yes | automated_test | A large-input regression test proves the function handles many transactions without the previous nested-scan slowdown. | pending | `python -m pytest tests/test_loop/test_duplicate_transactions.py` |
++| AC-4 | yes | functional_review | The implementation avoids the $O(n^2)$ pairwise scan and uses a linear-time approach such as counting duplicate keys before filtering IDs in input order. | pending | code review of `tests/test_loop/duplicate_transactions.py` |
++| AC-5 | yes | functional_review | The duplicate key remains exactly `(account_id, merchant, amount_cents)` and the function continues to expect the existing transaction dictionary shape. | pending | code review of `_duplicate_key` usage in `tests/test_loop/duplicate_transactions.py` |
++| AC-6 | yes | human_review | Requester reviews and approves this task-specific analysis and acceptance criteria before execution starts. | pending | `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md` |
++
++## Approval Instruction
++
++Review this file together with `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md`. Execution should start only after requester approval.
+diff --git a/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6f12ec2061e8f66fc0996386599a64b2070f9d31
+--- /dev/null
++++ b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md
+@@ -0,0 +1,42 @@
++# Task Analysis
++
++## Goal
++
++Fix the performance regression in `tests/test_loop/duplicate_transactions.py` by making `find_duplicate_transaction_ids(transactions)` scale efficiently on large inputs while preserving its current externally visible behavior.
++
++The current implementation is correct but performs a nested scan across the full transaction list for every transaction. That makes the function roughly $O(n^2)$ and repeatedly recomputes duplicate keys. The intended fix should identify duplicate keys in linear time, then return only the transaction IDs whose `(account_id, merchant, amount_cents)` key appears more than once, preserving the original input order.
++
++## Non-Goals
++
++- Do not redesign transaction data models or add validation for malformed transaction dictionaries.
++- Do not change the duplicate definition: duplicates are based only on `account_id`, `merchant`, and `amount_cents`.
++- Do not change result ordering: returned IDs must remain in original input order.
++- Do not add AgentLoop lifecycle, CLI, or runtime changes.
++- Do not broaden this into generic performance work outside `tests/test_loop/duplicate_transactions.py` and its focused regression tests.
++
++## Assumptions
++
++- Every transaction contains `transaction_id`, `account_id`, `merchant`, and `amount_cents`, matching the existing function's expectations.
++- Transaction keys are hashable because they are currently assembled into a tuple of scalar fields.
++- The function is allowed to use standard-library data structures such as `dict`, `set`, or `collections.Counter`.
++- A focused test file should exist or be added for this helper, most likely `tests/test_loop/test_duplicate_transactions.py`.
++- Large-input performance should be verified with a bounded regression test that is stable in CI, not an overly tight wall-clock benchmark.
++
++## Risks
++
++- A one-pass implementation can accidentally include only later duplicates and omit the first transaction in each duplicate group; the current behavior includes all transactions whose key appears at least twice.
++- Using an unordered data structure for output would violate the required original input ordering.
++- A brittle timing-only test could fail on slower CI machines; prefer a test that uses large input plus a reasonable timeout or demonstrates linear behavior without depending on tiny timing margins.
++- If tests import from `tests/test_loop/duplicate_transactions.py` directly, naming and package layout must be handled without assuming `tests/test_loop` is already a Python package.
++
++## Open Questions
++
++1. Is there an existing hidden performance threshold the implementation must satisfy, or should the fix target a clear linear-time algorithm with a focused large-input regression test?
++2. Should the regression test assert only acceptable completion on large input, or also instrument `_duplicate_key` call counts to prevent a future nested-scan regression?
++3. Should `merchant` comparison remain exact and case-sensitive, as it is today?
++
++## Verification Plan
++
++- Run the focused duplicate transaction tests: `python -m pytest tests/test_loop/test_duplicate_transactions.py`.
++- If the focused test file does not exist, add it with cases for no duplicates, duplicate groups including the first item, multiple duplicate groups, order preservation, and a large-input performance regression case.
++- Optionally run the broader relevant suite after the focused test passes: `python -m pytest tests/test_loop tests/test_phase2.py`.
+
+diff --git a/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5f0a3b5740a609b4b90ccae74a1c364e1c212b90
+--- /dev/null
++++ b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json
+@@ -0,0 +1,52 @@
++{
++  "acceptance_criteria": [
++    {
++      "id": "AC-1",
++      "description": "find_duplicate_transaction_ids returns the same duplicate transaction IDs as the current implementation for representative inputs: no duplicates, one duplicate group, multiple duplicate groups, and duplicate groups where the first occurrence must be included.",
++      "verification": "automated_test",
++      "required": true,
++      "status": "pending",
++      "evidence": "python -m pytest tests/test_loop/test_duplicate_transactions.py"
++    },
++    {
++      "id": "AC-2",
++      "description": "Returned transaction IDs preserve original input order.",
++      "verification": "automated_test",
++      "required": true,
++      "status": "pending",
++      "evidence": "python -m pytest tests/test_loop/test_duplicate_transactions.py"
++    },
++    {
++      "id": "AC-3",
++      "description": "A large-input regression test proves the function handles many transactions without the previous nested-scan slowdown.",
++      "verification": "automated_test",
++      "required": true,
++      "status": "pending",
++      "evidence": "python -m pytest tests/test_loop/test_duplicate_transactions.py"
++    },
++    {
++      "id": "AC-4",
++      "description": "The implementation avoids the O(n^2) pairwise scan and uses a linear-time approach such as counting duplicate keys before filtering IDs in input order.",
++      "verification": "functional_review",
++      "required": true,
++      "status": "pending",
++      "evidence": "code review of tests/test_loop/duplicate_transactions.py"
++    },
++    {
++      "id": "AC-5",
++      "description": "The duplicate key remains exactly (account_id, merchant, amount_cents) and the function continues to expect the existing transaction dictionary shape.",
++      "verification": "functional_review",
++      "required": true,
++      "status": "pending",
++      "evidence": "code review of _duplicate_key usage in tests/test_loop/duplicate_transactions.py"
++    },
++    {
++      "id": "AC-6",
++      "description": "Requester reviews and approves this task-specific analysis and acceptance criteria before execution starts.",
++      "verification": "human_review",
++      "required": true,
++      "status": "pending",
++      "evidence": ".agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md"
++    }
++  ]
++}
+diff --git a/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6101b73ddc78cb6b6b2f3d53e134e1f3e836b58d
+--- /dev/null
++++ b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md
+@@ -0,0 +1,20 @@
++# Acceptance Criteria
++
++## Task
++
++Fix the performance regression in `tests/test_loop/duplicate_transactions.py` for `find_duplicate_transaction_ids`.
++
++## Criteria
++
++| ID | Required | Verification | Criterion | Status | Evidence |
++| --- | --- | --- | --- | --- | --- |
++| AC-1 | yes | automated_test | `find_duplicate_transaction_ids` returns the same duplicate transaction IDs as the current implementation for representative inputs: no duplicates, one duplicate group, multiple duplicate groups, and duplicate groups where the first occurrence must be included. | pending | `python -m pytest tests/test_loop/test_duplicate_transactions.py` |
++| AC-2 | yes | automated_test | Returned transaction IDs preserve original input order. | pending | `python -m pytest tests/test_loop/test_duplicate_transactions.py` |
++| AC-3 | yes | automated_test | A large-input regression test proves the function handles many transactions without the previous nested-scan slowdown. | pending | `python -m pytest tests/test_loop/test_duplicate_transactions.py` |
++| AC-4 | yes | functional_review | The implementation avoids the $O(n^2)$ pairwise scan and uses a linear-time approach such as counting duplicate keys before filtering IDs in input order. | pending | code review of `tests/test_loop/duplicate_transactions.py` |
++| AC-5 | yes | functional_review | The duplicate key remains exactly `(account_id, merchant, amount_cents)` and the function continues to expect the existing transaction dictionary shape. | pending | code review of `_duplicate_key` usage in `tests/test_loop/duplicate_transactions.py` |
++| AC-6 | yes | human_review | Requester reviews and approves this task-specific analysis and acceptance criteria before execution starts. | pending | `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md` |
++
++## Approval Instruction
++
++Review this file together with `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md`. Execution should start only after requester approval.
+diff --git a/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6f12ec2061e8f66fc0996386599a64b2070f9d31
+--- /dev/null
++++ b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md
+@@ -0,0 +1,42 @@
++# Task Analysis
++
++## Goal
++
++Fix the performance regression in `tests/test_loop/duplicate_transactions.py` by making `find_duplicate_transaction_ids(transactions)` scale efficiently on large inputs while preserving its current externally visible behavior.
++
++The current implementation is correct but performs a nested scan across the full transaction list for every transaction. That makes the function roughly $O(n^2)$ and repeatedly recomputes duplicate keys. The intended fix should identify duplicate keys in linear time, then return only the transaction IDs whose `(account_id, merchant, amount_cents)` key appears more than once, preserving the original input order.
++
++## Non-Goals
++
++- Do not redesign transaction data models or add validation for malformed transaction dictionaries.
++- Do not change the duplicate definition: duplicates are based only on `account_id`, `merchant`, and `amount_cents`.
++- Do not change result ordering: returned IDs must remain in original input order.
++- Do not add AgentLoop lifecycle, CLI, or runtime changes.
++- Do not broaden this into generic performance work outside `tests/test_loop/duplicate_transactions.py` and its focused regression tests.
++
++## Assumptions
++
++- Every transaction contains `transaction_id`, `account_id`, `merchant`, and `amount_cents`, matching the existing function's expectations.
++- Transaction keys are hashable because they are currently assembled into a tuple of scalar fields.
++- The function is allowed to use standard-library data structures such as `dict`, `set`, or `collections.Counter`.
++- A focused test file should exist or be added for this helper, most likely `tests/test_loop/test_duplicate_transactions.py`.
++- Large-input performance should be verified with a bounded regression test that is stable in CI, not an overly tight wall-clock benchmark.
++
++## Risks
++
++- A one-pass implementation can accidentally include only later duplicates and omit the first transaction in each duplicate group; the current behavior includes all transactions whose key appears at least twice.
++- Using an unordered data structure for output would violate the required original input ordering.
++- A brittle timing-only test could fail on slower CI machines; prefer a test that uses large input plus a reasonable timeout or demonstrates linear behavior without depending on tiny timing margins.
++- If tests import from `tests/test_loop/duplicate_transactions.py` directly, naming and package layout must be handled without assuming `tests/test_loop` is already a Python package.
++
++## Open Questions
++
++1. Is there an existing hidden performance threshold the implementation must satisfy, or should the fix target a clear linear-time algorithm with a focused large-input regression test?
++2. Should the regression test assert only acceptable completion on large input, or also instrument `_duplicate_key` call counts to prevent a future nested-scan regression?
++3. Should `merchant` comparison remain exact and case-sensitive, as it is today?
++
++## Verification Plan
++
++- Run the focused duplicate transaction tests: `python -m pytest tests/test_loop/test_duplicate_transactions.py`.
++- If the focused test file does not exist, add it with cases for no duplicates, duplicate groups including the first item, multiple duplicate groups, order preservation, and a large-input performance regression case.
++- Optionally run the broader relevant suite after the focused test passes: `python -m pytest tests/test_loop tests/test_phase2.py`.
+
+codex
+Created the requested task-specific artifacts and stopped before execution:
+
+- [analysis.md](</C:/Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md>)
+- [acceptance.md](</C:/Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md>)
+- [acceptance.json](</C:/Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json>)
+
+No implementation changes or test execution were performed.
+diff --git a/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5f0a3b5740a609b4b90ccae74a1c364e1c212b90
+--- /dev/null
++++ b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.json
+@@ -0,0 +1,52 @@
++{
++  "acceptance_criteria": [
++    {
++      "id": "AC-1",
++      "description": "find_duplicate_transaction_ids returns the same duplicate transaction IDs as the current implementation for representative inputs: no duplicates, one duplicate group, multiple duplicate groups, and duplicate groups where the first occurrence must be included.",
++      "verification": "automated_test",
++      "required": true,
++      "status": "pending",
++      "evidence": "python -m pytest tests/test_loop/test_duplicate_transactions.py"
++    },
++    {
++      "id": "AC-2",
++      "description": "Returned transaction IDs preserve original input order.",
++      "verification": "automated_test",
++      "required": true,
++      "status": "pending",
++      "evidence": "python -m pytest tests/test_loop/test_duplicate_transactions.py"
++    },
++    {
++      "id": "AC-3",
++      "description": "A large-input regression test proves the function handles many transactions without the previous nested-scan slowdown.",
++      "verification": "automated_test",
++      "required": true,
++      "status": "pending",
++      "evidence": "python -m pytest tests/test_loop/test_duplicate_transactions.py"
++    },
++    {
++      "id": "AC-4",
++      "description": "The implementation avoids the O(n^2) pairwise scan and uses a linear-time approach such as counting duplicate keys before filtering IDs in input order.",
++      "verification": "functional_review",
++      "required": true,
++      "status": "pending",
++      "evidence": "code review of tests/test_loop/duplicate_transactions.py"
++    },
++    {
++      "id": "AC-5",
++      "description": "The duplicate key remains exactly (account_id, merchant, amount_cents) and the function continues to expect the existing transaction dictionary shape.",
++      "verification": "functional_review",
++      "required": true,
++      "status": "pending",
++      "evidence": "code review of _duplicate_key usage in tests/test_loop/duplicate_transactions.py"
++    },
++    {
++      "id": "AC-6",
++      "description": "Requester reviews and approves this task-specific analysis and acceptance criteria before execution starts.",
++      "verification": "human_review",
++      "required": true,
++      "status": "pending",
++      "evidence": ".agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md"
++    }
++  ]
++}
+diff --git a/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6101b73ddc78cb6b6b2f3d53e134e1f3e836b58d
+--- /dev/null
++++ b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/acceptance.md
+@@ -0,0 +1,20 @@
++# Acceptance Criteria
++
++## Task
++
++Fix the performance regression in `tests/test_loop/duplicate_transactions.py` for `find_duplicate_transaction_ids`.
++
++## Criteria
++
++| ID | Required | Verification | Criterion | Status | Evidence |
++| --- | --- | --- | --- | --- | --- |
++| AC-1 | yes | automated_test | `find_duplicate_transaction_ids` returns the same duplicate transaction IDs as the current implementation for representative inputs: no duplicates, one duplicate group, multiple duplicate groups, and duplicate groups where the first occurrence must be included. | pending | `python -m pytest tests/test_loop/test_duplicate_transactions.py` |
++| AC-2 | yes | automated_test | Returned transaction IDs preserve original input order. | pending | `python -m pytest tests/test_loop/test_duplicate_transactions.py` |
++| AC-3 | yes | automated_test | A large-input regression test proves the function handles many transactions without the previous nested-scan slowdown. | pending | `python -m pytest tests/test_loop/test_duplicate_transactions.py` |
++| AC-4 | yes | functional_review | The implementation avoids the $O(n^2)$ pairwise scan and uses a linear-time approach such as counting duplicate keys before filtering IDs in input order. | pending | code review of `tests/test_loop/duplicate_transactions.py` |
++| AC-5 | yes | functional_review | The duplicate key remains exactly `(account_id, merchant, amount_cents)` and the function continues to expect the existing transaction dictionary shape. | pending | code review of `_duplicate_key` usage in `tests/test_loop/duplicate_transactions.py` |
++| AC-6 | yes | human_review | Requester reviews and approves this task-specific analysis and acceptance criteria before execution starts. | pending | `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md` |
++
++## Approval Instruction
++
++Review this file together with `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md`. Execution should start only after requester approval.
+diff --git a/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6f12ec2061e8f66fc0996386599a64b2070f9d31
+--- /dev/null
++++ b/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/analysis.md
+@@ -0,0 +1,42 @@
++# Task Analysis
++
++## Goal
++
++Fix the performance regression in `tests/test_loop/duplicate_transactions.py` by making `find_duplicate_transaction_ids(transactions)` scale efficiently on large inputs while preserving its current externally visible behavior.
++
++The current implementation is correct but performs a nested scan across the full transaction list for every transaction. That makes the function roughly $O(n^2)$ and repeatedly recomputes duplicate keys. The intended fix should identify duplicate keys in linear time, then return only the transaction IDs whose `(account_id, merchant, amount_cents)` key appears more than once, preserving the original input order.
++
++## Non-Goals
++
++- Do not redesign transaction data models or add validation for malformed transaction dictionaries.
++- Do not change the duplicate definition: duplicates are based only on `account_id`, `merchant`, and `amount_cents`.
++- Do not change result ordering: returned IDs must remain in original input order.
++- Do not add AgentLoop lifecycle, CLI, or runtime changes.
++- Do not broaden this into generic performance work outside `tests/test_loop/duplicate_transactions.py` and its focused regression tests.
++
++## Assumptions
++
++- Every transaction contains `transaction_id`, `account_id`, `merchant`, and `amount_cents`, matching the existing function's expectations.
++- Transaction keys are hashable because they are currently assembled into a tuple of scalar fields.
++- The function is allowed to use standard-library data structures such as `dict`, `set`, or `collections.Counter`.
++- A focused test file should exist or be added for this helper, most likely `tests/test_loop/test_duplicate_transactions.py`.
++- Large-input performance should be verified with a bounded regression test that is stable in CI, not an overly tight wall-clock benchmark.
++
++## Risks
++
++- A one-pass implementation can accidentally include only later duplicates and omit the first transaction in each duplicate group; the current behavior includes all transactions whose key appears at least twice.
++- Using an unordered data structure for output would violate the required original input ordering.
++- A brittle timing-only test could fail on slower CI machines; prefer a test that uses large input plus a reasonable timeout or demonstrates linear behavior without depending on tiny timing margins.
++- If tests import from `tests/test_loop/duplicate_transactions.py` directly, naming and package layout must be handled without assuming `tests/test_loop` is already a Python package.
++
++## Open Questions
++
++1. Is there an existing hidden performance threshold the implementation must satisfy, or should the fix target a clear linear-time algorithm with a focused large-input regression test?
++2. Should the regression test assert only acceptable completion on large input, or also instrument `_duplicate_key` call counts to prevent a future nested-scan regression?
++3. Should `merchant` comparison remain exact and case-sensitive, as it is today?
++
++## Verification Plan
++
++- Run the focused duplicate transaction tests: `python -m pytest tests/test_loop/test_duplicate_transactions.py`.
++- If the focused test file does not exist, add it with cases for no duplicates, duplicate groups including the first item, multiple duplicate groups, order preservation, and a large-input performance regression case.
++- Optionally run the broader relevant suite after the focused test passes: `python -m pytest tests/test_loop tests/test_phase2.py`.
+
+tokens used
+209,409

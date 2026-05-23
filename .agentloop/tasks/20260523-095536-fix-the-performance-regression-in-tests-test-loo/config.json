@@ -1,0 +1,22 @@
+{
+  "roles": {
+    "analyst": {
+      "runtime": "codex"
+    },
+    "architect": {
+      "runtime": "codex"
+    },
+    "implementer": {
+      "runtime": "codex"
+    },
+    "tester": {
+      "runtime": "codex"
+    },
+    "reviewer": {
+      "runtime": "codex"
+    },
+    "integrator": {
+      "runtime": "codex"
+    }
+  }
+}

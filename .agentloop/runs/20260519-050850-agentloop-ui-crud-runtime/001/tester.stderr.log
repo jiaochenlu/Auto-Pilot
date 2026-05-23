@@ -1,0 +1,4007 @@
+OpenAI Codex v0.130.0
+--------
+workdir: C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+model: gpt-5.5
+provider: agent-maestro
+approval: never
+sandbox: workspace-write [workdir, C:\Users\chenlujiao\.codex\memories]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e3eb5-c3fc-78e0-9472-9496df85f4ab
+--------
+user
+# Tester Prompt
+
+Task: 给这个agentloop 做一个UI，你可以设计一个产品形态，核心功能就是任务的管理，包括CRUD，且需要能看到任务的最新进展和 runtime 的返回
+Iteration: 1
+Task artifact directory: `.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/`
+Use paths exactly as written. Do not write task artifacts to `.agentloop/artifacts/`.
+
+Produce the test plan and evidence at `.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md`. Add or update tests as needed.
+
+2026-05-19T05:29:28.262725Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Client(HttpRequest(HttpRequest("http/request failed: error sending request for url (http://127.0.0.1:3737/mcp)")))
+codex
+I’ll inspect the project structure and the existing agentloop implementation first, then add focused tests and write the required test plan under the task artifact directory.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'Get-ChildItem -Force' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'if (Get-Command rg -ErrorAction SilentlyContinue) { rg --files } else { Get-ChildItem -Recurse -File | ForEach-Object { $_.FullName } }' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'git status --short' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1263ms:
+
+    Directory: C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+
+[32;1mMode   [0m[32;1m              LastWriteTime[0m [32;1;3m        Length[0m[32;1m Name[0m
+[32;1m----   [0m [32;1m             -------------[0m [32;1m        ------[0m [32;1m----[0m
+l-r--           5/18/2026  6:24 PM                [44;1m.agentloop[0m
+l-rh-           5/18/2026  6:41 PM                [44;1m.git[0m
+l-r--           5/19/2026  1:23 PM                [44;1magentloop[0m
+l-r--           5/18/2026  6:36 PM                [44;1mdocs[0m
+l-r--           5/19/2026  1:25 PM                [44;1mtests[0m
+la---           5/18/2026  6:36 PM           5370 README.md
+
+
+ succeeded in 1268ms:
+ M .agentloop/config.json
+ M .agentloop/prompts/analyst.md
+ M .agentloop/prompts/architect.md
+ M .agentloop/prompts/implementer.md
+ M .agentloop/prompts/tester.md
+ M .agentloop/state.json
+ M agentloop/__pycache__/cli.cpython-311.pyc
+ M agentloop/__pycache__/tasks.cpython-311.pyc
+ M agentloop/cli.py
+ M agentloop/tasks.py
+?? .agentloop/locks/
+?? .agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/
+?? .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/
+?? agentloop/__pycache__/api.cpython-311.pyc
+?? agentloop/__pycache__/logs.cpython-311.pyc
+?? agentloop/__pycache__/ui.cpython-311.pyc
+?? agentloop/api.py
+?? agentloop/logs.py
+?? agentloop/ui.py
+?? agentloop/ui_static/
+?? tests/__pycache__/
+?? tests/test_ui_api.py
+
+ succeeded in 1461ms:
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\README.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\config.json
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\MIGRATED
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\state.json
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\locks\20260519-050850-agentloop-ui-crud-runtime.lock
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\acceptance.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\analysis.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\analyst.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\architect.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\implementer.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\integrator.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\reviewer.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\tester.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\prompts\verify.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\000\analyst.stderr.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\000\analyst.stdout.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\architect.stderr.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\architect.stdout.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\implementer.stderr.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\implementer.stdout.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\integrator.stderr.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\integrator.stdout.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\reviewer.stderr.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\reviewer.stdout.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\tester.stderr.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\tester.stdout.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260518-093703-agentloop\001\tests\01-test.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260519-050850-agentloop-ui-crud-runtime\000\analyst.stderr.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260519-050850-agentloop-ui-crud-runtime\000\analyst.stdout.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260519-050850-agentloop-ui-crud-runtime\001\architect.stderr.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260519-050850-agentloop-ui-crud-runtime\001\architect.stdout.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260519-050850-agentloop-ui-crud-runtime\001\implementer.stderr.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260519-050850-agentloop-ui-crud-runtime\001\implementer.stdout.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\runs\20260519-050850-agentloop-ui-crud-runtime\001\tests\01-test.log
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\state.json
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\artifacts\acceptance.json
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\artifacts\acceptance.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\artifacts\analysis.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\artifacts\design.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\artifacts\final-report.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\artifacts\review-001.json
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260518-093703-agentloop\artifacts\test-plan.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260519-050850-agentloop-ui-crud-runtime\state.json
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260519-050850-agentloop-ui-crud-runtime\artifacts\acceptance.json
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260519-050850-agentloop-ui-crud-runtime\artifacts\acceptance.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260519-050850-agentloop-ui-crud-runtime\artifacts\analysis.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260519-050850-agentloop-ui-crud-runtime\artifacts\design.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__init__.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__main__.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\adapters.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\api.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\cli.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\config.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\locks.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\logs.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\models.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\quality.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\runner.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\tasks.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\ui.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\verify.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\workflow.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\workspace.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\ui_static\app.js
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\ui_static\index.html
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\ui_static\styles.css
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\__init__.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\__main__.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\adapters.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\api.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\cli.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\config.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\locks.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\logs.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\models.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\quality.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\runner.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\tasks.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\ui.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\verify.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\workflow.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop\__pycache__\workspace.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\docs\agentloop-design.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\docs\agentloop-user-guide.md
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\docs\assets\autopilot-capability-map.png
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_adapters.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_multitask.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_phase1.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_phase2.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_phase3.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_quality.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_runtime_cli.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_ui_api.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_verify.py
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_adapters.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_multitask.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_phase1.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_phase2.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_phase3.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_quality.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_runtime_cli.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_ui_api.cpython-311.pyc
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\__pycache__\test_verify.cpython-311.pyc
+
+codex
+The repo already has a new `agentloop/ui.py`, static UI files, API tests, and uncommitted task artifacts. I’m going to read the UI/API implementation and current tests so the test coverage matches the actual product surface instead of duplicating assumptions.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw C:\\Users\\chenlujiao\\.codex\\skills\\webapp-testing\\SKILL.md" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1171ms:
+---
+name: webapp-testing
+description: Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.
+license: Complete terms in LICENSE.txt
+---
+
+# Web Application Testing
+
+To test local web applications, write native Python Playwright scripts.
+
+**Helper Scripts Available**:
+- `scripts/with_server.py` - Manages server lifecycle (supports multiple servers)
+
+**Always run scripts with `--help` first** to see usage. DO NOT read the source until you try running the script first and find that a customized solution is abslutely necessary. These scripts can be very large and thus pollute your context window. They exist to be called directly as black-box scripts rather than ingested into your context window.
+
+## Decision Tree: Choosing Your Approach
+
+```
+User task → Is it static HTML?
+    ├─ Yes → Read HTML file directly to identify selectors
+    │         ├─ Success → Write Playwright script using selectors
+    │         └─ Fails/Incomplete → Treat as dynamic (below)
+    │
+    └─ No (dynamic webapp) → Is the server already running?
+        ├─ No → Run: python scripts/with_server.py --help
+        │        Then use the helper + write simplified Playwright script
+        │
+        └─ Yes → Reconnaissance-then-action:
+            1. Navigate and wait for networkidle
+            2. Take screenshot or inspect DOM
+            3. Identify selectors from rendered state
+            4. Execute actions with discovered selectors
+```
+
+## Example: Using with_server.py
+
+To start a server, run `--help` first, then use the helper:
+
+**Single server:**
+```bash
+python scripts/with_server.py --server "npm run dev" --port 5173 -- python your_automation.py
+```
+
+**Multiple servers (e.g., backend + frontend):**
+```bash
+python scripts/with_server.py \
+  --server "cd backend && python server.py" --port 3000 \
+  --server "cd frontend && npm run dev" --port 5173 \
+  -- python your_automation.py
+```
+
+To create an automation script, include only Playwright logic (servers are managed automatically):
+```python
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True) # Always launch chromium in headless mode
+    page = browser.new_page()
+    page.goto('http://localhost:5173') # Server already running and ready
+    page.wait_for_load_state('networkidle') # CRITICAL: Wait for JS to execute
+    # ... your automation logic
+    browser.close()
+```
+
+## Reconnaissance-Then-Action Pattern
+
+1. **Inspect rendered DOM**:
+   ```python
+   page.screenshot(path='/tmp/inspect.png', full_page=True)
+   content = page.content()
+   page.locator('button').all()
+   ```
+
+2. **Identify selectors** from inspection results
+
+3. **Execute actions** using discovered selectors
+
+## Common Pitfall
+
+❌ **Don't** inspect the DOM before waiting for `networkidle` on dynamic apps
+✅ **Do** wait for `page.wait_for_load_state('networkidle')` before inspection
+
+## Best Practices
+
+- **Use bundled scripts as black boxes** - To accomplish a task, consider whether one of the scripts available in `scripts/` can help. These scripts handle common, complex workflows reliably without cluttering the context window. Use `--help` to see usage, then invoke directly. 
+- Use `sync_playwright()` for synchronous scripts
+- Always close the browser when done
+- Use descriptive selectors: `text=`, `role=`, CSS selectors, or IDs
+- Add appropriate waits: `page.wait_for_selector()` or `page.wait_for_timeout()`
+
+## Reference Files
+
+- **examples/** - Examples showing common patterns:
+  - `element_discovery.py` - Discovering buttons, links, and inputs on a page
+  - `static_html_automation.py` - Using file:// URLs for local HTML
+  - `console_logging.py` - Capturing console logs during automation
+
+codex
+I’m using the `webapp-testing` skill because this task needs evidence for a local web UI. The first pass is code-level coverage; if the app exposes an easy local server path, I’ll add runtime UI evidence too.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw agentloop\\ui.py" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw agentloop\\api.py" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw tests\\test_ui_api.py" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw agentloop\\ui_static\\index.html" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw agentloop\\ui_static\\app.js" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1384ms:
+"""JSON API and view-model builders for the AgentLoop local UI."""
+
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+from typing import Any
+
+from .locks import LockHeld, lock_path, task_lock
+from .logs import bounded_text, bounded_workspace_file, resolve_under
+from .models import default_state
+from .tasks import (
+    current_task_id,
+    effective_config,
+    list_task_ids,
+    load_task_config,
+    load_task_state,
+    save_task_config_patch,
+    set_current_task_id,
+    task_dir,
+    task_state_path,
+)
+from .workspace import WorkspaceError, agentloop_path, save_state
+from .workflow import approve_task, cancel_task, run_task, start_task
+
+
+ACTION_STATUSES_FOR_RUN = {"READY_TO_START", "DESIGNING"}
+
+
+def _title_from_state(state: dict[str, Any], task_id: str) -> str:
+    goal = state.get("goal") if isinstance(state.get("goal"), dict) else {}
+    title = state.get("title") or goal.get("raw_request") or task_id
+    return str(title).replace("\n", " ")[:120]
+
+
+def _lock_error(root: Path, task_id: str) -> str | None:
+    path = lock_path(root, task_id)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    pid = data.get("pid", "?") if isinstance(data, dict) else "?"
+    started_at = data.get("started_at", "?") if isinstance(data, dict) else "?"
+    return f"locked by pid {pid} since {started_at}"
+
+
+def build_task_list(root: Path) -> dict[str, Any]:
+    current = current_task_id(root)
+    rows: list[dict[str, Any]] = []
+    for task_id in list_task_ids(root):
+        try:
+            state = load_task_state(root, task_id)
+            row = {
+                "task_id": task_id,
+                "title": _title_from_state(state, task_id),
+                "status": state.get("status") or "UNKNOWN",
+                "current_phase": state.get("current_phase"),
+                "iteration": state.get("iteration", 0),
+                "max_iterations": state.get("max_iterations") or effective_config(root, task_id).get("max_iterations"),
+                "updated_at": state.get("updated_at") or state.get("created_at"),
+                "current": task_id == current,
+                "locked": _lock_error(root, task_id) is not None,
+                "error": None,
+            }
+        except WorkspaceError as exc:
+            row = {
+                "task_id": task_id,
+                "title": task_id,
+                "status": "UNKNOWN",
+                "current_phase": None,
+                "iteration": None,
+                "max_iterations": None,
+                "updated_at": None,
+                "current": task_id == current,
+                "locked": _lock_error(root, task_id) is not None,
+                "error": str(exc),
+            }
+        rows.append(row)
+    rows.sort(key=lambda item: str(item.get("updated_at") or ""), reverse=True)
+    return {"current_task_id": current, "tasks": rows}
+
+
+def available_actions(state: dict[str, Any], lock_reason: str | None = None) -> dict[str, Any]:
+    status = state.get("status")
+    locked_reason = lock_reason or None
+
+    def action(enabled: bool, reason: str | None = None) -> dict[str, Any]:
+        if locked_reason and enabled:
+            return {"enabled": False, "reason": locked_reason}
+        return {"enabled": enabled, "reason": reason}
+
+    approve_enabled = status == "WAITING_FOR_ALIGNMENT"
+    run_enabled = status in ACTION_STATUSES_FOR_RUN
+    cancel_enabled = status not in {"CREATED", "DONE", "CANCELLED"}
+    return {
+        "approve": action(approve_enabled, None if approve_enabled else f"status is {status}"),
+        "run": action(run_enabled, None if run_enabled else f"status is {status}"),
+        "cancel": action(cancel_enabled, None if cancel_enabled else f"status is {status}"),
+        "delete": action(True),
+        "config": action(True),
+    }
+
+
+def list_task_artifacts(root: Path, task_id: str) -> list[dict[str, Any]]:
+    base = task_dir(root, task_id) / "artifacts"
+    if not base.exists():
+        return []
+    artifacts: list[dict[str, Any]] = []
+    for path in sorted(item for item in base.iterdir() if item.is_file()):
+        artifacts.append(
+            {
+                "name": path.name,
+                "path": path.resolve().relative_to(root.resolve()).as_posix(),
+                "size": path.stat().st_size,
+                "updated_at": path.stat().st_mtime,
+                "preview": bounded_text(path),
+            }
+        )
+    return artifacts
+
+
+def _latest_iteration(root: Path, task_id: str, state: dict[str, Any]) -> int:
+    candidates: list[int] = []
+    value = state.get("iteration")
+    if isinstance(value, int):
+        candidates.append(value)
+    for agent in state.get("agents") or []:
+        if isinstance(agent, dict) and isinstance(agent.get("iteration"), int):
+            candidates.append(agent["iteration"])
+    run_root = agentloop_path(root) / "runs" / task_id
+    if run_root.exists():
+        for item in run_root.iterdir():
+            if item.is_dir() and item.name.isdigit():
+                candidates.append(int(item.name))
+    return max(candidates or [0])
+
+
+def _agent_log(root: Path, relative: Any) -> dict[str, Any] | None:
+    if not isinstance(relative, str) or not relative:
+        return None
+    try:
+        return bounded_workspace_file(root, relative)
+    except WorkspaceError as exc:
+        return {"missing": True, "exists": False, "error": str(exc), "content": ""}
+
+
+def _agent_iteration(agent: dict[str, Any]) -> int | None:
+    value = agent.get("iteration")
+    if isinstance(value, int):
+        return value
+    for key in ("stdout_log", "stderr_log"):
+        log_ref = agent.get(key)
+        if not isinstance(log_ref, str):
+            continue
+        for part in Path(log_ref).parts:
+            if part.isdigit():
+                return int(part)
+    return None
+
+
+def latest_runtime_summary(root: Path, state: dict[str, Any]) -> dict[str, Any]:
+    task_id = str(state.get("task_id") or "")
+    latest = _latest_iteration(root, task_id, state) if task_id else 0
+    run_root = agentloop_path(root) / "runs" / task_id
+    run_iterations: set[int] = set()
+    if task_id and run_root.exists():
+        run_iterations = {int(item.name) for item in run_root.iterdir() if item.is_dir() and item.name.isdigit()}
+    iterations = sorted(
+        {latest}
+        | {int(a.get("iteration")) for a in state.get("agents") or [] if isinstance(a, dict) and isinstance(a.get("iteration"), int)}
+        | run_iterations
+    )
+    agents: list[dict[str, Any]] = []
+    for agent in state.get("agents") or []:
+        if not isinstance(agent, dict):
+            continue
+        agent_iter = _agent_iteration(agent)
+        if agent_iter is not None and agent_iter != latest:
+            continue
+        agents.append(
+            {
+                "role": agent.get("role"),
+                "runtime": agent.get("runtime"),
+                "adapter": agent.get("adapter"),
+                "command": agent.get("command"),
+                "exit_code": agent.get("exit_code"),
+                "duration_ms": agent.get("duration_ms"),
+                "artifacts": agent.get("artifacts") or [],
+                "stdout": _agent_log(root, agent.get("stdout_log")),
+                "stderr": _agent_log(root, agent.get("stderr_log")),
+            }
+        )
+
+    tests: list[dict[str, Any]] = []
+    tests_dir = agentloop_path(root) / "runs" / task_id / f"{latest:03d}" / "tests" if task_id else None
+    if tests_dir and tests_dir.exists():
+        for path in sorted(tests_dir.glob("*.log")):
+            tests.append({"name": path.name, "log": bounded_text(path)})
+    return {"iterations": iterations, "latest_iteration": latest, "agents": agents, "tests": tests}
+
+
+def build_task_detail(root: Path, task_id: str) -> dict[str, Any]:
+    task_state_path(root, task_id)
+    errors: list[str] = []
+    try:
+        state = load_task_state(root, task_id)
+    except WorkspaceError as exc:
+        state = {**default_state(), "task_id": task_id, "title": task_id, "status": "UNKNOWN"}
+        errors.append(str(exc))
+    lock_reason = _lock_error(root, task_id)
+    try:
+        override = load_task_config(root, task_id)
+    except WorkspaceError as exc:
+        override = {}
+        errors.append(str(exc))
+    try:
+        merged = effective_config(root, task_id)
+    except WorkspaceError as exc:
+        merged = {}
+        errors.append(str(exc))
+    return {
+        "state": {
+            "task_id": task_id,
+            "title": _title_from_state(state, task_id),
+            "status": state.get("status"),
+            "current_phase": state.get("current_phase"),
+            "iteration": state.get("iteration"),
+            "max_iterations": state.get("max_iterations") or merged.get("max_iterations"),
+            "requires_human_approval": state.get("requires_human_approval"),
+            "goal": state.get("goal") or {},
+            "acceptance_criteria": state.get("acceptance_criteria") or [],
+            "phases": state.get("phases") or {},
+            "created_at": state.get("created_at"),
+            "updated_at": state.get("updated_at"),
+        },
+        "config": {"override": override, "effective": merged},
+        "actions": available_actions(state, lock_reason),
+        "artifacts": list_task_artifacts(root, task_id),
+        "runtime": latest_runtime_summary(root, state),
+        "errors": errors,
+    }
+
+
+def create_task(root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    request = payload.get("request")
+    if not isinstance(request, str) or not request.strip():
+        raise WorkspaceError("request must be a non-empty string.")
+    state = start_task(root, request)
+    return build_task_detail(root, str(state["task_id"]))
+
+
+def patch_task_config(root: Path, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    allowed = {"max_iterations", "test_commands"}
+    patch = {key: payload[key] for key in allowed if key in payload}
+    unknown = set(payload) - allowed
+    if unknown:
+        raise WorkspaceError(f"Unsupported config keys: {', '.join(sorted(unknown))}")
+    with task_lock(root, task_id, blocking=False):
+        save_task_config_patch(root, task_id, patch)
+    return build_task_detail(root, task_id)
+
+
+def delete_task(root: Path, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("confirm") != task_id:
+        raise WorkspaceError("Delete confirmation must match the task id exactly.")
+    with task_lock(root, task_id, blocking=False):
+        target = task_dir(root, task_id)
+        base = (agentloop_path(root) / "tasks").resolve()
+        if not str(target.resolve()).lower().startswith(str(base).lower()):
+            raise WorkspaceError("Invalid task path.")
+        if not target.exists():
+            raise WorkspaceError(f"Task does not exist: {task_id}")
+        shutil.rmtree(target)
+    if current_task_id(root) == task_id:
+        save_state(root, default_state())
+        set_current_task_id(root, None)
+    return {"deleted": True, "task_id": task_id}
+
+
+def approve_task_api(root: Path, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    by = payload.get("by") if isinstance(payload.get("by"), str) else "requester"
+    with task_lock(root, task_id, blocking=False):
+        approve_task(root, approved_by=by, task_id=task_id)
+    return build_task_detail(root, task_id)
+
+
+def cancel_task_api(root: Path, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    by = payload.get("by") if isinstance(payload.get("by"), str) else "requester"
+    with task_lock(root, task_id, blocking=False):
+        cancel_task(root, cancelled_by=by, task_id=task_id)
+    return build_task_detail(root, task_id)
+
+
+def run_task_api(root: Path, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    wait = bool(payload.get("wait", False))
+    with task_lock(root, task_id, blocking=wait):
+        run_task(root, task_id=task_id)
+    return build_task_detail(root, task_id)
+
+
+def read_artifact(root: Path, task_id: str, name: str) -> dict[str, Any]:
+    if not name or name.startswith(".") or "/" in name or "\\" in name:
+        raise WorkspaceError("Invalid artifact name.")
+    base = task_dir(root, task_id) / "artifacts"
+    path = resolve_under(base, name)
+    if not path.exists():
+        raise WorkspaceError(f"Artifact not found: {name}")
+    payload = bounded_text(path)
+    payload["path"] = path.resolve().relative_to(root.resolve()).as_posix()
+    payload["name"] = name
+    return payload
+
+
+def error_payload(exc: Exception) -> dict[str, Any]:
+    code = "lock_held" if isinstance(exc, LockHeld) else "workspace_error"
+    return {"error": {"code": code, "message": str(exc)}}
+
+
+ succeeded in 1405ms:
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
+from agentloop.workspace import init_workspace
+from agentloop.workflow import approve_task, start_task
+
+
+class UIApiTests(unittest.TestCase):
+    def test_task_list_marks_current_and_handles_malformed_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            init_workspace(root)
+            good = start_task(root, "build the console")
+            good_id = good["task_id"]
+            bad_dir = root / ".agentloop" / "tasks" / "bad-task"
+            bad_dir.mkdir(parents=True)
+            (bad_dir / "state.json").write_text("{not json", encoding="utf-8")
+            set_current_task_id(root, good_id)
+
+            data = build_task_list(root)
+            rows = {row["task_id"]: row for row in data["tasks"]}
+            self.assertTrue(rows[good_id]["current"])
+            self.assertEqual(rows[good_id]["status"], "WAITING_FOR_ALIGNMENT")
+            self.assertEqual(rows["bad-task"]["status"], "UNKNOWN")
+            self.assertIn("Invalid task state", rows["bad-task"]["error"])
+
+    def test_create_task_uses_workflow_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            init_workspace(root)
+            detail = create_task(root, {"request": "ship a UI"})
+            task_id = detail["state"]["task_id"]
+            artifact_dir = root / ".agentloop" / "tasks" / task_id / "artifacts"
+            self.assertTrue((artifact_dir / "analysis.md").exists())
+            self.assertTrue((artifact_dir / "acceptance.md").exists())
+            self.assertTrue((artifact_dir / "acceptance.json").exists())
+
+    def test_detail_includes_artifacts_runtime_and_test_logs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            init_workspace(root)
+            state = start_task(root, "show logs")
+            task_id = state["task_id"]
+            stdout = root / ".agentloop" / "runs" / task_id / "001" / "tester.stdout.log"
+            stderr = root / ".agentloop" / "runs" / task_id / "001" / "tester.stderr.log"
+            stdout.parent.mkdir(parents=True)
+            stdout.write_text("hello stdout", encoding="utf-8")
+            stderr.write_text("", encoding="utf-8")
+            tests_dir = stdout.parent / "tests"
+            tests_dir.mkdir()
+            (tests_dir / "01-test.log").write_text("COMMAND\npython -m unittest\n", encoding="utf-8")
+            state = load_task_state(root, task_id)
+            state["iteration"] = 1
+            state["agents"].append(
+                {
+                    "role": "tester",
+                    "runtime": "manual",
+                    "exit_code": 0,
+                    "stdout_log": stdout.relative_to(root).as_posix(),
+                    "stderr_log": stderr.relative_to(root).as_posix(),
+                    "artifacts": [],
+                }
+            )
+            save_task_state(root, task_id, state)
+
+            detail = build_task_detail(root, task_id)
+            self.assertTrue(detail["artifacts"])
+            self.assertEqual(detail["runtime"]["latest_iteration"], 1)
+            self.assertIn("hello stdout", detail["runtime"]["agents"][0]["stdout"]["content"])
+            self.assertIn("python -m unittest", detail["runtime"]["tests"][0]["log"]["content"])
+
+    def test_patch_config_and_delete_task(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            init_workspace(root)
+            state = start_task(root, "config task")
+            task_id = state["task_id"]
+
+            detail = patch_task_config(root, task_id, {"max_iterations": 3, "test_commands": ["python -V"]})
+            self.assertEqual(detail["config"]["override"]["max_iterations"], 3)
+            config = json.loads((root / ".agentloop" / "tasks" / task_id / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["test_commands"], ["python -V"])
+
+            result = delete_task(root, task_id, {"confirm": task_id})
+            self.assertTrue(result["deleted"])
+            self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
+
+    def test_actions_reflect_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            init_workspace(root)
+            state = start_task(root, "approval task")
+            task_id = state["task_id"]
+            waiting = build_task_detail(root, task_id)
+            self.assertTrue(waiting["actions"]["approve"]["enabled"])
+            self.assertFalse(waiting["actions"]["run"]["enabled"])
+
+            approve_task(root, task_id=task_id)
+            ready = build_task_detail(root, task_id)
+            self.assertFalse(ready["actions"]["approve"]["enabled"])
+            self.assertTrue(ready["actions"]["run"]["enabled"])
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+ succeeded in 1429ms:
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgentLoop Task Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <header class="sidebar-header">
+          <div>
+            <h1>AgentLoop</h1>
+            <p>Task Console</p>
+          </div>
+          <button id="refreshBtn" class="icon-button" title="Refresh">↻</button>
+        </header>
+
+        <div class="toolbar">
+          <button id="newTaskBtn" class="primary">New task</button>
+          <input id="searchInput" type="search" placeholder="Search tasks" />
+        </div>
+
+        <div class="segments" id="statusFilter">
+          <button data-filter="all" class="active">All</button>
+          <button data-filter="active">Active</button>
+          <button data-filter="waiting">Waiting</button>
+          <button data-filter="running">Running</button>
+          <button data-filter="done">Done</button>
+        </div>
+
+        <div id="taskList" class="task-list" aria-live="polite"></div>
+      </aside>
+
+      <main class="main">
+        <section class="detail-panel">
+          <div id="banner" class="banner hidden"></div>
+          <header class="detail-header">
+            <div>
+              <div class="eyebrow" id="taskIdLabel">No task selected</div>
+              <h2 id="taskTitle">Select a task</h2>
+              <div class="meta" id="taskMeta"></div>
+            </div>
+            <div class="actions">
+              <button id="approveBtn">Approve</button>
+              <button id="runBtn">Run</button>
+              <button id="cancelBtn">Cancel</button>
+              <button id="deleteBtn" class="danger">Delete</button>
+            </div>
+          </header>
+
+          <div class="tabs" id="detailTabs">
+            <button data-tab="overview" class="active">Overview</button>
+            <button data-tab="artifacts">Artifacts</button>
+            <button data-tab="config">Config</button>
+            <button data-tab="runtime">Runtime</button>
+          </div>
+
+          <div id="overviewTab" class="tab-panel active">
+            <div class="split">
+              <section>
+                <h3>Goal</h3>
+                <pre id="goalText" class="copy-block"></pre>
+              </section>
+              <section>
+                <h3>Phases</h3>
+                <div id="phaseList" class="phase-list"></div>
+              </section>
+            </div>
+            <section>
+              <h3>Acceptance</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>ID</th><th>Required</th><th>Verification</th><th>Criterion</th><th>Status</th><th>Evidence</th></tr>
+                  </thead>
+                  <tbody id="acceptanceBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <div id="artifactsTab" class="tab-panel">
+            <div id="artifactList" class="artifact-list"></div>
+          </div>
+
+          <div id="configTab" class="tab-panel">
+            <form id="configForm" class="config-form">
+              <label>
+                <span>Max iterations</span>
+                <input id="maxIterationsInput" type="number" min="1" />
+              </label>
+              <div>
+                <div class="field-row">
+                  <span>Test commands</span>
+                  <button type="button" id="addCommandBtn">Add</button>
+                </div>
+                <div id="commandsList" class="commands-list"></div>
+              </div>
+              <button class="primary" type="submit">Save config</button>
+            </form>
+          </div>
+
+          <div id="runtimeTab" class="tab-panel">
+            <div class="runtime-layout">
+              <div id="runtimeTabs" class="runtime-tabs"></div>
+              <div id="runtimeContent" class="runtime-content"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="createDialog">
+      <form method="dialog" id="createForm" class="dialog-form">
+        <h3>New task</h3>
+        <textarea id="requestInput" rows="7" placeholder="Describe the task"></textarea>
+        <menu>
+          <button type="button" value="cancel" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary" value="default">Create</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="deleteDialog">
+      <form method="dialog" id="deleteForm" class="dialog-form">
+        <h3>Delete task</h3>
+        <p>Type the full task id to confirm.</p>
+        <code id="deleteTaskId"></code>
+        <input id="deleteConfirmInput" autocomplete="off" />
+        <menu>
+          <button type="button" value="cancel" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="danger" value="default">Delete</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
+
+
+ succeeded in 1431ms:
+const state = {
+  tasks: [],
+  selectedTaskId: null,
+  detail: null,
+  filter: "all",
+  runtimeIndex: 0,
+  busy: false,
+};
+
+const $ = (id) => document.getElementById(id);
+
+async function apiFetch(path, options = {}) {
+  const response = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error?.message || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
+function showBanner(message) {
+  const banner = $("banner");
+  if (!message) {
+    banner.classList.add("hidden");
+    banner.textContent = "";
+    return;
+  }
+  banner.textContent = message;
+  banner.classList.remove("hidden");
+}
+
+function statusClass(status) {
+  return `badge status-${String(status || "UNKNOWN").replaceAll(" ", "_")}`;
+}
+
+function matchesFilter(task) {
+  const status = String(task.status || "");
+  if (state.filter === "all") return true;
+  if (state.filter === "active") return !["DONE", "CANCELLED", "CREATED"].includes(status);
+  if (state.filter === "waiting") return status.includes("WAITING") || status === "READY_TO_START";
+  if (state.filter === "running") return ["DESIGNING", "IMPLEMENTING_AND_TESTING", "REVIEWING"].includes(status);
+  if (state.filter === "done") return ["DONE", "CANCELLED"].includes(status);
+  return true;
+}
+
+function renderTaskList() {
+  const search = $("searchInput").value.toLowerCase().trim();
+  const list = $("taskList");
+  list.innerHTML = "";
+  const filtered = state.tasks.filter((task) => {
+    const text = `${task.task_id} ${task.title}`.toLowerCase();
+    return matchesFilter(task) && (!search || text.includes(search));
+  });
+  if (!filtered.length) {
+    list.innerHTML = '<div class="task-sub">No tasks match this view.</div>';
+    return;
+  }
+  for (const task of filtered) {
+    const button = document.createElement("button");
+    button.className = `task-row ${task.task_id === state.selectedTaskId ? "active" : ""}`;
+    button.innerHTML = `
+      <div class="task-row-top">
+        <span class="task-title">${escapeHtml(task.current ? "* " : "")}${escapeHtml(task.title || task.task_id)}</span>
+        <span class="${statusClass(task.status)}">${escapeHtml(task.status || "UNKNOWN")}</span>
+      </div>
+      <div class="task-sub">
+        <span class="task-id">${escapeHtml(task.task_id)}</span>
+      </div>
+      <div class="task-sub">
+        <span>${escapeHtml(task.current_phase || "-")}</span>
+        <span>${task.iteration ?? "-"}/${task.max_iterations ?? "-"}</span>
+        <span>${escapeHtml(task.updated_at || "-")}</span>
+        ${task.locked ? "<span>locked</span>" : ""}
+      </div>`;
+    button.addEventListener("click", () => selectTask(task.task_id));
+    list.appendChild(button);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch]));
+}
+
+async function loadTasks(keepSelection = true) {
+  const data = await apiFetch("/api/tasks");
+  state.tasks = data.tasks || [];
+  if (!keepSelection || !state.selectedTaskId || !state.tasks.some((task) => task.task_id === state.selectedTaskId)) {
+    state.selectedTaskId = data.current_task_id || state.tasks[0]?.task_id || null;
+  }
+  renderTaskList();
+  if (state.selectedTaskId) {
+    await loadDetail(state.selectedTaskId);
+  } else {
+    renderEmptyDetail();
+  }
+}
+
+async function selectTask(taskId) {
+  state.selectedTaskId = taskId;
+  renderTaskList();
+  await loadDetail(taskId);
+}
+
+async function loadDetail(taskId) {
+  try {
+    state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+    state.runtimeIndex = 0;
+    renderDetail();
+    showBanner((state.detail.errors || []).join("; "));
+  } catch (error) {
+    showBanner(error.message);
+  }
+}
+
+function renderEmptyDetail() {
+  state.detail = null;
+  $("taskIdLabel").textContent = "No task selected";
+  $("taskTitle").textContent = "Create or select a task";
+  $("taskMeta").textContent = "";
+  ["approveBtn", "runBtn", "cancelBtn", "deleteBtn"].forEach((id) => ($(id).disabled = true));
+}
+
+function renderDetail() {
+  const detail = state.detail;
+  const task = detail.state;
+  $("taskIdLabel").textContent = task.task_id;
+  $("taskTitle").textContent = task.title || task.task_id;
+  $("taskMeta").innerHTML = `<span class="${statusClass(task.status)}">${escapeHtml(task.status)}</span> ${escapeHtml(task.current_phase || "-")} · ${task.iteration ?? "-"}/${task.max_iterations ?? "-"} · updated ${escapeHtml(task.updated_at || "-")}`;
+  setAction("approveBtn", detail.actions.approve, () => mutate("approve"));
+  setAction("runBtn", detail.actions.run, () => mutate("run"));
+  setAction("cancelBtn", detail.actions.cancel, () => mutate("cancel"));
+  setAction("deleteBtn", detail.actions.delete, openDeleteDialog);
+  renderOverview(detail);
+  renderArtifacts(detail);
+  renderConfig(detail);
+  renderRuntime(detail);
+}
+
+function setAction(id, action, handler) {
+  const button = $(id);
+  button.disabled = !action?.enabled || state.busy;
+  button.title = action?.reason || "";
+  button.onclick = handler;
+}
+
+function renderOverview(detail) {
+  const task = detail.state;
+  $("goalText").textContent = task.goal?.raw_request || task.title || "";
+  const phaseList = $("phaseList");
+  phaseList.innerHTML = "";
+  Object.entries(task.phases || {}).forEach(([name, phase]) => {
+    const item = document.createElement("div");
+    item.className = "phase-item";
+    item.innerHTML = `<strong>${escapeHtml(name)}</strong><span class="badge">${escapeHtml(phase?.status || "pending")}</span>`;
+    phaseList.appendChild(item);
+  });
+  const body = $("acceptanceBody");
+  body.innerHTML = "";
+  for (const ac of task.acceptance_criteria || []) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td>${escapeHtml(ac.id)}</td><td>${ac.required ? "yes" : "no"}</td><td>${escapeHtml(ac.verification)}</td><td>${escapeHtml(ac.description)}</td><td>${escapeHtml(ac.status)}</td><td>${escapeHtml(ac.evidence)}</td>`;
+    body.appendChild(row);
+  }
+}
+
+function renderArtifacts(detail) {
+  const list = $("artifactList");
+  list.innerHTML = "";
+  if (!detail.artifacts?.length) {
+    list.innerHTML = '<div class="task-sub">No artifacts yet.</div>';
+    return;
+  }
+  for (const artifact of detail.artifacts) {
+    const node = document.createElement("section");
+    node.className = "artifact-item";
+    const truncated = artifact.preview?.truncated ? ` · truncated ${artifact.preview.bytes_returned}/${artifact.preview.bytes_total} bytes` : "";
+    node.innerHTML = `<div class="artifact-head"><strong>${escapeHtml(artifact.name)}</strong><span class="task-sub">${artifact.size} bytes${truncated}</span></div><pre class="copy-block">${escapeHtml(artifact.preview?.content || "")}</pre>`;
+    list.appendChild(node);
+  }
+}
+
+function renderConfig(detail) {
+  $("maxIterationsInput").value = detail.config.override.max_iterations || detail.config.effective.max_iterations || 7;
+  const commands = detail.config.override.test_commands || detail.config.effective.test_commands || [];
+  const list = $("commandsList");
+  list.innerHTML = "";
+  commands.forEach((command) => addCommandRow(command));
+}
+
+function addCommandRow(value = "") {
+  const row = document.createElement("div");
+  row.className = "command-row";
+  row.innerHTML = `<input value="${escapeHtml(value)}" /><button type="button">Remove</button>`;
+  row.querySelector("button").addEventListener("click", () => row.remove());
+  $("commandsList").appendChild(row);
+}
+
+function renderRuntime(detail) {
+  const entries = [...(detail.runtime.agents || []).map((agent) => ({ type: "agent", label: agent.role || "agent", data: agent })), ...(detail.runtime.tests || []).map((test) => ({ type: "test", label: test.name, data: test }))];
+  const tabs = $("runtimeTabs");
+  const content = $("runtimeContent");
+  tabs.innerHTML = "";
+  content.innerHTML = "";
+  if (!entries.length) {
+    content.innerHTML = '<div class="task-sub">No runtime output for this iteration.</div>';
+    return;
+  }
+  entries.forEach((entry, index) => {
+    const button = document.createElement("button");
+    button.textContent = entry.label;
+    button.className = index === state.runtimeIndex ? "active" : "";
+    button.addEventListener("click", () => { state.runtimeIndex = index; renderRuntime(detail); });
+    tabs.appendChild(button);
+  });
+  const selected = entries[state.runtimeIndex] || entries[0];
+  if (selected.type === "test") {
+    const log = selected.data.log || {};
+    content.innerHTML = `<div class="runtime-meta"><span>test</span><span>${escapeHtml(log.path || selected.label)}</span>${log.truncated ? `<span>truncated ${log.bytes_returned}/${log.bytes_total} bytes</span>` : ""}</div><pre class="log-block">${escapeHtml(log.content || "")}</pre>`;
+    return;
+  }
+  const agent = selected.data;
+  const stdout = agent.stdout || {};
+  const stderr = agent.stderr || {};
+  content.innerHTML = `<div class="runtime-meta"><span>${escapeHtml(agent.runtime || "runtime")}</span><span>exit ${escapeHtml(agent.exit_code ?? "-")}</span><span>${escapeHtml(agent.duration_ms ?? "-")} ms</span><span>${escapeHtml(agent.command || "manual")}</span></div><h3>stdout</h3><pre class="log-block">${escapeHtml(stdout.content || (stdout.missing ? "Missing stdout log" : ""))}</pre><h3>stderr</h3><pre class="log-block">${escapeHtml(stderr.content || (stderr.missing ? "Missing stderr log" : ""))}</pre>`;
+}
+
+async function mutate(op) {
+  if (!state.selectedTaskId) return;
+  state.busy = true;
+  renderDetail();
+  showBanner(`Running ${op}...`);
+  try {
+    state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/${op}`, { method: "POST", body: JSON.stringify({ by: "ui" }) });
+    await loadTasks(true);
+    showBanner(null);
+  } catch (error) {
+    showBanner(error.message);
+  } finally {
+    state.busy = false;
+    if (state.detail) renderDetail();
+  }
+}
+
+function openDeleteDialog() {
+  $("deleteTaskId").textContent = state.selectedTaskId;
+  $("deleteConfirmInput").value = "";
+  $("deleteDialog").showModal();
+}
+
+function wireEvents() {
+  $("refreshBtn").addEventListener("click", () => loadTasks(true).catch((error) => showBanner(error.message)));
+  $("searchInput").addEventListener("input", renderTaskList);
+  $("newTaskBtn").addEventListener("click", () => $("createDialog").showModal());
+  $("addCommandBtn").addEventListener("click", () => addCommandRow(""));
+  $("statusFilter").addEventListener("click", (event) => {
+    if (event.target.tagName !== "BUTTON") return;
+    state.filter = event.target.dataset.filter;
+    [...$("statusFilter").querySelectorAll("button")].forEach((button) => button.classList.toggle("active", button === event.target));
+    renderTaskList();
+  });
+  $("detailTabs").addEventListener("click", (event) => {
+    if (event.target.tagName !== "BUTTON") return;
+    const tab = event.target.dataset.tab;
+    [...$("detailTabs").querySelectorAll("button")].forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
+    [...document.querySelectorAll(".tab-panel")].forEach((panel) => panel.classList.toggle("active", panel.id === `${tab}Tab`));
+  });
+  $("createForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const request = $("requestInput").value.trim();
+    if (!request) return;
+    try {
+      const detail = await apiFetch("/api/tasks", { method: "POST", body: JSON.stringify({ request }) });
+      $("createDialog").close();
+      $("requestInput").value = "";
+      state.selectedTaskId = detail.state.task_id;
+      await loadTasks(true);
+    } catch (error) { showBanner(error.message); }
+  });
+  $("deleteForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}`, { method: "DELETE", body: JSON.stringify({ confirm: $("deleteConfirmInput").value }) });
+      $("deleteDialog").close();
+      state.selectedTaskId = null;
+      await loadTasks(false);
+    } catch (error) { showBanner(error.message); }
+  });
+  $("configForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const commands = [...$("commandsList").querySelectorAll("input")].map((input) => input.value.trim()).filter(Boolean);
+    try {
+      state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/config`, { method: "PATCH", body: JSON.stringify({ max_iterations: Number($("maxIterationsInput").value), test_commands: commands }) });
+      renderDetail();
+      showBanner(null);
+    } catch (error) { showBanner(error.message); }
+  });
+}
+
+wireEvents();
+loadTasks(false).catch((error) => showBanner(error.message));
+
+
+ succeeded in 1514ms:
+"""Local HTTP server for the AgentLoop Task Console."""
+
+from __future__ import annotations
+
+import json
+import mimetypes
+import sys
+import webbrowser
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+from . import api
+from .locks import LockHeld
+from .workspace import WorkspaceError
+
+
+STATIC_DIR = Path(__file__).with_name("ui_static")
+
+
+class AgentLoopUIHandler(BaseHTTPRequestHandler):
+    server_version = "AgentLoopUI/1.0"
+
+    @property
+    def root(self) -> Path:
+        return self.server.root  # type: ignore[attr-defined]
+
+    def log_message(self, format: str, *args: object) -> None:
+        print(f"{self.address_string()} - {format % args}", file=sys.stderr)
+
+    def _send_json(self, status: int, payload: dict | list) -> None:
+        body = json.dumps(payload, indent=2).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _read_json(self) -> dict:
+        length = int(self.headers.get("Content-Length") or "0")
+        if length <= 0:
+            return {}
+        raw = self.rfile.read(length)
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            raise WorkspaceError(f"Invalid JSON payload: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise WorkspaceError("JSON payload must be an object.")
+        return payload
+
+    def _handle_error(self, exc: Exception) -> None:
+        if isinstance(exc, LockHeld):
+            self._send_json(409, api.error_payload(exc))
+        elif isinstance(exc, WorkspaceError):
+            message = str(exc).lower()
+            status = 404 if "not found" in message or "does not exist" in message else 400
+            self._send_json(status, api.error_payload(exc))
+        else:
+            print(f"unexpected ui error: {exc}", file=sys.stderr)
+            self._send_json(500, {"error": {"code": "internal_error", "message": "Unexpected server error."}})
+
+    def do_GET(self) -> None:
+        try:
+            parsed = urlparse(self.path)
+            path = parsed.path
+            if path == "/api/tasks":
+                self._send_json(200, api.build_task_list(self.root))
+                return
+            parts = [unquote(part) for part in path.split("/") if part]
+            if len(parts) == 3 and parts[:2] == ["api", "tasks"]:
+                self._send_json(200, api.build_task_detail(self.root, parts[2]))
+                return
+            if len(parts) == 5 and parts[:2] == ["api", "tasks"] and parts[3] == "artifacts":
+                self._send_json(200, api.read_artifact(self.root, parts[2], parts[4]))
+                return
+            self._serve_static(path)
+        except Exception as exc:
+            self._handle_error(exc)
+
+    def do_POST(self) -> None:
+        try:
+            parts = [unquote(part) for part in urlparse(self.path).path.split("/") if part]
+            payload = self._read_json()
+            if parts == ["api", "tasks"]:
+                self._send_json(201, api.create_task(self.root, payload))
+                return
+            if len(parts) == 4 and parts[:2] == ["api", "tasks"]:
+                task_id, op = parts[2], parts[3]
+                if op == "approve":
+                    self._send_json(200, api.approve_task_api(self.root, task_id, payload))
+                    return
+                if op == "cancel":
+                    self._send_json(200, api.cancel_task_api(self.root, task_id, payload))
+                    return
+                if op == "run":
+                    self._send_json(200, api.run_task_api(self.root, task_id, payload))
+                    return
+            self._send_json(404, {"error": {"code": "not_found", "message": "Endpoint not found."}})
+        except Exception as exc:
+            self._handle_error(exc)
+
+    def do_PATCH(self) -> None:
+        try:
+            parts = [unquote(part) for part in urlparse(self.path).path.split("/") if part]
+            if len(parts) == 4 and parts[:2] == ["api", "tasks"] and parts[3] == "config":
+                self._send_json(200, api.patch_task_config(self.root, parts[2], self._read_json()))
+                return
+            self._send_json(404, {"error": {"code": "not_found", "message": "Endpoint not found."}})
+        except Exception as exc:
+            self._handle_error(exc)
+
+    def do_DELETE(self) -> None:
+        try:
+            parts = [unquote(part) for part in urlparse(self.path).path.split("/") if part]
+            if len(parts) == 3 and parts[:2] == ["api", "tasks"]:
+                self._send_json(200, api.delete_task(self.root, parts[2], self._read_json()))
+                return
+            self._send_json(404, {"error": {"code": "not_found", "message": "Endpoint not found."}})
+        except Exception as exc:
+            self._handle_error(exc)
+
+    def _serve_static(self, request_path: str) -> None:
+        name = "index.html" if request_path in {"/", ""} else request_path.lstrip("/")
+        if ".." in Path(name).parts:
+            self.send_error(404)
+            return
+        path = (STATIC_DIR / name).resolve()
+        if not str(path).lower().startswith(str(STATIC_DIR.resolve()).lower()) or not path.is_file():
+            self.send_error(404)
+            return
+        data = path.read_bytes()
+        content_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+        if path.suffix == ".js":
+            content_type = "text/javascript"
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+
+def serve(root: Path, host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False) -> None:
+    class Server(ThreadingHTTPServer):
+        pass
+
+    server = Server((host, port), AgentLoopUIHandler)
+    server.root = root.resolve()  # type: ignore[attr-defined]
+    url = f"http://{host}:{server.server_port}"
+    print(f"AgentLoop Task Console: {url}")
+    print("Press Ctrl+C to stop.")
+    if open_browser:
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nAgentLoop UI stopped.")
+    finally:
+        server.server_close()
+
+
+codex
+The current tests cover the pure API builders, including task creation, config patching, deletion, runtime logs, and action enablement. The gap is the HTTP layer that the browser UI actually calls, so I’m adding a small integration test around the local server handler.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw agentloop\\cli.py" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw agentloop\\tasks.py" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw agentloop\\logs.py" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1406ms:
+"""Command-line interface for AgentLoop."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import shlex
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Callable, Sequence
+
+from .config import add_command_runtime, add_preset_runtime, assign_all_runtime, assign_runtime, detect_runtimes, list_runtimes, set_default_runtime
+from .locks import LockHeld, lock_path, task_lock
+from .models import default_state, next_action
+from .tasks import (
+    INACTIVE_STATUSES,
+    active_task_ids,
+    apply_task_config_patch,
+    clear_task_config,
+    current_task_id,
+    effective_config,
+    list_task_ids,
+    load_task_config,
+    load_task_state,
+    migrate_workspace,
+    resolve_task_id,
+    save_task_state,
+    select_task_ids,
+    set_current_task_id,
+    task_dir,
+    task_snapshot,
+    task_state_path,
+    unset_task_config_key,
+)
+from .verify import verify_runtime
+from .workspace import WorkspaceError, agentloop_path, init_workspace, load_config, load_state, save_state
+from .workflow import approve_task, cancel_task, run_task, start_task
+
+
+def configure_output_encoding() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+
+
+def _add_task_id_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("task_id", nargs="?", default=None, help="Optional task id. Defaults to the single active task.")
+    parser.add_argument("--task-id", dest="task_id_opt", default=None, help="Task id selector (alternative to positional).")
+
+
+def _add_selector_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--task-id", dest="task_ids", action="append", default=[], help="Target task id (repeatable).")
+    parser.add_argument("--all", dest="all_tasks", action="store_true", help="Target every task in the workspace.")
+    parser.add_argument("--status", dest="statuses", action="append", default=[], help="Target every task with this status (repeatable).")
+    parser.add_argument("--dry-run", action="store_true", help="Print the selection without acting.")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="agentloop",
+        description="Local, agent-agnostic orchestration for coding tasks.",
+    )
+    parser.add_argument("--root", default=".", help="Workspace root. Defaults to the current directory.")
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    init_parser = subparsers.add_parser("init", help="Initialize .agentloop in the workspace.")
+    init_parser.add_argument("--detect-runtimes", action="store_true", help="Detect local Codex/Claude/Copilot runtimes after init.")
+    init_parser.add_argument("--replace-runtimes", action="store_true", help="Replace existing detected runtime entries during --detect-runtimes.")
+    status_parser = subparsers.add_parser("status", help="Show task status.")
+    _add_task_id_argument(status_parser)
+
+    tasks_parser = subparsers.add_parser("tasks", help="Inventory, batch lifecycle, per-task config, locks.")
+    tasks_subparsers = tasks_parser.add_subparsers(dest="tasks_command")
+
+    list_parser = tasks_subparsers.add_parser("list", help="List AgentLoop tasks.")
+    list_parser.add_argument("--status", dest="statuses", action="append", default=[], help="Filter by status (repeatable).")
+    list_parser.add_argument("--json", dest="as_json", action="store_true", help="Emit JSON.")
+
+    tasks_delete_parser = tasks_subparsers.add_parser("delete", help="Delete one task by task_id.")
+    tasks_delete_parser.add_argument("task_id", help="Task id to delete.")
+    tasks_subparsers.add_parser("delete-all", aliases=["clear"], help="Delete all tasks and reset current state.")
+
+    # Batch lifecycle
+    for op in ("approve", "cancel"):
+        sp = tasks_subparsers.add_parser(op, help=f"Batch {op} multiple tasks.")
+        _add_selector_arguments(sp)
+        sp.add_argument("--by", default="requester", help=f"Name recorded as {op}-er.")
+    run_batch = tasks_subparsers.add_parser("run", help="Batch run multiple tasks.")
+    _add_selector_arguments(run_batch)
+    run_batch.add_argument("--wait", action="store_true", help="Wait for per-task lock instead of failing fast.")
+    run_batch.add_argument("--parallel", type=int, default=1, help="Number of concurrent runs (default 1).")
+
+    unlock_parser = tasks_subparsers.add_parser("unlock", help="Remove a stale task lock.")
+    unlock_parser.add_argument("task_id", help="Task id to unlock.")
+
+    tasks_subparsers.add_parser("migrate", help="Run workspace migration (idempotent).")
+
+    # Config subgroup
+    config_parser = tasks_subparsers.add_parser("config", help="Per-task config overrides.")
+    config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
+    cfg_show = config_subparsers.add_parser("show", help="Show per-task config or effective merged config.")
+    cfg_show.add_argument("task_id")
+    cfg_show.add_argument("--effective", action="store_true", help="Show merged effective config instead of the raw override.")
+    cfg_set = config_subparsers.add_parser("set", help="Set a per-task config key on one or more tasks.")
+    _add_selector_arguments(cfg_set)
+    cfg_set.add_argument("key", help="Dotted key, e.g. test_commands, max_iterations, roles.reviewer.runtime")
+    cfg_set.add_argument("value", help="Value (string by default).")
+    cfg_set.add_argument("--json", dest="value_is_json", action="store_true", help="Treat value as JSON.")
+    cfg_unset = config_subparsers.add_parser("unset", help="Remove a per-task config key on one or more tasks.")
+    _add_selector_arguments(cfg_unset)
+    cfg_unset.add_argument("key")
+    cfg_clear = config_subparsers.add_parser("clear", help="Delete per-task config override file(s) entirely.")
+    _add_selector_arguments(cfg_clear)
+
+    start_parser = subparsers.add_parser("start", help="Start a task and draft analysis artifacts.")
+    start_parser.add_argument("task", help="Task request to analyze.")
+
+    approve_parser = subparsers.add_parser("approve", help="Approve the analysis and acceptance criteria.")
+    _add_task_id_argument(approve_parser)
+    approve_parser.add_argument("--by", default="requester", help="Name to record as the approver. Defaults to requester.")
+
+    cancel_parser = subparsers.add_parser("cancel", help="Cancel a task.")
+    _add_task_id_argument(cancel_parser)
+    cancel_parser.add_argument("--by", default="requester", help="Name to record as the canceller.")
+
+    run_parser = subparsers.add_parser("run", help="Run or resume the design/test/review loop.")
+    _add_task_id_argument(run_parser)
+    run_parser.add_argument("--wait", action="store_true", help="Wait for per-task lock instead of failing fast.")
+
+    ui_parser = subparsers.add_parser("ui", help="Start the local AgentLoop Task Console UI.")
+    ui_parser.add_argument("--host", default="127.0.0.1", help="Host to bind. Defaults to 127.0.0.1.")
+    ui_parser.add_argument("--port", type=int, default=8765, help="Port to bind. Defaults to 8765.")
+    ui_parser.add_argument("--open", action="store_true", help="Open the UI in the default browser.")
+
+    runtime_parser = subparsers.add_parser("runtime", help="Manage coding agent runtimes.")
+    runtime_subparsers = runtime_parser.add_subparsers(dest="runtime_command", required=True)
+
+    runtime_subparsers.add_parser("list", help="List configured runtimes and role assignments.")
+    detect_parser = runtime_subparsers.add_parser("detect", help="Detect local Codex/Claude/Copilot runtime commands.")
+    detect_parser.add_argument("--replace", action="store_true", help="Replace existing detected runtime entries.")
+
+    add_command_parser = runtime_subparsers.add_parser("add-command", help="Add a command-based runtime.")
+    add_command_parser.add_argument("name", help="Runtime name.")
+    add_command_parser.add_argument("--command", dest="runtime_executable", required=True, help="Executable to run.")
+    add_command_parser.add_argument("--arg", action="append", default=[], help="Argument (repeatable). Supports {prompt_file}, {cwd}, {role}, {iteration}.")
+    add_command_parser.add_argument("--args", default=None, help="Shell-like argument string.")
+    add_command_parser.add_argument("--stdin-file", default=None)
+    add_command_parser.add_argument("--timeout-seconds", type=int, default=None)
+    add_command_parser.add_argument("--set-default", action="store_true")
+    add_command_parser.add_argument("--replace", action="store_true")
+
+    add_preset_parser = runtime_subparsers.add_parser("add-preset", help="Add a built-in runtime preset.")
+    add_preset_parser.add_argument("preset")
+    add_preset_parser.add_argument("--assign", action="append", default=[])
+    add_preset_parser.add_argument("--assign-all", action="store_true")
+    add_preset_parser.add_argument("--set-default", action="store_true")
+    add_preset_parser.add_argument("--replace", action="store_true")
+
+    assign_parser = runtime_subparsers.add_parser("assign", help="Assign a runtime to a role.")
+    assign_parser.add_argument("role")
+    assign_parser.add_argument("runtime")
+
+    assign_all_parser = runtime_subparsers.add_parser("assign-all", help="Assign a runtime to all roles.")
+    assign_all_parser.add_argument("runtime")
+    assign_all_parser.add_argument("--except", dest="except_roles", action="append", default=[])
+
+    default_parser = runtime_subparsers.add_parser("set-default", help="Set the default runtime.")
+    default_parser.add_argument("runtime")
+
+    verify_parser = runtime_subparsers.add_parser("verify", help="Verify a command runtime can produce AgentLoop artifacts.")
+    verify_parser.add_argument("runtime")
+    verify_parser.add_argument("--timeout-seconds", type=int, default=300)
+
+    return parser
+
+
+def _resolve_task_arg(args: argparse.Namespace) -> str | None:
+    return getattr(args, "task_id", None) or getattr(args, "task_id_opt", None)
+
+
+# ---------- simple commands ----------
+
+
+def print_detect_summary(result: dict[str, Any]) -> None:
+    detected = result.get("detected", {})
+    installed = set(result.get("installed", []) or [])
+    skipped = set(result.get("skipped", []) or [])
+    print("Runtime detection:")
+    if not detected:
+        print("  detected: none")
+        print("  next: use `python -m agentloop runtime add-command ...` to configure a runtime manually")
+        return
+    for name, runtime in sorted(detected.items()):
+        status = "installed" if name in installed else "skipped"
+        if name in skipped:
+            status = "skipped existing"
+        print(f"  - {name}: {status} command={runtime.get('command')}")
+    print("  next:")
+    print("    python -m agentloop runtime assign-all <runtime>")
+    print("    python -m agentloop runtime verify <runtime> --timeout-seconds 120")
+
+
+def cmd_init(root: Path, detect: bool = False, replace_runtimes: bool = False) -> int:
+    result = init_workspace(root)
+    print("AgentLoop initialized.")
+    if result["created"]:
+        print("Created:")
+        for item in result["created"]:
+            print(f"  - {item}")
+    if result["skipped"]:
+        print("Already existed:")
+        for item in result["skipped"]:
+            print(f"  - {item}")
+    if detect:
+        print_detect_summary(detect_runtimes(root, replace=replace_runtimes))
+    return 0
+
+
+def cmd_status(root: Path, explicit_task: str | None) -> int:
+    if explicit_task:
+        tid = resolve_task_id(root, explicit_task)
+        state = load_task_state(root, tid)
+        config = effective_config(root, tid)
+    else:
+        try:
+            tid = resolve_task_id(root, None)
+            state = load_task_state(root, tid)
+            config = effective_config(root, tid)
+        except WorkspaceError:
+            state = load_state(root)
+            config = load_config(root)
+    print("AgentLoop status")
+    print(f"  task_id: {state.get('task_id') or '-'}")
+    print(f"  title: {state.get('title') or '-'}")
+    print(f"  status: {state.get('status')}")
+    print(f"  current_phase: {state.get('current_phase') or '-'}")
+    print(f"  iteration: {state.get('iteration', 0)}/{state.get('max_iterations', config.get('max_iterations', '-'))}")
+    print(f"  default_runtime: {config.get('default_runtime', '-')}")
+    print(f"  next_action: {next_action(state)}")
+    return 0
+
+
+# ---------- tasks subgroup ----------
+
+
+def cmd_tasks_list(root: Path, statuses: list[str], as_json: bool) -> int:
+    current = current_task_id(root)
+    wanted = {s.upper() for s in statuses}
+    rows: list[dict[str, Any]] = []
+    for tid in list_task_ids(root):
+        snap = task_snapshot(root, tid)
+        if wanted and str(snap.get("status", "")).upper() not in wanted:
+            continue
+        rows.append(snap)
+
+    if as_json:
+        print(json.dumps([
+            {
+                "task_id": r.get("task_id"),
+                "title": r.get("title"),
+                "status": r.get("status"),
+                "iteration": r.get("iteration"),
+                "max_iterations": r.get("max_iterations"),
+                "current": r.get("task_id") == current,
+            }
+            for r in rows
+        ], indent=2))
+        return 0
+
+    print("AgentLoop tasks")
+    if not rows:
+        print("  - none")
+        return 0
+    for snap in rows:
+        marker = "*" if snap.get("task_id") == current else " "
+        title = str(snap.get("title") or "-").replace("\n", " ")
+        if len(title) > 80:
+            title = title[:77] + "..."
+        tid = snap.get("task_id")
+        print(f"  {marker} {tid}")
+        print(f"      status: {snap.get('status', '-')}")
+        print(f"      iteration: {snap.get('iteration', '-')}/{snap.get('max_iterations', '-')}")
+        print(f"      title: {title}")
+        print(f"      artifacts: .agentloop/tasks/{tid}/artifacts/")
+    return 0
+
+
+def reset_current_state(root: Path) -> None:
+    save_state(root, default_state())
+
+
+def delete_task_dir(root: Path, task_id: str) -> bool:
+    target = task_dir(root, task_id)
+    if not target.exists():
+        return False
+    if not target.is_dir():
+        raise WorkspaceError(f"Task path is not a directory: {task_id}")
+    shutil.rmtree(target)
+    return True
+
+
+def clear_run_and_global_artifacts(root: Path) -> None:
+    for name in ["runs", "artifacts"]:
+        path = agentloop_path(root) / name
+        if path.exists():
+            shutil.rmtree(path)
+        path.mkdir(parents=True, exist_ok=True)
+
+
+def cmd_tasks_delete(root: Path, task_id: str) -> int:
+    current = current_task_id(root)
+    deleted = delete_task_dir(root, task_id)
+    if not deleted:
+        raise WorkspaceError(f"Task does not exist: {task_id}")
+    if current == task_id:
+        reset_current_state(root)
+    print("AgentLoop task deleted.")
+    print(f"  task_id: {task_id}")
+    print(f"  reset_current_state: {'yes' if current == task_id else 'no'}")
+    return 0
+
+
+def cmd_tasks_delete_all(root: Path) -> int:
+    tasks = list_task_ids(root)
+    for tid in tasks:
+        delete_task_dir(root, tid)
+    clear_run_and_global_artifacts(root)
+    reset_current_state(root)
+    print("AgentLoop tasks deleted.")
+    print(f"  deleted: {len(tasks)}")
+    print("  status: CREATED")
+    return 0
+
+
+def cmd_tasks_unlock(root: Path, task_id: str) -> int:
+    path = lock_path(root, task_id)
+    if not path.exists():
+        print(f"No lock present for task {task_id}.")
+        return 0
+    path.unlink()
+    print(f"Lock removed for task {task_id}.")
+    return 0
+
+
+def cmd_tasks_migrate(root: Path) -> int:
+    summary = migrate_workspace(root)
+    print("AgentLoop workspace migrated.")
+    print(json.dumps(summary, indent=2))
+    return 0
+
+
+# ---------- batch lifecycle helpers ----------
+
+
+def _resolve_selection(root: Path, args: argparse.Namespace) -> list[str]:
+    return select_task_ids(
+        root,
+        task_ids=list(getattr(args, "task_ids", []) or []),
+        all_tasks=bool(getattr(args, "all_tasks", False)),
+        statuses=list(getattr(args, "statuses", []) or []),
+    )
+
+
+def _print_batch_summary(label: str, results: list[tuple[str, str, str]]) -> int:
+    print(f"AgentLoop batch {label}:")
+    failures = 0
+    for status, tid, message in results:
+        print(f"  - {status:5s}  {tid}  {message}")
+        if status != "ok":
+            failures += 1
+    print(f"  total: {len(results)}  ok: {len(results) - failures}  error: {failures}")
+    return 0 if failures == 0 else 1
+
+
+def _run_batch_op(
+    root: Path,
+    selection: list[str],
+    *,
+    op: Callable[[str], str],
+    blocking: bool = False,
+    parallel: int = 1,
+) -> list[tuple[str, str, str]]:
+    def runner(tid: str) -> tuple[str, str, str]:
+        try:
+            with task_lock(root, tid, blocking=blocking):
+                message = op(tid)
+            return ("ok", tid, message)
+        except (WorkspaceError, LockHeld) as exc:
+            return ("error", tid, str(exc).replace("\n", " | "))
+
+    if parallel <= 1:
+        return [runner(tid) for tid in selection]
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+        return list(pool.map(runner, selection))
+
+
+def cmd_tasks_batch_approve(root: Path, args: argparse.Namespace) -> int:
+    selection = _resolve_selection(root, args)
+    if args.dry_run:
+        print("dry-run selection:")
+        for tid in selection:
+            print(f"  - {tid}")
+        return 0
+
+    def op(tid: str) -> str:
+        approve_task(root, approved_by=args.by, task_id=tid)
+        return "approved"
+
+    return _print_batch_summary("approve", _run_batch_op(root, selection, op=op))
+
+
+def cmd_tasks_batch_cancel(root: Path, args: argparse.Namespace) -> int:
+    selection = _resolve_selection(root, args)
+    if args.dry_run:
+        print("dry-run selection:")
+        for tid in selection:
+            print(f"  - {tid}")
+        return 0
+
+    def op(tid: str) -> str:
+        cancel_task(root, cancelled_by=args.by, task_id=tid)
+        return "cancelled"
+
+    return _print_batch_summary("cancel", _run_batch_op(root, selection, op=op))
+
+
+def cmd_tasks_batch_run(root: Path, args: argparse.Namespace) -> int:
+    selection = _resolve_selection(root, args)
+    if args.dry_run:
+        print("dry-run selection:")
+        for tid in selection:
+            print(f"  - {tid}")
+        return 0
+
+    def op(tid: str) -> str:
+        state = run_task(root, task_id=tid)
+        return f"status: {state.get('status')} iteration: {state.get('iteration')}"
+
+    results = _run_batch_op(
+        root,
+        selection,
+        op=op,
+        blocking=args.wait,
+        parallel=max(1, args.parallel),
+    )
+    return _print_batch_summary("run", results)
+
+
+# ---------- per-task config commands ----------
+
+
+def _parse_value(raw: str, as_json: bool) -> Any:
+    if as_json:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise WorkspaceError(f"Invalid JSON value: {exc}")
+    if raw.lstrip("-").isdigit():
+        return int(raw)
+    return raw
+
+
+def cmd_tasks_config_show(root: Path, task_id: str, show_effective: bool) -> int:
+    resolved = resolve_task_id(root, task_id)
+    if show_effective:
+        data = effective_config(root, resolved)
+    else:
+        data = load_task_config(root, resolved)
+    print(json.dumps(data, indent=2))
+    return 0
+
+
+def cmd_tasks_config_set(root: Path, args: argparse.Namespace) -> int:
+    selection = _resolve_selection(root, args)
+    value = _parse_value(args.value, args.value_is_json)
+    if args.dry_run:
+        print("dry-run:")
+        for tid in selection:
+            print(f"  - set {tid}.{args.key} = {value!r}")
+        return 0
+
+    def op(tid: str) -> str:
+        apply_task_config_patch(root, tid, args.key, value)
+        return f"set {args.key}"
+
+    return _print_batch_summary("config set", _run_batch_op(root, selection, op=op))
+
+
+def cmd_tasks_config_unset(root: Path, args: argparse.Namespace) -> int:
+    selection = _resolve_selection(root, args)
+    if args.dry_run:
+        print("dry-run:")
+        for tid in selection:
+            print(f"  - unset {tid}.{args.key}")
+        return 0
+
+    def op(tid: str) -> str:
+        unset_task_config_key(root, tid, args.key)
+        return f"unset {args.key}"
+
+    return _print_batch_summary("config unset", _run_batch_op(root, selection, op=op))
+
+
+def cmd_tasks_config_clear(root: Path, args: argparse.Namespace) -> int:
+    selection = _resolve_selection(root, args)
+    if args.dry_run:
+        print("dry-run:")
+        for tid in selection:
+            print(f"  - clear {tid}")
+        return 0
+
+    def op(tid: str) -> str:
+        clear_task_config(root, tid)
+        return "cleared"
+
+    return _print_batch_summary("config clear", _run_batch_op(root, selection, op=op))
+
+
+# ---------- single-task lifecycle ----------
+
+
+def cmd_start(root: Path, task: str) -> int:
+    state = start_task(root, task)
+    analysis = state.get("phases", {}).get("analysis", {}).get("artifact")
+    acceptance = state.get("phases", {}).get("alignment", {}).get("artifact")
+    print("AgentLoop task started.")
+    print(f"  task_id: {state.get('task_id')}")
+    print("  status: WAITING_FOR_ALIGNMENT")
+    print("  artifacts:")
+    print(f"    - {analysis}")
+    print(f"    - {acceptance}")
+    print(f"  next_action: {next_action(state)}")
+    return 0
+
+
+def cmd_approve(root: Path, approved_by: str, task_id: str | None) -> int:
+    state = approve_task(root, approved_by=approved_by, task_id=task_id)
+    print("AgentLoop alignment approved.")
+    print(f"  task_id: {state.get('task_id')}")
+    print(f"  approved_by: {approved_by}")
+    print("  status: READY_TO_START")
+    print(f"  next_action: {next_action(state)}")
+    return 0
+
+
+def cmd_cancel(root: Path, cancelled_by: str, task_id: str | None) -> int:
+    state = cancel_task(root, cancelled_by=cancelled_by, task_id=task_id)
+    print("AgentLoop task cancelled.")
+    print(f"  task_id: {state.get('task_id')}")
+    print(f"  cancelled_by: {cancelled_by}")
+    print("  status: CANCELLED")
+    print(f"  next_action: {next_action(state)}")
+    return 0
+
+
+def cmd_run(root: Path, task_id: str | None, wait: bool) -> int:
+    tid = resolve_task_id(root, task_id)
+    try:
+        with task_lock(root, tid, blocking=wait):
+            state = run_task(root, task_id=tid)
+    except LockHeld as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print("AgentLoop run completed.")
+    print(f"  task_id: {state.get('task_id')}")
+    print(f"  status: {state.get('status')}")
+    print(f"  current_phase: {state.get('current_phase')}")
+    print(f"  iteration: {state.get('iteration')}/{state.get('max_iterations')}")
+    review = state.get("phases", {}).get("review", {}).get("last_review")
+    if review:
+        print(f"  review: {review}")
+    print(f"  next_action: {next_action(state)}")
+    return 0
+
+
+# ---------- runtime commands (unchanged) ----------
+
+
+def cmd_runtime_list(root: Path) -> int:
+    config = list_runtimes(root)
+    print("AgentLoop runtimes")
+    print(f"  default_runtime: {config.get('default_runtime', '-')}")
+    print("  runtimes:")
+    for name, runtime in sorted(config.get("runtimes", {}).items()):
+        adapter = runtime.get("adapter", "command") if isinstance(runtime, dict) else "-"
+        command = runtime.get("command", "") if isinstance(runtime, dict) else ""
+        suffix = f" command={command}" if command else ""
+        print(f"    - {name}: adapter={adapter}{suffix}")
+    print("  roles:")
+    for role, role_config in sorted(config.get("roles", {}).items()):
+        runtime = role_config.get("runtime", config.get("default_runtime", "-")) if isinstance(role_config, dict) else "-"
+        print(f"    - {role}: {runtime}")
+    return 0
+
+
+def cmd_runtime_detect(root: Path, replace: bool) -> int:
+    print_detect_summary(detect_runtimes(root, replace=replace))
+    return 0
+
+
+def cmd_runtime_add_command(root: Path, args: argparse.Namespace) -> int:
+    runtime_args = list(args.arg or [])
+    if args.args:
+        runtime_args.extend(shlex.split(args.args))
+    config = add_command_runtime(
+        root,
+        name=args.name,
+        command=args.runtime_executable,
+        args=runtime_args,
+        stdin_file=args.stdin_file,
+        timeout_seconds=args.timeout_seconds,
+        set_default=args.set_default,
+        replace=args.replace,
+    )
+    print("Runtime added.")
+    print(f"  name: {args.name}")
+    print("  adapter: command")
+    print(f"  command: {args.runtime_executable}")
+    print(f"  args: {runtime_args}")
+    if args.stdin_file:
+        print(f"  stdin_file: {args.stdin_file}")
+    print(f"  default_runtime: {config.get('default_runtime')}")
+    return 0
+
+
+def cmd_runtime_add_preset(root: Path, args: argparse.Namespace) -> int:
+    config = add_preset_runtime(
+        root,
+        preset=args.preset,
+        assign_roles=list(args.assign or []),
+        assign_all=args.assign_all,
+        set_default=args.set_default,
+        replace=args.replace,
+    )
+    print("Runtime preset added.")
+    print(f"  preset: {args.preset}")
+    print(f"  default_runtime: {config.get('default_runtime')}")
+    if args.assign_all:
+        print("  assigned: all roles")
+    elif args.assign:
+        print(f"  assigned: {', '.join(args.assign)}")
+    else:
+        print("  assigned: -")
+    return 0
+
+
+def cmd_runtime_assign(root: Path, role: str, runtime: str) -> int:
+    assign_runtime(root, role, runtime)
+    print("Runtime assigned.")
+    print(f"  role: {role}")
+    print(f"  runtime: {runtime}")
+    return 0
+
+
+def cmd_runtime_assign_all(root: Path, runtime: str, except_roles: list[str]) -> int:
+    assign_all_runtime(root, runtime, except_roles=except_roles)
+    print("Runtime assigned to roles.")
+    print(f"  runtime: {runtime}")
+    if except_roles:
+        print(f"  except: {', '.join(except_roles)}")
+    else:
+        print("  except: -")
+    return 0
+
+
+def cmd_runtime_set_default(root: Path, runtime: str) -> int:
+    set_default_runtime(root, runtime)
+    print("Default runtime updated.")
+    print(f"  default_runtime: {runtime}")
+    return 0
+
+
+def cmd_runtime_verify(root: Path, runtime: str, timeout_seconds: int) -> int:
+    result = verify_runtime(root, runtime, timeout_seconds=timeout_seconds)
+    print("Runtime verified.")
+    print(f"  runtime: {runtime}")
+    print(f"  exit_code: {result.get('exit_code')}")
+    print(f"  stdout_log: {result.get('stdout_log')}")
+    print(f"  stderr_log: {result.get('stderr_log')}")
+    print("  artifact: .agentloop/artifacts/runtime-verify.txt")
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    configure_output_encoding()
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    root = Path(args.root).resolve()
+
+    # Best-effort lazy migration. Skip for commands that need a clean workspace.
+    if args.command not in {"init"}:
+        try:
+            if (root / ".agentloop").exists():
+                migrate_workspace(root)
+        except Exception:
+            pass
+
+    try:
+        if args.command == "init":
+            return cmd_init(root, detect=args.detect_runtimes, replace_runtimes=args.replace_runtimes)
+        if args.command == "status":
+            return cmd_status(root, _resolve_task_arg(args))
+        if args.command == "tasks":
+            if args.tasks_command in {None, "list"}:
+                statuses = list(getattr(args, "statuses", []) or [])
+                as_json = bool(getattr(args, "as_json", False))
+                return cmd_tasks_list(root, statuses, as_json)
+            if args.tasks_command == "delete":
+                return cmd_tasks_delete(root, args.task_id)
+            if args.tasks_command in {"delete-all", "clear"}:
+                return cmd_tasks_delete_all(root)
+            if args.tasks_command == "unlock":
+                return cmd_tasks_unlock(root, args.task_id)
+            if args.tasks_command == "migrate":
+                return cmd_tasks_migrate(root)
+            if args.tasks_command == "approve":
+                return cmd_tasks_batch_approve(root, args)
+            if args.tasks_command == "cancel":
+                return cmd_tasks_batch_cancel(root, args)
+            if args.tasks_command == "run":
+                return cmd_tasks_batch_run(root, args)
+            if args.tasks_command == "config":
+                if args.config_command == "show":
+                    return cmd_tasks_config_show(root, args.task_id, args.effective)
+                if args.config_command == "set":
+                    return cmd_tasks_config_set(root, args)
+                if args.config_command == "unset":
+                    return cmd_tasks_config_unset(root, args)
+                if args.config_command == "clear":
+                    return cmd_tasks_config_clear(root, args)
+        if args.command == "start":
+            return cmd_start(root, args.task)
+        if args.command == "approve":
+            return cmd_approve(root, args.by, _resolve_task_arg(args))
+        if args.command == "cancel":
+            return cmd_cancel(root, args.by, _resolve_task_arg(args))
+        if args.command == "run":
+            return cmd_run(root, _resolve_task_arg(args), args.wait)
+        if args.command == "ui":
+            from .ui import serve
+
+            serve(root, host=args.host, port=args.port, open_browser=args.open)
+            return 0
+        if args.command == "runtime":
+            if args.runtime_command == "list":
+                return cmd_runtime_list(root)
+            if args.runtime_command == "detect":
+                return cmd_runtime_detect(root, args.replace)
+            if args.runtime_command == "add-command":
+                return cmd_runtime_add_command(root, args)
+            if args.runtime_command == "add-preset":
+                return cmd_runtime_add_preset(root, args)
+            if args.runtime_command == "assign":
+                return cmd_runtime_assign(root, args.role, args.runtime)
+            if args.runtime_command == "assign-all":
+                return cmd_runtime_assign_all(root, args.runtime, list(args.except_roles or []))
+            if args.runtime_command == "set-default":
+                return cmd_runtime_set_default(root, args.runtime)
+            if args.runtime_command == "verify":
+                return cmd_runtime_verify(root, args.runtime, args.timeout_seconds)
+    except WorkspaceError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    parser.error(f"unknown command: {args.command}")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
+ succeeded in 1364ms:
+"""Safe bounded readers for AgentLoop UI artifacts and logs."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from .workspace import WorkspaceError
+
+
+DEFAULT_LIMIT_BYTES = 64 * 1024
+
+
+def _is_relative_to(path: Path, base: Path) -> bool:
+    try:
+        path.relative_to(base)
+        return True
+    except ValueError:
+        return False
+
+
+def resolve_under(base: Path, relative: str | Path) -> Path:
+    if isinstance(relative, Path):
+        candidate = relative
+    else:
+        if not relative or "\x00" in relative:
+            raise WorkspaceError("Invalid path.")
+        candidate = Path(relative)
+    if candidate.is_absolute():
+        resolved = candidate.resolve()
+    else:
+        resolved = (base / candidate).resolve()
+    resolved_base = base.resolve()
+    if not _is_relative_to(resolved, resolved_base):
+        raise WorkspaceError("Path escapes allowed directory.")
+    return resolved
+
+
+def bounded_text(path: Path, *, limit_bytes: int = DEFAULT_LIMIT_BYTES) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "path": str(path),
+        "exists": path.exists(),
+        "missing": not path.exists(),
+        "truncated": False,
+        "bytes_total": 0,
+        "bytes_returned": 0,
+        "content": "",
+    }
+    if not path.exists():
+        return payload
+    if not path.is_file():
+        raise WorkspaceError(f"Path is not a file: {path}")
+
+    size = path.stat().st_size
+    payload["bytes_total"] = size
+    with path.open("rb") as handle:
+        if size > limit_bytes:
+            handle.seek(max(size - limit_bytes, 0))
+            raw = handle.read(limit_bytes)
+            payload["truncated"] = True
+        else:
+            raw = handle.read()
+    text = raw.decode("utf-8", errors="replace")
+    payload["bytes_returned"] = len(raw)
+    payload["content"] = text
+    return payload
+
+
+def bounded_workspace_file(root: Path, relative: str, *, limit_bytes: int = DEFAULT_LIMIT_BYTES) -> dict[str, Any]:
+    path = resolve_under(root, relative)
+    payload = bounded_text(path, limit_bytes=limit_bytes)
+    payload["path"] = path.resolve().relative_to(root.resolve()).as_posix()
+    return payload
+
+
+ succeeded in 1422ms:
+"""Per-task discovery, IO, configuration merge, resolver, and migration."""
+
+from __future__ import annotations
+
+import copy
+import json
+import shutil
+from pathlib import Path
+from typing import Any
+
+from .models import default_config, default_state
+from .workspace import (
+    WorkspaceError,
+    agentloop_path,
+    load_config,
+    state_path,
+    write_json,
+)
+
+
+TERMINAL_STATUSES = {"DONE", "CANCELLED"}
+INACTIVE_STATUSES = {"CREATED"} | TERMINAL_STATUSES
+
+
+def tasks_dir(root: Path) -> Path:
+    return agentloop_path(root) / "tasks"
+
+
+def task_dir(root: Path, task_id: str) -> Path:
+    if not task_id or task_id in {".", ".."} or any(sep in task_id for sep in ["/", "\\"]):
+        raise WorkspaceError(f"Invalid task_id: {task_id}")
+    base = tasks_dir(root)
+    target = (base / task_id).resolve()
+    if not str(target).lower().startswith(str(base.resolve()).lower()):
+        raise WorkspaceError(f"Invalid task path: {task_id}")
+    return target
+
+
+def task_state_path(root: Path, task_id: str) -> Path:
+    return task_dir(root, task_id) / "state.json"
+
+
+def task_config_path(root: Path, task_id: str) -> Path:
+    return task_dir(root, task_id) / "config.json"
+
+
+def list_task_ids(root: Path) -> list[str]:
+    base = tasks_dir(root)
+    if not base.exists():
+        return []
+    return sorted(item.name for item in base.iterdir() if item.is_dir())
+
+
+def load_task_state(root: Path, task_id: str) -> dict[str, Any]:
+    path = task_state_path(root, task_id)
+    if not path.exists():
+        raise WorkspaceError(f"Task state not found: {task_id}")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise WorkspaceError(f"Invalid task state: {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise WorkspaceError(f"Invalid task state: {path}: expected object")
+    return data
+
+
+def save_task_state(root: Path, task_id: str, state: dict[str, Any]) -> None:
+    write_json(task_state_path(root, task_id), state)
+    pointer = _read_pointer(root)
+    current = pointer.get("current_task_id") or pointer.get("task_id")
+    if current is None or current == task_id:
+        # Mirror to legacy global state for backwards compatibility.
+        write_json(state_path(root), state)
+
+
+def _read_pointer(root: Path) -> dict[str, Any]:
+    path = state_path(root)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def set_current_task_id(root: Path, task_id: str | None) -> None:
+    pointer = _read_pointer(root)
+    if not pointer:
+        pointer = default_state()
+    pointer["task_id"] = task_id
+    if task_id:
+        try:
+            state = load_task_state(root, task_id)
+            write_json(state_path(root), state)
+            return
+        except WorkspaceError:
+            pass
+    write_json(state_path(root), pointer)
+
+
+def current_task_id(root: Path) -> str | None:
+    value = _read_pointer(root).get("task_id")
+    return value if isinstance(value, str) and value else None
+
+
+def active_task_ids(root: Path) -> list[str]:
+    out: list[str] = []
+    for tid in list_task_ids(root):
+        try:
+            state = load_task_state(root, tid)
+        except WorkspaceError:
+            continue
+        if state.get("status") not in INACTIVE_STATUSES:
+            out.append(tid)
+    return out
+
+
+def task_snapshot(root: Path, task_id: str) -> dict[str, Any]:
+    try:
+        return load_task_state(root, task_id)
+    except WorkspaceError:
+        return {"task_id": task_id, "title": "-", "status": "UNKNOWN", "iteration": "-"}
+
+
+def resolve_task_id(root: Path, explicit: str | None) -> str:
+    if explicit:
+        # Validate exists
+        task_state_path(root, explicit)
+        if not task_state_path(root, explicit).exists():
+            raise WorkspaceError(f"Task does not exist: {explicit}")
+        return explicit
+    actives = active_task_ids(root)
+    if len(actives) == 1:
+        return actives[0]
+    if not actives:
+        current = current_task_id(root)
+        if current and task_state_path(root, current).exists():
+            return current
+        raise WorkspaceError("No active task. Pass --task-id <id> or run `agentloop start`.")
+    lines = ["multiple active tasks; pass --task-id <id>. Candidates:"]
+    for tid in actives:
+        snap = task_snapshot(root, tid)
+        status = snap.get("status", "-")
+        iteration = snap.get("iteration", "-")
+        max_it = snap.get("max_iterations", "-")
+        lines.append(f"  - {tid}  {status} (it {iteration}/{max_it})")
+    raise WorkspaceError("\n".join(lines))
+
+
+# ---------- per-task config ----------
+
+ALLOWED_TOP_KEYS = {"test_commands", "max_iterations", "roles", "default_runtime"}
+
+
+def load_task_config(root: Path, task_id: str) -> dict[str, Any]:
+    path = task_config_path(root, task_id)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise WorkspaceError(f"Invalid task config: {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise WorkspaceError(f"Invalid task config: {path}: expected object")
+    return data
+
+
+def save_task_config(root: Path, task_id: str, config: dict[str, Any]) -> None:
+    path = task_config_path(root, task_id)
+    if config:
+        write_json(path, config)
+    elif path.exists():
+        path.unlink()
+
+
+def save_task_config_patch(root: Path, task_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    """Atomically merge and validate a top-level per-task config patch."""
+
+    override = load_task_config(root, task_id)
+    merged = {**override, **patch}
+    _validate_patch(merged, load_config(root))
+    save_task_config(root, task_id, merged)
+    return merged
+
+
+def clear_task_config(root: Path, task_id: str) -> None:
+    path = task_config_path(root, task_id)
+    if path.exists():
+        path.unlink()
+
+
+def effective_config(root: Path, task_id: str | None) -> dict[str, Any]:
+    global_cfg: dict[str, Any]
+    try:
+        global_cfg = copy.deepcopy(load_config(root))
+    except WorkspaceError:
+        global_cfg = default_config()
+
+    if not task_id:
+        return global_cfg
+
+    override = load_task_config(root, task_id)
+    if not override:
+        return global_cfg
+
+    merged = copy.deepcopy(global_cfg)
+    if "test_commands" in override:
+        merged["test_commands"] = list(override["test_commands"])
+    if "max_iterations" in override:
+        merged["max_iterations"] = override["max_iterations"]
+    if "default_runtime" in override:
+        merged["default_runtime"] = override["default_runtime"]
+    if "roles" in override and isinstance(override["roles"], dict):
+        roles = merged.setdefault("roles", {})
+        for role, role_cfg in override["roles"].items():
+            base = roles.get(role, {})
+            if isinstance(role_cfg, dict):
+                merged_role = {**base, **role_cfg}
+            else:
+                merged_role = role_cfg
+            roles[role] = merged_role
+    return merged
+
+
+def _validate_patch(patch: dict[str, Any], global_cfg: dict[str, Any]) -> None:
+    unknown = set(patch) - ALLOWED_TOP_KEYS
+    if unknown:
+        raise WorkspaceError(
+            f"Unknown override keys: {', '.join(sorted(unknown))}. "
+            f"Allowed: {', '.join(sorted(ALLOWED_TOP_KEYS))}"
+        )
+    if "test_commands" in patch:
+        value = patch["test_commands"]
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise WorkspaceError("test_commands must be a list of strings.")
+    if "max_iterations" in patch:
+        value = patch["max_iterations"]
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise WorkspaceError("max_iterations must be a positive integer.")
+    runtimes = global_cfg.get("runtimes", {}) if isinstance(global_cfg, dict) else {}
+    if "default_runtime" in patch:
+        if patch["default_runtime"] not in runtimes:
+            raise WorkspaceError(f"Unknown runtime: {patch['default_runtime']}")
+    if "roles" in patch:
+        if not isinstance(patch["roles"], dict):
+            raise WorkspaceError("roles override must be an object.")
+        for role, role_cfg in patch["roles"].items():
+            if not isinstance(role_cfg, dict):
+                raise WorkspaceError(f"roles.{role} must be an object.")
+            runtime_name = role_cfg.get("runtime")
+            if runtime_name is not None and runtime_name not in runtimes:
+                raise WorkspaceError(f"Unknown runtime for role {role}: {runtime_name}")
+
+
+def _set_dotted(target: dict[str, Any], dotted_key: str, value: Any) -> None:
+    parts = dotted_key.split(".")
+    cur = target
+    for part in parts[:-1]:
+        nxt = cur.get(part)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            cur[part] = nxt
+        cur = nxt
+    cur[parts[-1]] = value
+
+
+def _unset_dotted(target: dict[str, Any], dotted_key: str) -> None:
+    parts = dotted_key.split(".")
+    cur = target
+    for part in parts[:-1]:
+        nxt = cur.get(part)
+        if not isinstance(nxt, dict):
+            return
+        cur = nxt
+    cur.pop(parts[-1], None)
+
+
+def apply_task_config_patch(
+    root: Path,
+    task_id: str,
+    key: str,
+    value: Any,
+) -> dict[str, Any]:
+    override = load_task_config(root, task_id)
+    _set_dotted(override, key, value)
+    _validate_patch(override, load_config(root))
+    save_task_config(root, task_id, override)
+    return override
+
+
+def unset_task_config_key(root: Path, task_id: str, key: str) -> dict[str, Any]:
+    override = load_task_config(root, task_id)
+    _unset_dotted(override, key)
+    # Prune empty containers
+    if "roles" in override and isinstance(override["roles"], dict):
+        override["roles"] = {k: v for k, v in override["roles"].items() if v}
+        if not override["roles"]:
+            override.pop("roles")
+    save_task_config(root, task_id, override)
+    return override
+
+
+# ---------- migration ----------
+
+MIGRATION_MARKER = "MIGRATED"
+
+
+def migrate_workspace(root: Path) -> dict[str, Any]:
+    """Idempotent migration to per-task state layout. Returns summary."""
+
+    base = agentloop_path(root)
+    if not base.exists():
+        return {"migrated": False, "reason": "no .agentloop directory"}
+
+    (base / "tasks").mkdir(parents=True, exist_ok=True)
+    (base / "runs").mkdir(parents=True, exist_ok=True)
+    (base / "locks").mkdir(parents=True, exist_ok=True)
+
+    summary: dict[str, Any] = {"copied_state": False, "moved_runs": [], "task_id": None}
+
+    legacy = state_path(root)
+    if legacy.exists():
+        try:
+            data = json.loads(legacy.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict):
+            tid = data.get("task_id")
+            if isinstance(tid, str) and tid:
+                summary["task_id"] = tid
+                per_task = task_state_path(root, tid)
+                if not per_task.exists():
+                    write_json(per_task, data)
+                    summary["copied_state"] = True
+
+    # Move legacy runs/NNN to runs/<current_task_id>/NNN if a current task exists.
+    current = current_task_id(root)
+    runs_dir = base / "runs"
+    if current and runs_dir.exists():
+        for child in list(runs_dir.iterdir()):
+            if not child.is_dir():
+                continue
+            # Iteration dirs are 3-digit numerics. Task ids start with date prefix.
+            if child.name.isdigit():
+                target = runs_dir / current / child.name
+                if not target.exists():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(child), str(target))
+                    summary["moved_runs"].append(child.name)
+
+    (base / MIGRATION_MARKER).write_text("ok\n", encoding="utf-8")
+    return summary
+
+
+# ---------- selectors ----------
+
+
+def select_task_ids(
+    root: Path,
+    *,
+    task_ids: list[str] | None = None,
+    all_tasks: bool = False,
+    statuses: list[str] | None = None,
+) -> list[str]:
+    modes = sum(1 for m in [bool(task_ids), all_tasks, bool(statuses)] if m)
+    if modes == 0:
+        raise WorkspaceError("Selector required: --task-id, --all, or --status.")
+    if modes > 1:
+        raise WorkspaceError("Selectors are mutually exclusive: choose one of --task-id, --all, --status.")
+    if task_ids:
+        for tid in task_ids:
+            if not task_state_path(root, tid).exists():
+                raise WorkspaceError(f"Task does not exist: {tid}")
+        return list(task_ids)
+    if all_tasks:
+        return list_task_ids(root)
+    wanted = {s.upper() for s in (statuses or [])}
+    out = []
+    for tid in list_task_ids(root):
+        snap = task_snapshot(root, tid)
+        if str(snap.get("status", "")).upper() in wanted:
+            out.append(tid)
+    return out
+
+
+codex
+I’m going to keep the new coverage in `tests/test_ui_api.py` because it already owns the UI API behavior. The added test will exercise the same JSON endpoints the frontend uses: create, list/detail, patch config, static asset serving, and delete.
+apply patch
+patch: completed
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\tests\test_ui_api.py
+diff --git a/tests/test_ui_api.py b/tests/test_ui_api.py
+index 0c47740ab888013d4d3c220ed03fcbfcfb4a3371..07fe54943a6136bffa910faf81a0f3bcfef4f19e
+--- a/tests/test_ui_api.py
++++ b/tests/test_ui_api.py
+@@ -2,11 +2,16 @@
+ 
+ import json
+ import tempfile
++import threading
+ import unittest
++import urllib.error
++import urllib.request
++from http.server import ThreadingHTTPServer
+ from pathlib import Path
+ 
+ from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+ from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
++from agentloop.ui import AgentLoopUIHandler
+ from agentloop.workspace import init_workspace
+ from agentloop.workflow import approve_task, start_task
+ 
+@@ -106,6 +111,75 @@
+             self.assertFalse(ready["actions"]["approve"]["enabled"])
+             self.assertTrue(ready["actions"]["run"]["enabled"])
+ 
++    def test_http_ui_endpoints_back_task_crud_and_static_assets(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            init_workspace(root)
++
++            class Server(ThreadingHTTPServer):
++                pass
++
++            server = Server(("127.0.0.1", 0), AgentLoopUIHandler)
++            server.root = root.resolve()  # type: ignore[attr-defined]
++            thread = threading.Thread(target=server.serve_forever, daemon=True)
++            thread.start()
++            base_url = f"http://127.0.0.1:{server.server_port}"
++
++            def request(path: str, method: str = "GET", payload: dict | None = None) -> tuple[int, dict | str, str]:
++                body = None if payload is None else json.dumps(payload).encode("utf-8")
++                req = urllib.request.Request(
++                    f"{base_url}{path}",
++                    data=body,
++                    method=method,
++                    headers={"Content-Type": "application/json"},
++                )
++                with urllib.request.urlopen(req, timeout=5) as response:
++                    raw = response.read().decode("utf-8")
++                    content_type = response.headers.get("Content-Type", "")
++                    data: dict | str = json.loads(raw) if "application/json" in content_type else raw
++                    return response.status, data, content_type
++
++            try:
++                status, html, content_type = request("/")
++                self.assertEqual(status, 200)
++                self.assertIn("text/html", content_type)
++                self.assertIn("AgentLoop Task Console", html)
++
++                status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
++                self.assertEqual(status, 201)
++                self.assertIsInstance(detail, dict)
++                task_id = detail["state"]["task_id"]
++                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ALIGNMENT")
++
++                status, task_list, _ = request("/api/tasks")
++                self.assertEqual(status, 200)
++                self.assertIsInstance(task_list, dict)
++                self.assertEqual(task_list["tasks"][0]["task_id"], task_id)
++
++                status, patched, _ = request(
++                    f"/api/tasks/{task_id}/config",
++                    "PATCH",
++                    {"max_iterations": 2, "test_commands": ["python -m unittest"]},
++                )
++                self.assertEqual(status, 200)
++                self.assertIsInstance(patched, dict)
++                self.assertEqual(patched["config"]["override"]["max_iterations"], 2)
++                self.assertEqual(patched["config"]["override"]["test_commands"], ["python -m unittest"])
++
++                with self.assertRaises(urllib.error.HTTPError) as ctx:
++                    request(f"/api/tasks/{task_id}", "DELETE", {"confirm": "wrong-id"})
++                self.assertEqual(ctx.exception.code, 400)
++
++                status, deleted, _ = request(f"/api/tasks/{task_id}", "DELETE", {"confirm": task_id})
++                self.assertEqual(status, 200)
++                self.assertIsInstance(deleted, dict)
++                self.assertTrue(deleted["deleted"])
++                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
++            finally:
++                server.shutdown()
++                server.server_close()
++                thread.join(timeout=5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+
+diff --git a/tests/test_ui_api.py b/tests/test_ui_api.py
+index 0c47740ab888013d4d3c220ed03fcbfcfb4a3371..07fe54943a6136bffa910faf81a0f3bcfef4f19e
+--- a/tests/test_ui_api.py
++++ b/tests/test_ui_api.py
+@@ -2,11 +2,16 @@
+ 
+ import json
+ import tempfile
++import threading
+ import unittest
++import urllib.error
++import urllib.request
++from http.server import ThreadingHTTPServer
+ from pathlib import Path
+ 
+ from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+ from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
++from agentloop.ui import AgentLoopUIHandler
+ from agentloop.workspace import init_workspace
+ from agentloop.workflow import approve_task, start_task
+ 
+@@ -106,6 +111,75 @@
+             self.assertFalse(ready["actions"]["approve"]["enabled"])
+             self.assertTrue(ready["actions"]["run"]["enabled"])
+ 
++    def test_http_ui_endpoints_back_task_crud_and_static_assets(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            init_workspace(root)
++
++            class Server(ThreadingHTTPServer):
++                pass
++
++            server = Server(("127.0.0.1", 0), AgentLoopUIHandler)
++            server.root = root.resolve()  # type: ignore[attr-defined]
++            thread = threading.Thread(target=server.serve_forever, daemon=True)
++            thread.start()
++            base_url = f"http://127.0.0.1:{server.server_port}"
++
++            def request(path: str, method: str = "GET", payload: dict | None = None) -> tuple[int, dict | str, str]:
++                body = None if payload is None else json.dumps(payload).encode("utf-8")
++                req = urllib.request.Request(
++                    f"{base_url}{path}",
++                    data=body,
++                    method=method,
++                    headers={"Content-Type": "application/json"},
++                )
++                with urllib.request.urlopen(req, timeout=5) as response:
++                    raw = response.read().decode("utf-8")
++                    content_type = response.headers.get("Content-Type", "")
++                    data: dict | str = json.loads(raw) if "application/json" in content_type else raw
++                    return response.status, data, content_type
++
++            try:
++                status, html, content_type = request("/")
++                self.assertEqual(status, 200)
++                self.assertIn("text/html", content_type)
++                self.assertIn("AgentLoop Task Console", html)
++
++                status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
++                self.assertEqual(status, 201)
++                self.assertIsInstance(detail, dict)
++                task_id = detail["state"]["task_id"]
++                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ALIGNMENT")
++
++                status, task_list, _ = request("/api/tasks")
++                self.assertEqual(status, 200)
++                self.assertIsInstance(task_list, dict)
++                self.assertEqual(task_list["tasks"][0]["task_id"], task_id)
++
++                status, patched, _ = request(
++                    f"/api/tasks/{task_id}/config",
++                    "PATCH",
++                    {"max_iterations": 2, "test_commands": ["python -m unittest"]},
++                )
++                self.assertEqual(status, 200)
++                self.assertIsInstance(patched, dict)
++                self.assertEqual(patched["config"]["override"]["max_iterations"], 2)
++                self.assertEqual(patched["config"]["override"]["test_commands"], ["python -m unittest"])
++
++                with self.assertRaises(urllib.error.HTTPError) as ctx:
++                    request(f"/api/tasks/{task_id}", "DELETE", {"confirm": "wrong-id"})
++                self.assertEqual(ctx.exception.code, 400)
++
++                status, deleted, _ = request(f"/api/tasks/{task_id}", "DELETE", {"confirm": task_id})
++                self.assertEqual(status, 200)
++                self.assertIsInstance(deleted, dict)
++                self.assertTrue(deleted["deleted"])
++                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
++            finally:
++                server.shutdown()
++                server.server_close()
++                thread.join(timeout=5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+
+codex
+The HTTP integration test is in place. I’m running the UI/API test module first, then the full suite if that passes, so failures stay easy to isolate.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'python -m unittest tests.test_ui_api -v' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 3785ms:
+test_actions_reflect_status (tests.test_ui_api.UIApiTests.test_actions_reflect_status) ... ok
+test_create_task_uses_workflow_artifacts (tests.test_ui_api.UIApiTests.test_create_task_uses_workflow_artifacts) ... ok
+test_detail_includes_artifacts_runtime_and_test_logs (tests.test_ui_api.UIApiTests.test_detail_includes_artifacts_runtime_and_test_logs) ... ok
+test_http_ui_endpoints_back_task_crud_and_static_assets (tests.test_ui_api.UIApiTests.test_http_ui_endpoints_back_task_crud_and_static_assets) ... 127.0.0.1 - "GET / HTTP/1.1" 200 -
+127.0.0.1 - "POST /api/tasks HTTP/1.1" 201 -
+127.0.0.1 - "GET /api/tasks HTTP/1.1" 200 -
+127.0.0.1 - "PATCH /api/tasks/20260519-053033-manage-ui-tasks/config HTTP/1.1" 200 -
+127.0.0.1 - "DELETE /api/tasks/20260519-053033-manage-ui-tasks HTTP/1.1" 400 -
+127.0.0.1 - "DELETE /api/tasks/20260519-053033-manage-ui-tasks HTTP/1.1" 200 -
+ok
+test_patch_config_and_delete_task (tests.test_ui_api.UIApiTests.test_patch_config_and_delete_task) ... ok
+test_task_list_marks_current_and_handles_malformed_state (tests.test_ui_api.UIApiTests.test_task_list_marks_current_and_handles_malformed_state) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 2.096s
+
+OK
+
+diff --git a/tests/test_ui_api.py b/tests/test_ui_api.py
+index 0c47740ab888013d4d3c220ed03fcbfcfb4a3371..07fe54943a6136bffa910faf81a0f3bcfef4f19e
+--- a/tests/test_ui_api.py
++++ b/tests/test_ui_api.py
+@@ -2,11 +2,16 @@
+ 
+ import json
+ import tempfile
++import threading
+ import unittest
++import urllib.error
++import urllib.request
++from http.server import ThreadingHTTPServer
+ from pathlib import Path
+ 
+ from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+ from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
++from agentloop.ui import AgentLoopUIHandler
+ from agentloop.workspace import init_workspace
+ from agentloop.workflow import approve_task, start_task
+ 
+@@ -106,6 +111,75 @@
+             self.assertFalse(ready["actions"]["approve"]["enabled"])
+             self.assertTrue(ready["actions"]["run"]["enabled"])
+ 
++    def test_http_ui_endpoints_back_task_crud_and_static_assets(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            init_workspace(root)
++
++            class Server(ThreadingHTTPServer):
++                pass
++
++            server = Server(("127.0.0.1", 0), AgentLoopUIHandler)
++            server.root = root.resolve()  # type: ignore[attr-defined]
++            thread = threading.Thread(target=server.serve_forever, daemon=True)
++            thread.start()
++            base_url = f"http://127.0.0.1:{server.server_port}"
++
++            def request(path: str, method: str = "GET", payload: dict | None = None) -> tuple[int, dict | str, str]:
++                body = None if payload is None else json.dumps(payload).encode("utf-8")
++                req = urllib.request.Request(
++                    f"{base_url}{path}",
++                    data=body,
++                    method=method,
++                    headers={"Content-Type": "application/json"},
++                )
++                with urllib.request.urlopen(req, timeout=5) as response:
++                    raw = response.read().decode("utf-8")
++                    content_type = response.headers.get("Content-Type", "")
++                    data: dict | str = json.loads(raw) if "application/json" in content_type else raw
++                    return response.status, data, content_type
++
++            try:
++                status, html, content_type = request("/")
++                self.assertEqual(status, 200)
++                self.assertIn("text/html", content_type)
++                self.assertIn("AgentLoop Task Console", html)
++
++                status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
++                self.assertEqual(status, 201)
++                self.assertIsInstance(detail, dict)
++                task_id = detail["state"]["task_id"]
++                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ALIGNMENT")
++
++                status, task_list, _ = request("/api/tasks")
++                self.assertEqual(status, 200)
++                self.assertIsInstance(task_list, dict)
++                self.assertEqual(task_list["tasks"][0]["task_id"], task_id)
++
++                status, patched, _ = request(
++                    f"/api/tasks/{task_id}/config",
++                    "PATCH",
++                    {"max_iterations": 2, "test_commands": ["python -m unittest"]},
++                )
++                self.assertEqual(status, 200)
++                self.assertIsInstance(patched, dict)
++                self.assertEqual(patched["config"]["override"]["max_iterations"], 2)
++                self.assertEqual(patched["config"]["override"]["test_commands"], ["python -m unittest"])
++
++                with self.assertRaises(urllib.error.HTTPError) as ctx:
++                    request(f"/api/tasks/{task_id}", "DELETE", {"confirm": "wrong-id"})
++                self.assertEqual(ctx.exception.code, 400)
++
++                status, deleted, _ = request(f"/api/tasks/{task_id}", "DELETE", {"confirm": task_id})
++                self.assertEqual(status, 200)
++                self.assertIsInstance(deleted, dict)
++                self.assertTrue(deleted["deleted"])
++                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
++            finally:
++                server.shutdown()
++                server.server_close()
++                thread.join(timeout=5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+
+codex
+The UI/API module passes, including the new live HTTP handler coverage. I’m running the full unit suite now to catch interactions with existing task, runtime, and CLI behavior.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'python -m unittest discover -v' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1403ms:
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.000s
+
+OK
+
+diff --git a/tests/test_ui_api.py b/tests/test_ui_api.py
+index 0c47740ab888013d4d3c220ed03fcbfcfb4a3371..07fe54943a6136bffa910faf81a0f3bcfef4f19e
+--- a/tests/test_ui_api.py
++++ b/tests/test_ui_api.py
+@@ -2,11 +2,16 @@
+ 
+ import json
+ import tempfile
++import threading
+ import unittest
++import urllib.error
++import urllib.request
++from http.server import ThreadingHTTPServer
+ from pathlib import Path
+ 
+ from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+ from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
++from agentloop.ui import AgentLoopUIHandler
+ from agentloop.workspace import init_workspace
+ from agentloop.workflow import approve_task, start_task
+ 
+@@ -106,6 +111,75 @@
+             self.assertFalse(ready["actions"]["approve"]["enabled"])
+             self.assertTrue(ready["actions"]["run"]["enabled"])
+ 
++    def test_http_ui_endpoints_back_task_crud_and_static_assets(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            init_workspace(root)
++
++            class Server(ThreadingHTTPServer):
++                pass
++
++            server = Server(("127.0.0.1", 0), AgentLoopUIHandler)
++            server.root = root.resolve()  # type: ignore[attr-defined]
++            thread = threading.Thread(target=server.serve_forever, daemon=True)
++            thread.start()
++            base_url = f"http://127.0.0.1:{server.server_port}"
++
++            def request(path: str, method: str = "GET", payload: dict | None = None) -> tuple[int, dict | str, str]:
++                body = None if payload is None else json.dumps(payload).encode("utf-8")
++                req = urllib.request.Request(
++                    f"{base_url}{path}",
++                    data=body,
++                    method=method,
++                    headers={"Content-Type": "application/json"},
++                )
++                with urllib.request.urlopen(req, timeout=5) as response:
++                    raw = response.read().decode("utf-8")
++                    content_type = response.headers.get("Content-Type", "")
++                    data: dict | str = json.loads(raw) if "application/json" in content_type else raw
++                    return response.status, data, content_type
++
++            try:
++                status, html, content_type = request("/")
++                self.assertEqual(status, 200)
++                self.assertIn("text/html", content_type)
++                self.assertIn("AgentLoop Task Console", html)
++
++                status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
++                self.assertEqual(status, 201)
++                self.assertIsInstance(detail, dict)
++                task_id = detail["state"]["task_id"]
++                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ALIGNMENT")
++
++                status, task_list, _ = request("/api/tasks")
++                self.assertEqual(status, 200)
++                self.assertIsInstance(task_list, dict)
++                self.assertEqual(task_list["tasks"][0]["task_id"], task_id)
++
++                status, patched, _ = request(
++                    f"/api/tasks/{task_id}/config",
++                    "PATCH",
++                    {"max_iterations": 2, "test_commands": ["python -m unittest"]},
++                )
++                self.assertEqual(status, 200)
++                self.assertIsInstance(patched, dict)
++                self.assertEqual(patched["config"]["override"]["max_iterations"], 2)
++                self.assertEqual(patched["config"]["override"]["test_commands"], ["python -m unittest"])
++
++                with self.assertRaises(urllib.error.HTTPError) as ctx:
++                    request(f"/api/tasks/{task_id}", "DELETE", {"confirm": "wrong-id"})
++                self.assertEqual(ctx.exception.code, 400)
++
++                status, deleted, _ = request(f"/api/tasks/{task_id}", "DELETE", {"confirm": task_id})
++                self.assertEqual(status, 200)
++                self.assertIsInstance(deleted, dict)
++                self.assertTrue(deleted["deleted"])
++                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
++            finally:
++                server.shutdown()
++                server.server_close()
++                thread.join(timeout=5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+
+codex
+The default `unittest discover` did not find the tests from the repository root, so I’m using the explicit `tests` start directory. That is the command I’ll record as meaningful suite evidence.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'python -m unittest discover -s tests -v' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 25568ms:
+test_command_adapter_can_pipe_prompt_file_to_stdin (test_adapters.AdapterTests.test_command_adapter_can_pipe_prompt_file_to_stdin) ... ok
+test_command_adapter_reports_missing_command_cleanly (test_adapters.AdapterTests.test_command_adapter_reports_missing_command_cleanly) ... ok
+test_command_adapter_runs_external_role_and_validates_artifact (test_adapters.AdapterTests.test_command_adapter_runs_external_role_and_validates_artifact) ... ok
+test_command_adapter_uses_utf8_for_non_ascii_stdin (test_adapters.AdapterTests.test_command_adapter_uses_utf8_for_non_ascii_stdin) ... ok
+test_manual_adapter_records_prompt_and_expected_artifacts (test_adapters.AdapterTests.test_manual_adapter_records_prompt_and_expected_artifacts) ... ok
+test_batch_cancel_isolates_failures (test_multitask.BatchOperationsTests.test_batch_cancel_isolates_failures) ... ok
+test_batch_config_set_all (test_multitask.BatchOperationsTests.test_batch_config_set_all) ... ok
+test_run_namespaces_logs_per_task (test_multitask.BatchOperationsTests.test_run_namespaces_logs_per_task) ... ok
+test_run_fails_fast_when_task_locked (test_multitask.LockingTests.test_run_fails_fast_when_task_locked) ... ok
+test_unlock_removes_stale_lock (test_multitask.LockingTests.test_unlock_removes_stale_lock) ... ok
+test_migration_copies_legacy_state_into_per_task_file (test_multitask.MigrationTests.test_migration_copies_legacy_state_into_per_task_file) ... ok
+test_ambiguous_bare_command_lists_candidates (test_multitask.MultiTaskLifecycleTests.test_ambiguous_bare_command_lists_candidates) ... ok
+test_bare_command_works_with_single_active (test_multitask.MultiTaskLifecycleTests.test_bare_command_works_with_single_active) ... ok
+test_explicit_task_id_targets_non_current_task (test_multitask.MultiTaskLifecycleTests.test_explicit_task_id_targets_non_current_task) ... ok
+test_start_allows_multiple_concurrent_tasks (test_multitask.MultiTaskLifecycleTests.test_start_allows_multiple_concurrent_tasks) ... ok
+test_config_show_returns_override_and_effective (test_multitask.PerTaskConfigTests.test_config_show_returns_override_and_effective) ... ok
+test_per_task_test_commands_override_takes_effect (test_multitask.PerTaskConfigTests.test_per_task_test_commands_override_takes_effect) ... ok
+test_init_creates_workspace_files (test_phase1.PhaseOneCliTests.test_init_creates_workspace_files) ... ok
+test_status_prints_current_state (test_phase1.PhaseOneCliTests.test_status_prints_current_state) ... ok
+test_approve_moves_task_to_ready_to_start (test_phase2.PhaseTwoCliTests.test_approve_moves_task_to_ready_to_start) ... ok
+test_approve_requires_waiting_for_alignment (test_phase2.PhaseTwoCliTests.test_approve_requires_waiting_for_alignment) ... ok
+test_cancel_active_task_allows_new_start (test_phase2.PhaseTwoCliTests.test_cancel_active_task_allows_new_start) ... ok
+test_cancel_requires_active_task (test_phase2.PhaseTwoCliTests.test_cancel_requires_active_task) ... ok
+test_start_after_done_resets_execution_state (test_phase2.PhaseTwoCliTests.test_start_after_done_resets_execution_state) ... ok
+test_start_creates_analysis_acceptance_and_waits_for_alignment (test_phase2.PhaseTwoCliTests.test_start_creates_analysis_acceptance_and_waits_for_alignment) ... ok
+test_start_uses_analyst_runtime_for_task_specific_criteria (test_phase2.PhaseTwoCliTests.test_start_uses_analyst_runtime_for_task_specific_criteria) ... ok
+test_tasks_delete_all_resets_state_and_removes_tasks (test_phase2.PhaseTwoCliTests.test_tasks_delete_all_resets_state_and_removes_tasks) ... ok
+test_tasks_delete_current_task_resets_state (test_phase2.PhaseTwoCliTests.test_tasks_delete_current_task_resets_state) ... ok
+test_tasks_delete_non_current_task (test_phase2.PhaseTwoCliTests.test_tasks_delete_non_current_task) ... ok
+test_tasks_lists_current_and_older_task_directories (test_phase2.PhaseTwoCliTests.test_tasks_lists_current_and_older_task_directories) ... ok
+test_run_auto_iterates_until_tests_pass (test_phase3.PhaseThreeCliTests.test_run_auto_iterates_until_tests_pass) ... ok
+test_run_manual_runtime_completes_when_no_tests_fail (test_phase3.PhaseThreeCliTests.test_run_manual_runtime_completes_when_no_tests_fail) ... ok
+test_run_records_failed_test_and_requests_changes (test_phase3.PhaseThreeCliTests.test_run_records_failed_test_and_requests_changes) ... ok
+test_approved_review_with_null_test_exit_code_requires_changes (test_quality.QualityGateTests.test_approved_review_with_null_test_exit_code_requires_changes) ... ok
+test_approved_review_with_passing_test_is_approved (test_quality.QualityGateTests.test_approved_review_with_passing_test_is_approved) ... ok
+test_approved_review_with_required_automated_test_needs_passing_test (test_quality.QualityGateTests.test_approved_review_with_required_automated_test_needs_passing_test) ... ok
+test_manual_only_acceptance_can_approve_without_test_results (test_quality.QualityGateTests.test_manual_only_acceptance_can_approve_without_test_results) ... ok
+test_init_can_detect_runtimes (test_runtime_cli.RuntimeCliTests.test_init_can_detect_runtimes) ... ok
+test_runtime_add_command_accepts_args_string (test_runtime_cli.RuntimeCliTests.test_runtime_add_command_accepts_args_string) ... ok
+test_runtime_add_command_assign_and_list (test_runtime_cli.RuntimeCliTests.test_runtime_add_command_assign_and_list) ... ok
+test_runtime_add_preset_can_assign_all_roles (test_runtime_cli.RuntimeCliTests.test_runtime_add_preset_can_assign_all_roles) ... ok
+test_runtime_add_preset_rejects_unknown_preset (test_runtime_cli.RuntimeCliTests.test_runtime_add_preset_rejects_unknown_preset) ... ok
+test_runtime_assign_all_can_exclude_roles (test_runtime_cli.RuntimeCliTests.test_runtime_assign_all_can_exclude_roles) ... ok
+test_runtime_assign_all_updates_every_role (test_runtime_cli.RuntimeCliTests.test_runtime_assign_all_updates_every_role) ... ok
+test_runtime_assign_validates_role (test_runtime_cli.RuntimeCliTests.test_runtime_assign_validates_role) ... ok
+test_runtime_detect_adds_found_runtimes_without_assigning_roles (test_runtime_cli.RuntimeCliTests.test_runtime_detect_adds_found_runtimes_without_assigning_roles) ... ok
+test_runtime_detect_skips_existing_without_replace (test_runtime_cli.RuntimeCliTests.test_runtime_detect_skips_existing_without_replace) ... ok
+test_runtime_set_default_requires_existing_runtime (test_runtime_cli.RuntimeCliTests.test_runtime_set_default_requires_existing_runtime) ... ok
+test_actions_reflect_status (test_ui_api.UIApiTests.test_actions_reflect_status) ... ok
+test_create_task_uses_workflow_artifacts (test_ui_api.UIApiTests.test_create_task_uses_workflow_artifacts) ... ok
+test_detail_includes_artifacts_runtime_and_test_logs (test_ui_api.UIApiTests.test_detail_includes_artifacts_runtime_and_test_logs) ... ok
+test_http_ui_endpoints_back_task_crud_and_static_assets (test_ui_api.UIApiTests.test_http_ui_endpoints_back_task_crud_and_static_assets) ... 127.0.0.1 - "GET / HTTP/1.1" 200 -
+127.0.0.1 - "POST /api/tasks HTTP/1.1" 201 -
+127.0.0.1 - "GET /api/tasks HTTP/1.1" 200 -
+127.0.0.1 - "PATCH /api/tasks/20260519-053106-manage-ui-tasks/config HTTP/1.1" 200 -
+127.0.0.1 - "DELETE /api/tasks/20260519-053106-manage-ui-tasks HTTP/1.1" 400 -
+127.0.0.1 - "DELETE /api/tasks/20260519-053106-manage-ui-tasks HTTP/1.1" 200 -
+ok
+test_patch_config_and_delete_task (test_ui_api.UIApiTests.test_patch_config_and_delete_task) ... ok
+test_task_list_marks_current_and_handles_malformed_state (test_ui_api.UIApiTests.test_task_list_marks_current_and_handles_malformed_state) ... ok
+test_runtime_verify_checks_external_artifact_contract (test_verify.RuntimeVerifyTests.test_runtime_verify_checks_external_artifact_contract) ... ok
+test_runtime_verify_rejects_manual_runtime (test_verify.RuntimeVerifyTests.test_runtime_verify_rejects_manual_runtime) ... ok
+
+----------------------------------------------------------------------
+Ran 56 tests in 23.563s
+
+OK
+
+diff --git a/tests/test_ui_api.py b/tests/test_ui_api.py
+index 0c47740ab888013d4d3c220ed03fcbfcfb4a3371..07fe54943a6136bffa910faf81a0f3bcfef4f19e
+--- a/tests/test_ui_api.py
++++ b/tests/test_ui_api.py
+@@ -2,11 +2,16 @@
+ 
+ import json
+ import tempfile
++import threading
+ import unittest
++import urllib.error
++import urllib.request
++from http.server import ThreadingHTTPServer
+ from pathlib import Path
+ 
+ from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+ from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
++from agentloop.ui import AgentLoopUIHandler
+ from agentloop.workspace import init_workspace
+ from agentloop.workflow import approve_task, start_task
+ 
+@@ -106,6 +111,75 @@
+             self.assertFalse(ready["actions"]["approve"]["enabled"])
+             self.assertTrue(ready["actions"]["run"]["enabled"])
+ 
++    def test_http_ui_endpoints_back_task_crud_and_static_assets(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            init_workspace(root)
++
++            class Server(ThreadingHTTPServer):
++                pass
++
++            server = Server(("127.0.0.1", 0), AgentLoopUIHandler)
++            server.root = root.resolve()  # type: ignore[attr-defined]
++            thread = threading.Thread(target=server.serve_forever, daemon=True)
++            thread.start()
++            base_url = f"http://127.0.0.1:{server.server_port}"
++
++            def request(path: str, method: str = "GET", payload: dict | None = None) -> tuple[int, dict | str, str]:
++                body = None if payload is None else json.dumps(payload).encode("utf-8")
++                req = urllib.request.Request(
++                    f"{base_url}{path}",
++                    data=body,
++                    method=method,
++                    headers={"Content-Type": "application/json"},
++                )
++                with urllib.request.urlopen(req, timeout=5) as response:
++                    raw = response.read().decode("utf-8")
++                    content_type = response.headers.get("Content-Type", "")
++                    data: dict | str = json.loads(raw) if "application/json" in content_type else raw
++                    return response.status, data, content_type
++
++            try:
++                status, html, content_type = request("/")
++                self.assertEqual(status, 200)
++                self.assertIn("text/html", content_type)
++                self.assertIn("AgentLoop Task Console", html)
++
++                status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
++                self.assertEqual(status, 201)
++                self.assertIsInstance(detail, dict)
++                task_id = detail["state"]["task_id"]
++                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ALIGNMENT")
++
++                status, task_list, _ = request("/api/tasks")
++                self.assertEqual(status, 200)
++                self.assertIsInstance(task_list, dict)
++                self.assertEqual(task_list["tasks"][0]["task_id"], task_id)
++
++                status, patched, _ = request(
++                    f"/api/tasks/{task_id}/config",
++                    "PATCH",
++                    {"max_iterations": 2, "test_commands": ["python -m unittest"]},
++                )
++                self.assertEqual(status, 200)
++                self.assertIsInstance(patched, dict)
++                self.assertEqual(patched["config"]["override"]["max_iterations"], 2)
++                self.assertEqual(patched["config"]["override"]["test_commands"], ["python -m unittest"])
++
++                with self.assertRaises(urllib.error.HTTPError) as ctx:
++                    request(f"/api/tasks/{task_id}", "DELETE", {"confirm": "wrong-id"})
++                self.assertEqual(ctx.exception.code, 400)
++
++                status, deleted, _ = request(f"/api/tasks/{task_id}", "DELETE", {"confirm": task_id})
++                self.assertEqual(status, 200)
++                self.assertIsInstance(deleted, dict)
++                self.assertTrue(deleted["deleted"])
++                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
++            finally:
++                server.shutdown()
++                server.server_close()
++                thread.join(timeout=5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+
+codex
+All 56 tests pass with the explicit discovery command. I’m writing the required `test-plan.md` now with the coverage matrix, commands run, and the remaining manual/browser risks.
+apply patch
+patch: completed
+C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\.agentloop\tasks\20260519-050850-agentloop-ui-crud-runtime\artifacts\test-plan.md
+diff --git a/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md b/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b389199e33fdfd49651eb9aa24db5d81286a1d9d
+--- /dev/null
++++ b/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md
+@@ -0,0 +1,86 @@
++# Test Plan: AgentLoop Task Console UI
++
++## Scope
++
++Validate the AgentLoop UI product surface for task management:
++
++- Task CRUD through the local JSON API used by the browser UI.
++- Task list/detail view models for status, phase, iteration, current task, and malformed task handling.
++- Latest runtime output exposure, including agent stdout/stderr and test logs.
++- Artifact previews and bounded artifact reads.
++- Per-task configuration updates from the UI.
++- HTTP server routing for static UI assets and API endpoints.
++
++## Automated Coverage Added
++
++Updated `tests/test_ui_api.py` with `test_http_ui_endpoints_back_task_crud_and_static_assets`.
++
++This test starts the real `AgentLoopUIHandler` on an ephemeral localhost port and verifies:
++
++- `GET /` serves the static Task Console HTML.
++- `POST /api/tasks` creates a task and returns a task detail payload.
++- `GET /api/tasks` lists the created task for the sidebar.
++- `PATCH /api/tasks/{task_id}/config` persists `max_iterations` and `test_commands`.
++- `DELETE /api/tasks/{task_id}` rejects an incorrect confirmation with HTTP 400.
++- `DELETE /api/tasks/{task_id}` deletes the task when confirmation matches.
++
++Existing UI/API tests cover:
++
++- Current-task marker and malformed state resilience.
++- Create-task workflow artifacts: `analysis.md`, `acceptance.md`, and `acceptance.json`.
++- Detail payload artifacts, latest runtime iteration, agent stdout, and test log content.
++- Direct config patch and delete behavior.
++- Action enablement for approval and run states.
++
++## Commands Run
++
++```powershell
++python -m unittest tests.test_ui_api -v
++```
++
++Result: passed, 6 tests.
++
++```powershell
++python -m unittest discover -s tests -v
++```
++
++Result: passed, 56 tests.
++
++Note: `python -m unittest discover -v` from the repository root returned `Ran 0 tests`, so the evidence command uses the repository's explicit `tests` start directory.
++
++## Evidence
++
++Focused UI/API run:
++
++```text
++Ran 6 tests in 2.096s
++OK
++```
++
++Full suite run:
++
++```text
++Ran 56 tests in 23.563s
++OK
++```
++
++HTTP integration evidence from the new test included successful live requests:
++
++```text
++GET / HTTP/1.1 200
++POST /api/tasks HTTP/1.1 201
++GET /api/tasks HTTP/1.1 200
++PATCH /api/tasks/<task_id>/config HTTP/1.1 200
++DELETE /api/tasks/<task_id> HTTP/1.1 400
++DELETE /api/tasks/<task_id> HTTP/1.1 200
++```
++
++## Manual Verification Recommended
++
++- Start the UI with `python -m agentloop --root . ui --port 8765` and verify the browser workflow visually.
++- Create a task, search/filter it, update config, inspect artifacts, inspect runtime logs, and delete it.
++- Check responsive layout at a narrow viewport because the automated tests validate API/server behavior, not CSS layout.
++
++## Residual Risk
++
++The automated coverage verifies the data contract and HTTP routes behind the UI, but it does not run a Playwright browser interaction against the static JavaScript. Browser-level coverage should be added if this UI becomes a larger surface or if regressions appear in DOM event wiring, dialogs, filters, or responsive layout.
+diff --git a/tests/test_ui_api.py b/tests/test_ui_api.py
+index 0c47740ab888013d4d3c220ed03fcbfcfb4a3371..07fe54943a6136bffa910faf81a0f3bcfef4f19e
+--- a/tests/test_ui_api.py
++++ b/tests/test_ui_api.py
+@@ -2,11 +2,16 @@
+ 
+ import json
+ import tempfile
++import threading
+ import unittest
++import urllib.error
++import urllib.request
++from http.server import ThreadingHTTPServer
+ from pathlib import Path
+ 
+ from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+ from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
++from agentloop.ui import AgentLoopUIHandler
+ from agentloop.workspace import init_workspace
+ from agentloop.workflow import approve_task, start_task
+ 
+@@ -106,6 +111,75 @@
+             self.assertFalse(ready["actions"]["approve"]["enabled"])
+             self.assertTrue(ready["actions"]["run"]["enabled"])
+ 
++    def test_http_ui_endpoints_back_task_crud_and_static_assets(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            init_workspace(root)
++
++            class Server(ThreadingHTTPServer):
++                pass
++
++            server = Server(("127.0.0.1", 0), AgentLoopUIHandler)
++            server.root = root.resolve()  # type: ignore[attr-defined]
++            thread = threading.Thread(target=server.serve_forever, daemon=True)
++            thread.start()
++            base_url = f"http://127.0.0.1:{server.server_port}"
++
++            def request(path: str, method: str = "GET", payload: dict | None = None) -> tuple[int, dict | str, str]:
++                body = None if payload is None else json.dumps(payload).encode("utf-8")
++                req = urllib.request.Request(
++                    f"{base_url}{path}",
++                    data=body,
++                    method=method,
++                    headers={"Content-Type": "application/json"},
++                )
++                with urllib.request.urlopen(req, timeout=5) as response:
++                    raw = response.read().decode("utf-8")
++                    content_type = response.headers.get("Content-Type", "")
++                    data: dict | str = json.loads(raw) if "application/json" in content_type else raw
++                    return response.status, data, content_type
++
++            try:
++                status, html, content_type = request("/")
++                self.assertEqual(status, 200)
++                self.assertIn("text/html", content_type)
++                self.assertIn("AgentLoop Task Console", html)
++
++                status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
++                self.assertEqual(status, 201)
++                self.assertIsInstance(detail, dict)
++                task_id = detail["state"]["task_id"]
++                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ALIGNMENT")
++
++                status, task_list, _ = request("/api/tasks")
++                self.assertEqual(status, 200)
++                self.assertIsInstance(task_list, dict)
++                self.assertEqual(task_list["tasks"][0]["task_id"], task_id)
++
++                status, patched, _ = request(
++                    f"/api/tasks/{task_id}/config",
++                    "PATCH",
++                    {"max_iterations": 2, "test_commands": ["python -m unittest"]},
++                )
++                self.assertEqual(status, 200)
++                self.assertIsInstance(patched, dict)
++                self.assertEqual(patched["config"]["override"]["max_iterations"], 2)
++                self.assertEqual(patched["config"]["override"]["test_commands"], ["python -m unittest"])
++
++                with self.assertRaises(urllib.error.HTTPError) as ctx:
++                    request(f"/api/tasks/{task_id}", "DELETE", {"confirm": "wrong-id"})
++                self.assertEqual(ctx.exception.code, 400)
++
++                status, deleted, _ = request(f"/api/tasks/{task_id}", "DELETE", {"confirm": task_id})
++                self.assertEqual(status, 200)
++                self.assertIsInstance(deleted, dict)
++                self.assertTrue(deleted["deleted"])
++                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
++            finally:
++                server.shutdown()
++                server.server_close()
++                thread.join(timeout=5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+
+diff --git a/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md b/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b389199e33fdfd49651eb9aa24db5d81286a1d9d
+--- /dev/null
++++ b/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md
+@@ -0,0 +1,86 @@
++# Test Plan: AgentLoop Task Console UI
++
++## Scope
++
++Validate the AgentLoop UI product surface for task management:
++
++- Task CRUD through the local JSON API used by the browser UI.
++- Task list/detail view models for status, phase, iteration, current task, and malformed task handling.
++- Latest runtime output exposure, including agent stdout/stderr and test logs.
++- Artifact previews and bounded artifact reads.
++- Per-task configuration updates from the UI.
++- HTTP server routing for static UI assets and API endpoints.
++
++## Automated Coverage Added
++
++Updated `tests/test_ui_api.py` with `test_http_ui_endpoints_back_task_crud_and_static_assets`.
++
++This test starts the real `AgentLoopUIHandler` on an ephemeral localhost port and verifies:
++
++- `GET /` serves the static Task Console HTML.
++- `POST /api/tasks` creates a task and returns a task detail payload.
++- `GET /api/tasks` lists the created task for the sidebar.
++- `PATCH /api/tasks/{task_id}/config` persists `max_iterations` and `test_commands`.
++- `DELETE /api/tasks/{task_id}` rejects an incorrect confirmation with HTTP 400.
++- `DELETE /api/tasks/{task_id}` deletes the task when confirmation matches.
++
++Existing UI/API tests cover:
++
++- Current-task marker and malformed state resilience.
++- Create-task workflow artifacts: `analysis.md`, `acceptance.md`, and `acceptance.json`.
++- Detail payload artifacts, latest runtime iteration, agent stdout, and test log content.
++- Direct config patch and delete behavior.
++- Action enablement for approval and run states.
++
++## Commands Run
++
++```powershell
++python -m unittest tests.test_ui_api -v
++```
++
++Result: passed, 6 tests.
++
++```powershell
++python -m unittest discover -s tests -v
++```
++
++Result: passed, 56 tests.
++
++Note: `python -m unittest discover -v` from the repository root returned `Ran 0 tests`, so the evidence command uses the repository's explicit `tests` start directory.
++
++## Evidence
++
++Focused UI/API run:
++
++```text
++Ran 6 tests in 2.096s
++OK
++```
++
++Full suite run:
++
++```text
++Ran 56 tests in 23.563s
++OK
++```
++
++HTTP integration evidence from the new test included successful live requests:
++
++```text
++GET / HTTP/1.1 200
++POST /api/tasks HTTP/1.1 201
++GET /api/tasks HTTP/1.1 200
++PATCH /api/tasks/<task_id>/config HTTP/1.1 200
++DELETE /api/tasks/<task_id> HTTP/1.1 400
++DELETE /api/tasks/<task_id> HTTP/1.1 200
++```
++
++## Manual Verification Recommended
++
++- Start the UI with `python -m agentloop --root . ui --port 8765` and verify the browser workflow visually.
++- Create a task, search/filter it, update config, inspect artifacts, inspect runtime logs, and delete it.
++- Check responsive layout at a narrow viewport because the automated tests validate API/server behavior, not CSS layout.
++
++## Residual Risk
++
++The automated coverage verifies the data contract and HTTP routes behind the UI, but it does not run a Playwright browser interaction against the static JavaScript. Browser-level coverage should be added if this UI becomes a larger surface or if regressions appear in DOM event wiring, dialogs, filters, or responsive layout.
+diff --git a/tests/test_ui_api.py b/tests/test_ui_api.py
+index 0c47740ab888013d4d3c220ed03fcbfcfb4a3371..07fe54943a6136bffa910faf81a0f3bcfef4f19e
+--- a/tests/test_ui_api.py
++++ b/tests/test_ui_api.py
+@@ -2,11 +2,16 @@
+ 
+ import json
+ import tempfile
++import threading
+ import unittest
++import urllib.error
++import urllib.request
++from http.server import ThreadingHTTPServer
+ from pathlib import Path
+ 
+ from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+ from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
++from agentloop.ui import AgentLoopUIHandler
+ from agentloop.workspace import init_workspace
+ from agentloop.workflow import approve_task, start_task
+ 
+@@ -106,6 +111,75 @@
+             self.assertFalse(ready["actions"]["approve"]["enabled"])
+             self.assertTrue(ready["actions"]["run"]["enabled"])
+ 
++    def test_http_ui_endpoints_back_task_crud_and_static_assets(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            init_workspace(root)
++
++            class Server(ThreadingHTTPServer):
++                pass
++
++            server = Server(("127.0.0.1", 0), AgentLoopUIHandler)
++            server.root = root.resolve()  # type: ignore[attr-defined]
++            thread = threading.Thread(target=server.serve_forever, daemon=True)
++            thread.start()
++            base_url = f"http://127.0.0.1:{server.server_port}"
++
++            def request(path: str, method: str = "GET", payload: dict | None = None) -> tuple[int, dict | str, str]:
++                body = None if payload is None else json.dumps(payload).encode("utf-8")
++                req = urllib.request.Request(
++                    f"{base_url}{path}",
++                    data=body,
++                    method=method,
++                    headers={"Content-Type": "application/json"},
++                )
++                with urllib.request.urlopen(req, timeout=5) as response:
++                    raw = response.read().decode("utf-8")
++                    content_type = response.headers.get("Content-Type", "")
++                    data: dict | str = json.loads(raw) if "application/json" in content_type else raw
++                    return response.status, data, content_type
++
++            try:
++                status, html, content_type = request("/")
++                self.assertEqual(status, 200)
++                self.assertIn("text/html", content_type)
++                self.assertIn("AgentLoop Task Console", html)
++
++                status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
++                self.assertEqual(status, 201)
++                self.assertIsInstance(detail, dict)
++                task_id = detail["state"]["task_id"]
++                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ALIGNMENT")
++
++                status, task_list, _ = request("/api/tasks")
++                self.assertEqual(status, 200)
++                self.assertIsInstance(task_list, dict)
++                self.assertEqual(task_list["tasks"][0]["task_id"], task_id)
++
++                status, patched, _ = request(
++                    f"/api/tasks/{task_id}/config",
++                    "PATCH",
++                    {"max_iterations": 2, "test_commands": ["python -m unittest"]},
++                )
++                self.assertEqual(status, 200)
++                self.assertIsInstance(patched, dict)
++                self.assertEqual(patched["config"]["override"]["max_iterations"], 2)
++                self.assertEqual(patched["config"]["override"]["test_commands"], ["python -m unittest"])
++
++                with self.assertRaises(urllib.error.HTTPError) as ctx:
++                    request(f"/api/tasks/{task_id}", "DELETE", {"confirm": "wrong-id"})
++                self.assertEqual(ctx.exception.code, 400)
++
++                status, deleted, _ = request(f"/api/tasks/{task_id}", "DELETE", {"confirm": task_id})
++                self.assertEqual(status, 200)
++                self.assertIsInstance(deleted, dict)
++                self.assertTrue(deleted["deleted"])
++                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
++            finally:
++                server.shutdown()
++                server.server_close()
++                thread.join(timeout=5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+
+codex
+The required test plan artifact is now written in the specified task directory. I’m doing a final diff/status check to make sure the only intentional code change is the UI HTTP test plus the test-plan artifact.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'git diff -- tests/test_ui_api.py .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'git status --short' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1711ms:
+ M .agentloop/config.json
+ M .agentloop/prompts/analyst.md
+ M .agentloop/prompts/architect.md
+ M .agentloop/prompts/implementer.md
+ M .agentloop/prompts/tester.md
+ M .agentloop/state.json
+ M agentloop/__pycache__/cli.cpython-311.pyc
+ M agentloop/__pycache__/tasks.cpython-311.pyc
+ M agentloop/cli.py
+ M agentloop/tasks.py
+?? .agentloop/locks/
+?? .agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/
+?? .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/
+?? agentloop/__pycache__/api.cpython-311.pyc
+?? agentloop/__pycache__/logs.cpython-311.pyc
+?? agentloop/__pycache__/ui.cpython-311.pyc
+?? agentloop/api.py
+?? agentloop/logs.py
+?? agentloop/ui.py
+?? agentloop/ui_static/
+?? tests/__pycache__/
+?? tests/test_ui_api.py
+
+ succeeded in 1771ms:
+diff --git a/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md b/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b389199e33fdfd49651eb9aa24db5d81286a1d9d
+--- /dev/null
++++ b/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md
+@@ -0,0 +1,86 @@
++# Test Plan: AgentLoop Task Console UI
++
++## Scope
++
++Validate the AgentLoop UI product surface for task management:
++
++- Task CRUD through the local JSON API used by the browser UI.
++- Task list/detail view models for status, phase, iteration, current task, and malformed task handling.
++- Latest runtime output exposure, including agent stdout/stderr and test logs.
++- Artifact previews and bounded artifact reads.
++- Per-task configuration updates from the UI.
++- HTTP server routing for static UI assets and API endpoints.
++
++## Automated Coverage Added
++
++Updated `tests/test_ui_api.py` with `test_http_ui_endpoints_back_task_crud_and_static_assets`.
++
++This test starts the real `AgentLoopUIHandler` on an ephemeral localhost port and verifies:
++
++- `GET /` serves the static Task Console HTML.
++- `POST /api/tasks` creates a task and returns a task detail payload.
++- `GET /api/tasks` lists the created task for the sidebar.
++- `PATCH /api/tasks/{task_id}/config` persists `max_iterations` and `test_commands`.
++- `DELETE /api/tasks/{task_id}` rejects an incorrect confirmation with HTTP 400.
++- `DELETE /api/tasks/{task_id}` deletes the task when confirmation matches.
++
++Existing UI/API tests cover:
++
++- Current-task marker and malformed state resilience.
++- Create-task workflow artifacts: `analysis.md`, `acceptance.md`, and `acceptance.json`.
++- Detail payload artifacts, latest runtime iteration, agent stdout, and test log content.
++- Direct config patch and delete behavior.
++- Action enablement for approval and run states.
++
++## Commands Run
++
++```powershell
++python -m unittest tests.test_ui_api -v
++```
++
++Result: passed, 6 tests.
++
++```powershell
++python -m unittest discover -s tests -v
++```
++
++Result: passed, 56 tests.
++
++Note: `python -m unittest discover -v` from the repository root returned `Ran 0 tests`, so the evidence command uses the repository's explicit `tests` start directory.
++
++## Evidence
++
++Focused UI/API run:
++
++```text
++Ran 6 tests in 2.096s
++OK
++```
++
++Full suite run:
++
++```text
++Ran 56 tests in 23.563s
++OK
++```
++
++HTTP integration evidence from the new test included successful live requests:
++
++```text
++GET / HTTP/1.1 200
++POST /api/tasks HTTP/1.1 201
++GET /api/tasks HTTP/1.1 200
++PATCH /api/tasks/<task_id>/config HTTP/1.1 200
++DELETE /api/tasks/<task_id> HTTP/1.1 400
++DELETE /api/tasks/<task_id> HTTP/1.1 200
++```
++
++## Manual Verification Recommended
++
++- Start the UI with `python -m agentloop --root . ui --port 8765` and verify the browser workflow visually.
++- Create a task, search/filter it, update config, inspect artifacts, inspect runtime logs, and delete it.
++- Check responsive layout at a narrow viewport because the automated tests validate API/server behavior, not CSS layout.
++
++## Residual Risk
++
++The automated coverage verifies the data contract and HTTP routes behind the UI, but it does not run a Playwright browser interaction against the static JavaScript. Browser-level coverage should be added if this UI becomes a larger surface or if regressions appear in DOM event wiring, dialogs, filters, or responsive layout.
+diff --git a/tests/test_ui_api.py b/tests/test_ui_api.py
+index 0c47740ab888013d4d3c220ed03fcbfcfb4a3371..07fe54943a6136bffa910faf81a0f3bcfef4f19e
+--- a/tests/test_ui_api.py
++++ b/tests/test_ui_api.py
+@@ -2,11 +2,16 @@
+ 
+ import json
+ import tempfile
++import threading
+ import unittest
++import urllib.error
++import urllib.request
++from http.server import ThreadingHTTPServer
+ from pathlib import Path
+ 
+ from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+ from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
++from agentloop.ui import AgentLoopUIHandler
+ from agentloop.workspace import init_workspace
+ from agentloop.workflow import approve_task, start_task
+ 
+@@ -106,6 +111,75 @@
+             self.assertFalse(ready["actions"]["approve"]["enabled"])
+             self.assertTrue(ready["actions"]["run"]["enabled"])
+ 
++    def test_http_ui_endpoints_back_task_crud_and_static_assets(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            init_workspace(root)
++
++            class Server(ThreadingHTTPServer):
++                pass
++
++            server = Server(("127.0.0.1", 0), AgentLoopUIHandler)
++            server.root = root.resolve()  # type: ignore[attr-defined]
++            thread = threading.Thread(target=server.serve_forever, daemon=True)
++            thread.start()
++            base_url = f"http://127.0.0.1:{server.server_port}"
++
++            def request(path: str, method: str = "GET", payload: dict | None = None) -> tuple[int, dict | str, str]:
++                body = None if payload is None else json.dumps(payload).encode("utf-8")
++                req = urllib.request.Request(
++                    f"{base_url}{path}",
++                    data=body,
++                    method=method,
++                    headers={"Content-Type": "application/json"},
++                )
++                with urllib.request.urlopen(req, timeout=5) as response:
++                    raw = response.read().decode("utf-8")
++                    content_type = response.headers.get("Content-Type", "")
++                    data: dict | str = json.loads(raw) if "application/json" in content_type else raw
++                    return response.status, data, content_type
++
++            try:
++                status, html, content_type = request("/")
++                self.assertEqual(status, 200)
++                self.assertIn("text/html", content_type)
++                self.assertIn("AgentLoop Task Console", html)
++
++                status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
++                self.assertEqual(status, 201)
++                self.assertIsInstance(detail, dict)
++                task_id = detail["state"]["task_id"]
++                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ALIGNMENT")
++
++                status, task_list, _ = request("/api/tasks")
++                self.assertEqual(status, 200)
++                self.assertIsInstance(task_list, dict)
++                self.assertEqual(task_list["tasks"][0]["task_id"], task_id)
++
++                status, patched, _ = request(
++                    f"/api/tasks/{task_id}/config",
++                    "PATCH",
++                    {"max_iterations": 2, "test_commands": ["python -m unittest"]},
++                )
++                self.assertEqual(status, 200)
++                self.assertIsInstance(patched, dict)
++                self.assertEqual(patched["config"]["override"]["max_iterations"], 2)
++                self.assertEqual(patched["config"]["override"]["test_commands"], ["python -m unittest"])
++
++                with self.assertRaises(urllib.error.HTTPError) as ctx:
++                    request(f"/api/tasks/{task_id}", "DELETE", {"confirm": "wrong-id"})
++                self.assertEqual(ctx.exception.code, 400)
++
++                status, deleted, _ = request(f"/api/tasks/{task_id}", "DELETE", {"confirm": task_id})
++                self.assertEqual(status, 200)
++                self.assertIsInstance(deleted, dict)
++                self.assertTrue(deleted["deleted"])
++                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
++            finally:
++                server.shutdown()
++                server.server_close()
++                thread.join(timeout=5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+
+codex
+已完成测试侧工作。
+
+新增/更新内容：
+- 在 [tests/test_ui_api.py](</C:/Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/tests/test_ui_api.py>) 增加 HTTP 集成测试，启动真实 `AgentLoopUIHandler`，覆盖：
+  - 静态 UI 首页加载
+  - 任务创建
+  - 任务列表读取
+  - 配置更新
+  - 删除确认失败
+  - 删除成功
+- 已写入测试计划和证据到指定路径：[test-plan.md](</C:/Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md>)
+
+验证结果：
+- `python -m unittest tests.test_ui_api -v`
+  - 通过，6 tests
+- `python -m unittest discover -s tests -v`
+  - 通过，56 tests
+
+备注：`python -m unittest discover -v` 在 repo 根目录返回 `Ran 0 tests`，所以证据中记录的是当前仓库可用的显式 `tests` 目录发现命令。
+diff --git a/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md b/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b389199e33fdfd49651eb9aa24db5d81286a1d9d
+--- /dev/null
++++ b/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md
+@@ -0,0 +1,86 @@
++# Test Plan: AgentLoop Task Console UI
++
++## Scope
++
++Validate the AgentLoop UI product surface for task management:
++
++- Task CRUD through the local JSON API used by the browser UI.
++- Task list/detail view models for status, phase, iteration, current task, and malformed task handling.
++- Latest runtime output exposure, including agent stdout/stderr and test logs.
++- Artifact previews and bounded artifact reads.
++- Per-task configuration updates from the UI.
++- HTTP server routing for static UI assets and API endpoints.
++
++## Automated Coverage Added
++
++Updated `tests/test_ui_api.py` with `test_http_ui_endpoints_back_task_crud_and_static_assets`.
++
++This test starts the real `AgentLoopUIHandler` on an ephemeral localhost port and verifies:
++
++- `GET /` serves the static Task Console HTML.
++- `POST /api/tasks` creates a task and returns a task detail payload.
++- `GET /api/tasks` lists the created task for the sidebar.
++- `PATCH /api/tasks/{task_id}/config` persists `max_iterations` and `test_commands`.
++- `DELETE /api/tasks/{task_id}` rejects an incorrect confirmation with HTTP 400.
++- `DELETE /api/tasks/{task_id}` deletes the task when confirmation matches.
++
++Existing UI/API tests cover:
++
++- Current-task marker and malformed state resilience.
++- Create-task workflow artifacts: `analysis.md`, `acceptance.md`, and `acceptance.json`.
++- Detail payload artifacts, latest runtime iteration, agent stdout, and test log content.
++- Direct config patch and delete behavior.
++- Action enablement for approval and run states.
++
++## Commands Run
++
++```powershell
++python -m unittest tests.test_ui_api -v
++```
++
++Result: passed, 6 tests.
++
++```powershell
++python -m unittest discover -s tests -v
++```
++
++Result: passed, 56 tests.
++
++Note: `python -m unittest discover -v` from the repository root returned `Ran 0 tests`, so the evidence command uses the repository's explicit `tests` start directory.
++
++## Evidence
++
++Focused UI/API run:
++
++```text
++Ran 6 tests in 2.096s
++OK
++```
++
++Full suite run:
++
++```text
++Ran 56 tests in 23.563s
++OK
++```
++
++HTTP integration evidence from the new test included successful live requests:
++
++```text
++GET / HTTP/1.1 200
++POST /api/tasks HTTP/1.1 201
++GET /api/tasks HTTP/1.1 200
++PATCH /api/tasks/<task_id>/config HTTP/1.1 200
++DELETE /api/tasks/<task_id> HTTP/1.1 400
++DELETE /api/tasks/<task_id> HTTP/1.1 200
++```
++
++## Manual Verification Recommended
++
++- Start the UI with `python -m agentloop --root . ui --port 8765` and verify the browser workflow visually.
++- Create a task, search/filter it, update config, inspect artifacts, inspect runtime logs, and delete it.
++- Check responsive layout at a narrow viewport because the automated tests validate API/server behavior, not CSS layout.
++
++## Residual Risk
++
++The automated coverage verifies the data contract and HTTP routes behind the UI, but it does not run a Playwright browser interaction against the static JavaScript. Browser-level coverage should be added if this UI becomes a larger surface or if regressions appear in DOM event wiring, dialogs, filters, or responsive layout.
+diff --git a/tests/test_ui_api.py b/tests/test_ui_api.py
+index 0c47740ab888013d4d3c220ed03fcbfcfb4a3371..07fe54943a6136bffa910faf81a0f3bcfef4f19e
+--- a/tests/test_ui_api.py
++++ b/tests/test_ui_api.py
+@@ -2,11 +2,16 @@
+ 
+ import json
+ import tempfile
++import threading
+ import unittest
++import urllib.error
++import urllib.request
++from http.server import ThreadingHTTPServer
+ from pathlib import Path
+ 
+ from agentloop.api import build_task_detail, build_task_list, create_task, delete_task, patch_task_config
+ from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
++from agentloop.ui import AgentLoopUIHandler
+ from agentloop.workspace import init_workspace
+ from agentloop.workflow import approve_task, start_task
+ 
+@@ -106,6 +111,75 @@
+             self.assertFalse(ready["actions"]["approve"]["enabled"])
+             self.assertTrue(ready["actions"]["run"]["enabled"])
+ 
++    def test_http_ui_endpoints_back_task_crud_and_static_assets(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            init_workspace(root)
++
++            class Server(ThreadingHTTPServer):
++                pass
++
++            server = Server(("127.0.0.1", 0), AgentLoopUIHandler)
++            server.root = root.resolve()  # type: ignore[attr-defined]
++            thread = threading.Thread(target=server.serve_forever, daemon=True)
++            thread.start()
++            base_url = f"http://127.0.0.1:{server.server_port}"
++
++            def request(path: str, method: str = "GET", payload: dict | None = None) -> tuple[int, dict | str, str]:
++                body = None if payload is None else json.dumps(payload).encode("utf-8")
++                req = urllib.request.Request(
++                    f"{base_url}{path}",
++                    data=body,
++                    method=method,
++                    headers={"Content-Type": "application/json"},
++                )
++                with urllib.request.urlopen(req, timeout=5) as response:
++                    raw = response.read().decode("utf-8")
++                    content_type = response.headers.get("Content-Type", "")
++                    data: dict | str = json.loads(raw) if "application/json" in content_type else raw
++                    return response.status, data, content_type
++
++            try:
++                status, html, content_type = request("/")
++                self.assertEqual(status, 200)
++                self.assertIn("text/html", content_type)
++                self.assertIn("AgentLoop Task Console", html)
++
++                status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
++                self.assertEqual(status, 201)
++                self.assertIsInstance(detail, dict)
++                task_id = detail["state"]["task_id"]
++                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ALIGNMENT")
++
++                status, task_list, _ = request("/api/tasks")
++                self.assertEqual(status, 200)
++                self.assertIsInstance(task_list, dict)
++                self.assertEqual(task_list["tasks"][0]["task_id"], task_id)
++
++                status, patched, _ = request(
++                    f"/api/tasks/{task_id}/config",
++                    "PATCH",
++                    {"max_iterations": 2, "test_commands": ["python -m unittest"]},
++                )
++                self.assertEqual(status, 200)
++                self.assertIsInstance(patched, dict)
++                self.assertEqual(patched["config"]["override"]["max_iterations"], 2)
++                self.assertEqual(patched["config"]["override"]["test_commands"], ["python -m unittest"])
++
++                with self.assertRaises(urllib.error.HTTPError) as ctx:
++                    request(f"/api/tasks/{task_id}", "DELETE", {"confirm": "wrong-id"})
++                self.assertEqual(ctx.exception.code, 400)
++
++                status, deleted, _ = request(f"/api/tasks/{task_id}", "DELETE", {"confirm": task_id})
++                self.assertEqual(status, 200)
++                self.assertIsInstance(deleted, dict)
++                self.assertTrue(deleted["deleted"])
++                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
++            finally:
++                server.shutdown()
++                server.server_close()
++                thread.join(timeout=5)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+
+tokens used
+604,634

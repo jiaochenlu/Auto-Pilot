@@ -135,6 +135,11 @@ def build_parser() -> argparse.ArgumentParser:
     _add_task_id_argument(run_parser)
     run_parser.add_argument("--wait", action="store_true", help="Wait for per-task lock instead of failing fast.")
 
+    ui_parser = subparsers.add_parser("ui", help="Start the local AgentLoop Task Console UI.")
+    ui_parser.add_argument("--host", default="127.0.0.1", help="Host to bind. Defaults to 127.0.0.1.")
+    ui_parser.add_argument("--port", type=int, default=8765, help="Port to bind. Defaults to 8765.")
+    ui_parser.add_argument("--open", action="store_true", help="Open the UI in the default browser.")
+
     runtime_parser = subparsers.add_parser("runtime", help="Manage coding agent runtimes.")
     runtime_subparsers = runtime_parser.add_subparsers(dest="runtime_command", required=True)
 
@@ -739,6 +744,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             return cmd_cancel(root, args.by, _resolve_task_arg(args))
         if args.command == "run":
             return cmd_run(root, _resolve_task_arg(args), args.wait)
+        if args.command == "ui":
+            from .ui import serve
+
+            serve(root, host=args.host, port=args.port, open_browser=args.open)
+            return 0
         if args.command == "runtime":
             if args.runtime_command == "list":
                 return cmd_runtime_list(root)

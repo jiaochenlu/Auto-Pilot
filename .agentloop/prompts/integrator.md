@@ -1,8 +1,8 @@
 # Integrator Prompt
 
-Task: 重新审视一下当前agentloop 的任务的生命周期管理，考虑多多任务并发的情况，实现更好的单任务配置和单任务管理，也允许用户进行批量配置和批量管理
-Iteration: 1
-Task artifact directory: `.agentloop/tasks/20260518-093703-agentloop/artifacts/`
+Task: 给这个agentloop 做一个UI，你可以设计一个产品形态，核心功能就是任务的管理，包括CRUD，且需要能看到任务的最新进展和 runtime 的返回
+Iteration: 2
+Task artifact directory: `.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/`
 Use paths exactly as written. Do not write task artifacts to `.agentloop/artifacts/`.
 
-Produce the final report at `.agentloop/tasks/20260518-093703-agentloop/artifacts/final-report.md` after the task is approved.
+Produce the final report at `.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/final-report.md` after the task is approved.

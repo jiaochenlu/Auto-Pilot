@@ -1,0 +1,3 @@
+Design written to `.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/design.md`.
+
+Approach: replace the O(n²) nested scan with a two-pass linear algorithm — precompute `_duplicate_key` once per transaction into an aligned list, count keys in a dict, then filter `transactions` in order keeping IDs whose key count ≥ 2. Preserves duplicate definition, input shape, and original order (including the first occurrence of each duplicate group). Test plan covers AC-1/2/3 with case-based unit tests plus a ~50k-row regression test under a loose wall-clock bound, with an optional `_duplicate_key` call-count assertion to avoid timing flake.

@@ -1,0 +1,273 @@
+{
+  "schema_version": 1,
+  "task_id": "20260519-050850-agentloop-ui-crud-runtime",
+  "title": "\u7ed9\u8fd9\u4e2aagentloop \u505a\u4e00\u4e2aUI\uff0c\u4f60\u53ef\u4ee5\u8bbe\u8ba1\u4e00\u4e2a\u4ea7\u54c1\u5f62\u6001\uff0c\u6838\u5fc3\u529f\u80fd\u5c31\u662f\u4efb\u52a1\u7684\u7ba1\u7406\uff0c\u5305\u62ecCRUD\uff0c\u4e14\u9700\u8981\u80fd\u770b\u5230\u4efb\u52a1\u7684\u6700\u65b0\u8fdb\u5c55\u548c runtime \u7684\u8fd4\u56de",
+  "status": "DONE",
+  "current_phase": "done",
+  "iteration": 2,
+  "max_iterations": 7,
+  "requires_human_approval": false,
+  "goal": {
+    "raw_request": "\u7ed9\u8fd9\u4e2aagentloop \u505a\u4e00\u4e2aUI\uff0c\u4f60\u53ef\u4ee5\u8bbe\u8ba1\u4e00\u4e2a\u4ea7\u54c1\u5f62\u6001\uff0c\u6838\u5fc3\u529f\u80fd\u5c31\u662f\u4efb\u52a1\u7684\u7ba1\u7406\uff0c\u5305\u62ecCRUD\uff0c\u4e14\u9700\u8981\u80fd\u770b\u5230\u4efb\u52a1\u7684\u6700\u65b0\u8fdb\u5c55\u548c runtime \u7684\u8fd4\u56de",
+    "problem": null,
+    "desired_outcome": null,
+    "non_goals": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "description": "The UI provides a task list that reads existing AgentLoop tasks from `.agentloop/tasks`, shows each task's id, title, status, phase, iteration progress, updated time, and clearly indicates the current task when known.",
+      "verification": "functional test or browser smoke test",
+      "required": true,
+      "status": "passed",
+      "evidence": "build_task_list and the UI task list read .agentloop/tasks and expose task_id, title, status, current_phase, iteration/max_iterations, updated_at, current marker, and lock/error state. Covered by test_task_list_marks_current_and_handles_malformed_state and HTTP /api/tasks coverage."
+    },
+    {
+      "id": "AC-2",
+      "description": "A user can create a new task from the UI by entering a task request; creation uses AgentLoop's existing task start behavior and results in a new task directory with `state.json`, `analysis.md`, `acceptance.md`, and `acceptance.json`.",
+      "verification": "functional test",
+      "required": true,
+      "status": "passed",
+      "evidence": "create_task uses start_task and produces the expected task artifacts. Covered by test_create_task_uses_workflow_artifacts and POST /api/tasks integration coverage."
+    },
+    {
+      "id": "AC-3",
+      "description": "A user can open a task detail view that shows the task request/title, status, current phase, iteration count, approval requirement, phase statuses, acceptance criteria, and available artifact links or previews.",
+      "verification": "functional test or browser smoke test",
+      "required": true,
+      "status": "passed",
+      "evidence": "build_task_detail returns task title/request, status, phase, iteration count, approval flag, phase statuses, acceptance criteria, artifact previews, runtime, config, and actions; the Overview, Artifacts, Config, and Runtime tabs render these fields. Covered by UI/API detail tests and source review."
+    },
+    {
+      "id": "AC-4",
+      "description": "A user can update supported per-task settings from the UI, at minimum `max_iterations` and `test_commands`, using existing AgentLoop config validation and persisting changes to the task's `config.json`.",
+      "verification": "functional test",
+      "required": true,
+      "status": "passed",
+      "evidence": "PATCH /api/tasks/<task_id>/config supports max_iterations and test_commands and persists them to the per-task config.json through existing validation paths. Covered by test_patch_config_and_delete_task and HTTP integration coverage."
+    },
+    {
+      "id": "AC-5",
+      "description": "A user can delete a task from the UI after explicit confirmation; the task disappears from the list and its task directory is removed using the same safety boundaries as existing task deletion behavior.",
+      "verification": "functional test",
+      "required": true,
+      "status": "passed",
+      "evidence": "DELETE /api/tasks/<task_id> requires exact task id confirmation, removes the task directory within the .agentloop/tasks boundary, and rejects incorrect confirmation. Covered by test_patch_config_and_delete_task and HTTP integration coverage."
+    },
+    {
+      "id": "AC-6",
+      "description": "The UI exposes valid lifecycle actions for the selected task, including approve when waiting for alignment, cancel when cancellable, and run/resume when ready, while disabling or explaining invalid actions based on current status.",
+      "verification": "functional test",
+      "required": true,
+      "status": "passed",
+      "evidence": "available_actions exposes approve, run, cancel, delete, and config action state with disabled reasons when invalid or locked. Covered by test_actions_reflect_status and source review of lifecycle buttons."
+    },
+    {
+      "id": "AC-7",
+      "description": "The UI shows the latest task progress after lifecycle actions by refreshing persisted state fields, including status, current phase, phase statuses, iteration/max iteration, and acceptance criteria statuses.",
+      "verification": "functional test or browser smoke test",
+      "required": true,
+      "status": "passed",
+      "evidence": "Lifecycle API mutations return fresh task detail and the frontend reloads task list/detail after approve, run, and cancel. Action state transition after approve is covered by test_actions_reflect_status."
+    },
+    {
+      "id": "AC-8",
+      "description": "The UI shows runtime return information for the latest relevant iteration, including role, runtime, command when available, exit code, duration when available, produced artifacts, and readable stdout/stderr log content or clear missing-log messages.",
+      "verification": "functional test",
+      "required": true,
+      "status": "passed",
+      "evidence": "latest_runtime_summary returns latest iteration agent entries with role, runtime, adapter, command, exit_code, duration_ms, artifacts, bounded stdout, and bounded stderr; renderRuntime displays this data. Covered by test_detail_includes_artifacts_runtime_and_test_logs."
+    },
+    {
+      "id": "AC-9",
+      "description": "The UI shows local test command output for the latest iteration when present, including command, exit code, duration, and log content from `.agentloop/runs/<task_id>/<iteration>/tests/`.",
+      "verification": "functional test",
+      "required": true,
+      "status": "passed",
+      "evidence": "Iteration 2 now merges structured review test_results with latest iteration test logs and renders command, exit_code, duration_ms, and log content. Covered by test_detail_merges_structured_test_result_metadata, test_detail_includes_structured_test_result_with_missing_log, and full-suite execution."
+    },
+    {
+      "id": "AC-10",
+      "description": "The implementation handles missing or malformed task files, missing artifacts, empty runtime logs, and long logs without crashing; long log content is bounded in the UI.",
+      "verification": "review and functional test",
+      "required": true,
+      "status": "passed",
+      "evidence": "Malformed task state, missing logs, missing artifacts, and long logs are handled with error or missing payloads and bounded_text/bounded_workspace_file limits. Covered by malformed-state and missing-log tests plus source review."
+    },
+    {
+      "id": "AC-11",
+      "description": "Core task UI data-loading and mutation paths are covered by tests that use temporary workspaces and do not depend on a user's real `.agentloop` data.",
+      "verification": "automated tests",
+      "required": true,
+      "status": "passed",
+      "evidence": "Core UI/API loading and mutation tests use TemporaryDirectory workspaces and do not depend on the user's real .agentloop data. Both focused and full automated suites passed with exit_code 0."
+    },
+    {
+      "id": "AC-12",
+      "description": "The UI is task-management first: first screen is the usable task console, not a marketing page, and it uses clear controls for task CRUD, lifecycle actions, progress, and runtime output.",
+      "verification": "manual review",
+      "required": true,
+      "status": "passed",
+      "evidence": "Manual source review of index.html, app.js, and styles.css confirms the first screen is a task-management console with task list, create, search/filter, detail, CRUD/lifecycle controls, config, artifacts, progress, and runtime output rather than a marketing page."
+    }
+  ],
+  "phases": {
+    "analysis": {
+      "status": "completed",
+      "artifact": ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/analysis.md"
+    },
+    "alignment": {
+      "status": "approved",
+      "approved_by": "requester",
+      "approved_at": "2026-05-19T05:14:51+00:00",
+      "artifact": ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.md"
+    },
+    "design": {
+      "status": "completed",
+      "artifact": ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/design.md"
+    },
+    "implementation": {
+      "status": "completed"
+    },
+    "testing": {
+      "status": "completed",
+      "artifact": ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md"
+    },
+    "review": {
+      "status": "approved",
+      "last_review": ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/review-002.json"
+    }
+  },
+  "agents": [
+    {
+      "role": "analyst",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 206640,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/000/analyst.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/000/analyst.stderr.log",
+      "artifacts": [
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/analysis.md",
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.md",
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.json"
+      ]
+    },
+    {
+      "role": "architect",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 352718,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/001/architect.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/001/architect.stderr.log",
+      "artifacts": [
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/design.md"
+      ]
+    },
+    {
+      "role": "implementer",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 482016,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/001/implementer.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/001/implementer.stderr.log",
+      "artifacts": []
+    },
+    {
+      "role": "tester",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 147875,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/001/tester.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/001/tester.stderr.log",
+      "artifacts": [
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md"
+      ]
+    },
+    {
+      "role": "reviewer",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 215172,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/001/reviewer.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/001/reviewer.stderr.log",
+      "artifacts": [
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/review-001.json"
+      ]
+    },
+    {
+      "role": "architect",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 125311,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/architect.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/architect.stderr.log",
+      "artifacts": [
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/design.md"
+      ]
+    },
+    {
+      "role": "implementer",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 214625,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/implementer.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/implementer.stderr.log",
+      "artifacts": []
+    },
+    {
+      "role": "tester",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 170734,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/tester.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/tester.stderr.log",
+      "artifacts": [
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test-plan.md"
+      ]
+    },
+    {
+      "role": "reviewer",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 101469,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/reviewer.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/reviewer.stderr.log",
+      "artifacts": [
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/review-002.json"
+      ]
+    },
+    {
+      "role": "integrator",
+      "runtime": "codex",
+      "adapter": "command",
+      "command": "C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe exec --skip-git-repo-check --sandbox workspace-write -",
+      "exit_code": 0,
+      "duration_ms": 181125,
+      "stdout_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/integrator.stdout.log",
+      "stderr_log": ".agentloop/runs/20260519-050850-agentloop-ui-crud-runtime/002/integrator.stderr.log",
+      "artifacts": [
+        ".agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/final-report.md"
+      ]
+    }
+  ],
+  "created_at": "2026-05-19T05:08:50+00:00",
+  "updated_at": "2026-05-19T05:48:56+00:00"
+}

@@ -1,0 +1,15 @@
+Handled the requested verification and evidence update.
+
+`find_duplicate_transaction_ids` in [duplicate_transactions.py](</Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/tests/test_loop/duplicate_transactions.py>) is already using the linear two-pass dictionary approach: one `_duplicate_key` call per transaction, cached keys, then ordered output filtering.
+
+Updated [test-plan.md](</Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/.agentloop/tasks/20260523-074957-fix-the-performance-regression-in-tests-test-loo/artifacts/test-plan.md:56>) with Iteration 1 evidence.
+
+Verification:
+- `python -m pytest tests/test_loop/test_duplicate_transactions.py -q` exited `1`: `No module named pytest`
+- `py -m pytest tests/test_loop/test_duplicate_transactions.py -q` exited `1`: `No module named pytest`
+- Fallback direct Python harness exited `0`
+- Behavior cases passed: `4`
+- `_duplicate_key` calls for `500` transactions: `500`
+- Large unique input timing: `100000` transactions in `0.0693s`, `0` duplicates
+
+Remaining gap: focused pytest could not run because `pytest` is not installed in the available Python environment.

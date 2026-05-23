@@ -64,6 +64,10 @@ def default_state() -> dict[str, Any]:
                 "status": "pending",
                 "artifact": ".agentloop/artifacts/analysis.md",
             },
+            "analysis_review": {
+                "status": "pending",
+                "artifact": ".agentloop/artifacts/analysis.md",
+            },
             "alignment": {
                 "status": "pending",
                 "approved_by": None,
@@ -72,6 +76,10 @@ def default_state() -> dict[str, Any]:
             "design": {
                 "status": "pending",
                 "artifact": ".agentloop/artifacts/design.md",
+            },
+            "test_authoring": {
+                "status": "pending",
+                "artifact": ".agentloop/artifacts/test-plan.md",
             },
             "implementation": {"status": "pending"},
             "testing": {

@@ -62,9 +62,45 @@ The requester wants this specific outcome delivered:
 
 ## Open Questions
 
-- Are there project-specific constraints, files, or test commands that should be added before execution?
-- Should any acceptance criteria be marked as manual checks instead of automated tests?
+- None. The current request is specific enough to proceed with conservative assumptions.
 """
+
+
+def draft_analysis_questions(raw_request: str) -> list[dict[str, Any]]:
+    lower = raw_request.lower()
+    questions: list[dict[str, Any]] = []
+    if any(token in lower for token in ["performance", "slow", "too slow", "性能", "太慢"]):
+        questions.append(
+            {
+                "id": "Q-1",
+                "question": "Is there a specific performance target, or should AgentLoop define a conservative benchmark from the current code and input size?",
+                "blocking": False,
+                "reason": "A target improves precision, but the agent can choose a reasonable regression benchmark if unanswered.",
+                "answer": None,
+            }
+        )
+    if not re.search(r"[\w./\\-]+\.(py|js|ts|tsx|jsx|json|md|html|css)\b", raw_request):
+        questions.append(
+            {
+                "id": "Q-2",
+                "question": "Which files or area of the codebase should AgentLoop inspect first?",
+                "blocking": True,
+                "reason": "The request does not name a concrete file or subsystem, so implementation scope may be ambiguous.",
+                "answer": None,
+            }
+        )
+    return questions
+
+
+def append_analysis_answers(analysis: str, questions: list[dict[str, Any]]) -> str:
+    if not questions:
+        return analysis
+    lines = [analysis.rstrip(), "", "## User Answers", ""]
+    for item in questions:
+        answer = str(item.get("answer") or "").strip() or "No answer provided; proceed with documented assumptions."
+        lines.append(f"- {item.get('id')}: {item.get('question')}")
+        lines.append(f"  Answer: {answer}")
+    return "\n".join(lines) + "\n"
 
 
 def requirement_fragments(raw_request: str) -> list[str]:
@@ -82,7 +118,28 @@ def draft_custom_acceptance_items(raw_request: str, analysis_ref: str, acceptanc
     items: list[dict[str, Any]] = []
     for index, fragment in enumerate(requirement_fragments(raw_request), start=1):
         lower = fragment.lower()
-        verification = "automated_test" if any(token in lower for token in ["test", "tests", "unittest", "pytest", "单元测试", "测试"]) else "functional_review"
+        automated_tokens = [
+            "test",
+            "tests",
+            "unittest",
+            "pytest",
+            "bug",
+            "fix",
+            "regression",
+            "performance",
+            "slow",
+            "too slow",
+            "timeout",
+            "单元测试",
+            "测试",
+            "缺陷",
+            "修复",
+            "回归",
+            "性能",
+            "太慢",
+            "超时",
+        ]
+        verification = "automated_test" if any(token in lower for token in automated_tokens) else "functional_review"
         items.append(
             {
                 "id": f"AC-{index}",
@@ -138,15 +195,25 @@ def prepare_analyst_prompt(root: Path, state: dict[str, Any]) -> None:
         "Analyze this specific task. Do not use generic AgentLoop acceptance criteria unless they are directly required by the task.\n\n"
         "Required outputs:\n"
         f"- Write task-specific analysis to `{analysis_ref}`. Include goal, non-goals, assumptions, risks, and open questions.\n"
+        "- Include a `Verification Plan` section in the analysis. For bug, regression, performance, or code-change tasks, name the focused tests or test files that should prove the fix.\n"
         f"- Write human-readable task-specific acceptance criteria to `{acceptance_ref}`.\n"
         f"- Write structured acceptance criteria JSON to `{acceptance_json_ref}`.\n\n"
         "The JSON must be an object with `acceptance_criteria`, an array of objects containing: "
         "id, description, verification, required, status, evidence. Use status `pending`.\n"
+        "For bug, regression, performance, slow, timeout, or code-change tasks, include at least one required "
+        "criterion with verification `automated_test`; its evidence should name the expected regression test file or command.\n"
         "Stop after producing these files; execution starts only after requester approval.\n",
     )
 
 
-def prepare_role_prompt(root: Path, state: dict[str, Any], role: str, iteration: int, review_name: str | None = None) -> None:
+def prepare_role_prompt(
+    root: Path,
+    state: dict[str, Any],
+    role: str,
+    iteration: int,
+    review_name: str | None = None,
+    mode: str | None = None,
+) -> None:
     request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
     design_ref = artifact_ref(state, "design.md")
     test_plan_ref = artifact_ref(state, "test-plan.md")
@@ -160,6 +227,22 @@ def prepare_role_prompt(root: Path, state: dict[str, Any], role: str, iteration:
         f"Task artifact directory: `{artifact_dir_ref}`\n"
         "Use paths exactly as written. Do not write task artifacts to `.agentloop/artifacts/`.\n"
     )
+    tester_instruction = (
+        f"Produce the test plan and evidence at `{test_plan_ref}`. Add or update tests as needed.\n"
+    )
+    if mode == "pre_implementation":
+        tester_instruction = (
+            f"Before implementation, create or update focused regression tests for the approved task and write the plan at `{test_plan_ref}`.\n"
+            "The tests should fail against the current buggy or slow behavior when feasible, and pass after the implementation fix.\n"
+            "Include exact test files, commands, expected signals, and measurable acceptance thresholds when the task implies performance.\n"
+            "Do not implement the production fix in this tester step.\n"
+        )
+    elif mode == "post_implementation":
+        tester_instruction = (
+            f"After implementation, run the relevant focused tests and update `{test_plan_ref}` with evidence.\n"
+            "Record commands, exit codes, important output, timing evidence for performance tasks, and any remaining gaps.\n"
+        )
+
     prompts = {
         "architect": (
             "# Architect Prompt\n\n"
@@ -174,7 +257,7 @@ def prepare_role_prompt(root: Path, state: dict[str, Any], role: str, iteration:
         "tester": (
             "# Tester Prompt\n\n"
             f"{common}\n"
-            f"Produce the test plan and evidence at `{test_plan_ref}`. Add or update tests as needed.\n"
+            f"{tester_instruction}"
         ),
         "reviewer": (
             "# Reviewer Prompt\n\n"
@@ -185,6 +268,8 @@ def prepare_role_prompt(root: Path, state: dict[str, Any], role: str, iteration:
             "Do not use APPROVED if any required automated/unit/test acceptance criterion lacks an executed "
             "test result with exit_code 0. If a test could not run, report CHANGES_REQUIRED or BLOCKED and "
             "include the reason in comments and test_results.\n"
+            "Do not use APPROVED for bug, regression, performance, slow, or timeout tasks unless the work added "
+            "or updated a focused regression/performance test and the review records passing evidence for it.\n"
         ),
         "integrator": (
             "# Integrator Prompt\n\n"
@@ -404,8 +489,14 @@ def load_acceptance_criteria(path: Path) -> list[dict[str, Any]]:
     return normalized
 
 
-def start_task(root: Path, raw_request: str) -> dict[str, Any]:
-    from .tasks import effective_config, set_current_task_id
+def start_task(
+    root: Path,
+    raw_request: str,
+    config_override: dict[str, Any] | None = None,
+    require_analysis_review: bool = False,
+    run_analyst: bool = True,
+) -> dict[str, Any]:
+    from .tasks import effective_config, save_task_config, set_current_task_id
 
     request = raw_request.strip()
     if not request:
@@ -415,13 +506,15 @@ def start_task(root: Path, raw_request: str) -> dict[str, Any]:
     now = utc_now_iso()
     state = default_state()
     state["task_id"] = task_id
+    if config_override:
+        save_task_config(root, task_id, config_override)
     config = effective_config(root, task_id)
     analysis_ref = task_artifact_ref(task_id, "analysis.md")
     acceptance_ref = task_artifact_ref(task_id, "acceptance.md")
     acceptance_json_ref = task_artifact_ref(task_id, "acceptance.json")
     state["title"] = request[:80]
-    state["status"] = "WAITING_FOR_ALIGNMENT"
-    state["current_phase"] = "alignment"
+    state["status"] = "WAITING_FOR_ANALYSIS_REVIEW" if require_analysis_review else "WAITING_FOR_ALIGNMENT"
+    state["current_phase"] = "analysis_review" if require_analysis_review else "alignment"
     state["iteration"] = 0
     state["requires_human_approval"] = True
     state["goal"] = {
@@ -433,24 +526,31 @@ def start_task(root: Path, raw_request: str) -> dict[str, Any]:
     state["acceptance_criteria"] = []
     state["phases"]["analysis"]["status"] = "completed"
     state["phases"]["analysis"]["artifact"] = analysis_ref
-    state["phases"]["alignment"]["status"] = "waiting_for_approval"
+    state.setdefault("phases", {}).setdefault("analysis_review", {"status": "pending"})
+    state["phases"]["analysis_review"]["status"] = "waiting_for_review" if require_analysis_review else "completed"
+    state["phases"]["analysis_review"]["artifact"] = analysis_ref
+    state["phases"]["alignment"]["status"] = "pending" if require_analysis_review else "waiting_for_approval"
     state["phases"]["alignment"]["artifact"] = acceptance_ref
     state["phases"]["design"]["artifact"] = task_artifact_ref(task_id, "design.md")
+    state.setdefault("phases", {}).setdefault("test_authoring", {"status": "pending"})
+    state["phases"]["test_authoring"]["artifact"] = task_artifact_ref(task_id, "test-plan.md")
     state["phases"]["testing"]["artifact"] = task_artifact_ref(task_id, "test-plan.md")
+    state["analysis_questions"] = draft_analysis_questions(request) if require_analysis_review else []
     state["agents"] = []
     state["updated_at"] = now
 
     task_artifact_path(root, task_id, "analysis.md").parent.mkdir(parents=True, exist_ok=True)
     prepare_analyst_prompt(root, state)
     manual_criteria = draft_custom_acceptance_items(request, analysis_ref, acceptance_ref)
-    if role_uses_manual(config, "analyst"):
+    if not run_analyst or role_uses_manual(config, "analyst"):
         write_text(task_artifact_path(root, task_id, "analysis.md"), draft_analysis(request))
         write_text(task_artifact_path(root, task_id, "acceptance.json"), json.dumps({"acceptance_criteria": manual_criteria}, indent=2) + "\n")
         write_text(task_artifact_path(root, task_id, "acceptance.md"), draft_acceptance(request, manual_criteria, analysis_ref))
-    record_agent_result(
-        state,
-        run_role(root, config, "analyst", 0, [analysis_ref, acceptance_ref, acceptance_json_ref], task_id=task_id),
-    )
+    if run_analyst:
+        record_agent_result(
+            state,
+            run_role(root, config, "analyst", 0, [analysis_ref, acceptance_ref, acceptance_json_ref], task_id=task_id),
+        )
     state["acceptance_criteria"] = load_acceptance_criteria(task_artifact_path(root, task_id, "acceptance.json"))
     # Make this task the current one (updates legacy pointer + per-task file).
     set_current_task_id(root, task_id)
@@ -551,17 +651,37 @@ def run_one_iteration(root: Path, task_id: str | None = None) -> dict[str, Any]:
     )
     state["phases"]["design"]["status"] = "completed"
     state["status"] = "IMPLEMENTING_AND_TESTING"
-    state["current_phase"] = "testing"
-    state["phases"]["implementation"]["status"] = "completed"
-    state["phases"]["testing"]["status"] = "in_progress"
+    state["current_phase"] = "test_authoring"
+    state.setdefault("phases", {}).setdefault(
+        "test_authoring",
+        {"status": "pending", "artifact": artifact_ref(state, "test-plan.md")},
+    )
+    state["phases"]["test_authoring"]["status"] = "in_progress"
+    state["updated_at"] = utc_now_iso()
+    save_task_state(root, tid, state)
+
+    test_plan_ref = artifact_ref(state, "test-plan.md")
+    prepare_role_prompt(root, state, "tester", iteration, mode="pre_implementation")
+    record_agent_result(
+        state,
+        run_role(root, config, "tester", iteration, [test_plan_ref], task_id=tid),
+    )
+    state["phases"]["test_authoring"]["status"] = "completed"
+    state["current_phase"] = "implementation"
+    state["phases"]["implementation"]["status"] = "in_progress"
     state["updated_at"] = utc_now_iso()
     save_task_state(root, tid, state)
 
     prepare_role_prompt(root, state, "implementer", iteration)
     record_agent_result(state, run_role(root, config, "implementer", iteration, [], task_id=tid))
+    state["phases"]["implementation"]["status"] = "completed"
+    state["current_phase"] = "testing"
+    state["phases"]["testing"]["status"] = "in_progress"
+    state["updated_at"] = utc_now_iso()
+    save_task_state(root, tid, state)
+
     test_results = run_test_commands(root, list(config.get("test_commands") or []), iteration, task_id=tid)
-    test_plan_ref = artifact_ref(state, "test-plan.md")
-    prepare_role_prompt(root, state, "tester", iteration)
+    prepare_role_prompt(root, state, "tester", iteration, mode="post_implementation")
     if role_uses_manual(config, "tester"):
         write_text(artifact_file(root, state, "test-plan.md"), draft_test_plan(state, test_results))
     record_agent_result(

@@ -38,10 +38,11 @@ class PhaseThreeCliTests(unittest.TestCase):
             self.assertEqual(state["status"], "DONE")
             self.assertEqual(state["iteration"], 1)
             self.assertEqual(state["phases"]["design"]["status"], "completed")
+            self.assertEqual(state["phases"]["test_authoring"]["status"], "completed")
             self.assertEqual(state["phases"]["testing"]["status"], "completed")
             self.assertEqual(state["phases"]["review"]["status"], "approved")
             roles = [item["role"] for item in state["agents"]]
-            self.assertEqual(roles, ["analyst", "architect", "implementer", "tester", "reviewer", "integrator"])
+            self.assertEqual(roles, ["analyst", "architect", "tester", "implementer", "tester", "reviewer", "integrator"])
             self.assertTrue(all(item["adapter"] == "manual" for item in state["agents"]))
             self.assertTrue(all("\\" not in item["stdout_log"] for item in state["agents"]))
 
@@ -59,6 +60,24 @@ class PhaseThreeCliTests(unittest.TestCase):
 
             review = read_json(root, review_ref)
             self.assertEqual(review["decision"], "APPROVED")
+
+            tester_prompt = (root / ".agentloop" / "prompts" / "tester.md").read_text(encoding="utf-8")
+            self.assertIn("After implementation", tester_prompt)
+
+    def test_run_prompts_tester_to_author_tests_before_implementation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            init_approved_task(root)
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["--root", str(root), "run"])
+
+            self.assertEqual(exit_code, 0)
+            state = json.loads((root / ".agentloop" / "state.json").read_text(encoding="utf-8"))
+            roles = [item["role"] for item in state["agents"]]
+            self.assertLess(roles.index("tester"), roles.index("implementer"))
+            self.assertEqual(state["phases"]["test_authoring"]["status"], "completed")
 
     def test_run_records_failed_test_and_requests_changes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

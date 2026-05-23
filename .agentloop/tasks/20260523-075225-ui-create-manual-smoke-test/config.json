@@ -1,0 +1,22 @@
+{
+  "roles": {
+    "analyst": {
+      "runtime": "manual"
+    },
+    "architect": {
+      "runtime": "manual"
+    },
+    "implementer": {
+      "runtime": "manual"
+    },
+    "tester": {
+      "runtime": "manual"
+    },
+    "reviewer": {
+      "runtime": "manual"
+    },
+    "integrator": {
+      "runtime": "manual"
+    }
+  }
+}

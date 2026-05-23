@@ -1,0 +1,2505 @@
+OpenAI Codex v0.130.0
+--------
+workdir: C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+model: gpt-5.5
+provider: agent-maestro
+approval: never
+sandbox: workspace-write [workdir, C:\Users\chenlujiao\.codex\memories]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e3ea3-0a4e-75d0-beb3-5c5c90cbceed
+--------
+user
+# Analyst Prompt
+
+Task request:
+给这个agentloop 做一个UI，你可以设计一个产品形态，核心功能就是任务的管理，包括CRUD，且需要能看到任务的最新进展和 runtime 的返回
+
+Analyze this specific task. Do not use generic AgentLoop acceptance criteria unless they are directly required by the task.
+
+Required outputs:
+- Write task-specific analysis to `.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/analysis.md`. Include goal, non-goals, assumptions, risks, and open questions.
+- Write human-readable task-specific acceptance criteria to `.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.md`.
+- Write structured acceptance criteria JSON to `.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.json`.
+
+The JSON must be an object with `acceptance_criteria`, an array of objects containing: id, description, verification, required, status, evidence. Use status `pending`.
+Stop after producing these files; execution starts only after requester approval.
+
+2026-05-19T05:09:01.097570Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Client(HttpRequest(HttpRequest("http/request failed: error sending request for url (http://127.0.0.1:3737/mcp)")))
+codex
+I’ll produce only the requested analysis and acceptance artifacts, scoped to this UI task, then stop before any implementation.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-ChildItem -Force .agentloop\\tasks\\20260519-050850-agentloop-ui-crud-runtime\\artifacts" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'Get-ChildItem -Force' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 2219ms:
+ succeeded in 2287ms:
+
+    Directory: C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+
+[32;1mMode   [0m[32;1m              LastWriteTime[0m [32;1;3m        Length[0m[32;1m Name[0m
+[32;1m----   [0m [32;1m             -------------[0m [32;1m        ------[0m [32;1m----[0m
+l-r--           5/18/2026  6:24 PM                [44;1m.agentloop[0m
+l-rh-           5/18/2026  6:41 PM                [44;1m.git[0m
+l-r--           5/18/2026  6:27 PM                [44;1magentloop[0m
+l-r--           5/18/2026  6:36 PM                [44;1mdocs[0m
+l-r--           5/18/2026  6:26 PM                [44;1mtests[0m
+la---           5/18/2026  6:36 PM           5370 README.md
+
+
+codex
+The artifact directory exists and is empty. I’m checking the repo shape briefly so the criteria fit this AgentLoop project instead of inventing generic UI requirements.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'rg --files' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'Get-Content README.md' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'Get-ChildItem -Force agentloop' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1059ms:
+# AgentLoop
+
+AgentLoop is a local, file-backed orchestration layer for coding agents. It helps a user turn a coding task into a controlled loop:
+
+1. analyze the task
+2. generate task-specific acceptance criteria
+3. wait for human approval
+4. design, implement, test, and review
+5. iterate automatically until the gate passes or the iteration limit is reached
+
+It is agent-agnostic. You can use Claude Code, Codex, GitHub Copilot CLI, or a manual runtime if the command can read prompts and write files in the workspace.
+
+**Runtime == Coding agent run**
+
+## Capability Map
+
+![AutoPilot AgentLoop capability map](docs/assets/autopilot-capability-map.png)
+
+AgentLoop keeps orchestration local: task state, runtime config, generated artifacts, review decisions, and iteration history all stay in `.agentloop/`.
+
+## Quick Start
+
+Run these commands from the repository root.
+
+```powershell
+python -m agentloop init --detect-runtimes
+python -m agentloop runtime list
+```
+
+Pick one detected runtime and assign it to every role. For example, with Claude Code:
+
+```powershell
+python -m agentloop runtime assign-all claude-code
+python -m agentloop runtime verify claude-code --timeout-seconds 120
+```
+
+Or with Codex:
+
+```powershell
+python -m agentloop runtime assign-all codex
+python -m agentloop runtime verify codex --timeout-seconds 120
+```
+
+If detection misses a runtime, add a built-in preset first:
+
+```powershell
+python -m agentloop runtime add-preset claude-code --replace
+python -m agentloop runtime add-preset codex --replace
+python -m agentloop runtime add-preset manual --replace
+python -m agentloop runtime list
+```
+
+## Run Your First Task
+
+Start with a small task that can be verified by tests.
+
+```powershell
+python -m agentloop start "实现 doctor 命令，检查 workspace 状态并输出 PASS/FAIL"
+```
+
+`start` creates a task and asks the analyst runtime to produce task-specific analysis and acceptance criteria. It stops before implementation so the user can review the goal.
+
+List tasks:
+
+```powershell
+python -m agentloop tasks
+```
+
+Open the generated task artifacts:
+
+```powershell
+Get-Content .agentloop\tasks\<task_id>\artifacts\analysis.md
+Get-Content .agentloop\tasks\<task_id>\artifacts\acceptance.md
+```
+
+Approve only after the analysis and acceptance criteria match what you want:
+
+```powershell
+python -m agentloop approve --task-id <task_id>
+```
+
+Then run the execution loop:
+
+```powershell
+python -m agentloop run --task-id <task_id>
+```
+
+AgentLoop will run the configured roles, execute the quality gate, and iterate when review says changes are required.
+
+## Daily Commands
+
+```powershell
+python -m agentloop status
+python -m agentloop tasks
+python -m agentloop status --task-id <task_id>
+python -m agentloop cancel --task-id <task_id>
+python -m agentloop tasks delete <task_id>
+python -m agentloop tasks delete-all
+```
+
+Runtime commands:
+
+```powershell
+python -m agentloop runtime detect
+python -m agentloop runtime list
+python -m agentloop runtime assign analyst claude-code
+python -m agentloop runtime assign implementer codex
+python -m agentloop runtime assign-all claude-code
+python -m agentloop runtime verify claude-code --timeout-seconds 120
+```
+
+Per-task config commands:
+
+```powershell
+python -m agentloop tasks config show --task-id <task_id>
+python -m agentloop tasks config set --task-id <task_id> max_iterations 5
+python -m agentloop tasks config set --task-id <task_id> --json test_commands '["python -m unittest discover -s tests"]'
+python -m agentloop tasks config clear --task-id <task_id>
+```
+
+## Where Files Live
+
+```text
+.agentloop/
+  config.json                 global runtime and workflow config
+  tasks/
+    <task_id>/
+      state.json              task lifecycle state
+      config.json             optional per-task overrides
+      artifacts/              analysis, acceptance, design, tests, review output
+```
+
+Important generated artifacts usually include:
+
+```text
+analysis.md
+acceptance.md
+acceptance.json
+design.md
+test_plan.md
+review.md
+quality_gate.json
+```
+
+## Recommended New-User Flow
+
+1. Run `python -m agentloop init --detect-runtimes`.
+2. Run `python -m agentloop runtime list` and confirm at least one real runtime is available.
+3. Run `python -m agentloop runtime assign-all <runtime>`.
+4. Run `python -m agentloop runtime verify <runtime> --timeout-seconds 120`.
+5. Start a small task with clear testable output.
+6. Review `analysis.md` and `acceptance.md` before approving.
+7. Run the task and inspect generated artifacts after completion.
+
+## Troubleshooting
+
+If all roles still show `manual`, runtime detection found commands but no role has been assigned yet. Run:
+
+```powershell
+python -m agentloop runtime assign-all claude-code
+```
+
+If a Chinese task fails with encoding errors on Windows, make sure you are running the current code. AgentLoop uses UTF-8 subprocess I/O for runtime prompts.
+
+If a task is stuck waiting for approval, either approve or cancel it:
+
+```powershell
+python -m agentloop approve --task-id <task_id>
+python -m agentloop cancel --task-id <task_id>
+```
+
+If you want to restart from zero:
+
+```powershell
+python -m agentloop tasks delete-all
+```
+
+## Full Documentation
+
+See [docs/agentloop-user-guide.md](docs/agentloop-user-guide.md) for the complete user guide, including runtime presets, per-task overrides, task locks, batch operations, and the detailed lifecycle.
+
+
+
+
+ succeeded in 1099ms:
+
+    Directory: C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot\agentloop
+
+[32;1mMode   [0m[32;1m              LastWriteTime[0m [32;1;3m        Length[0m[32;1m Name[0m
+[32;1m----   [0m [32;1m             -------------[0m [32;1m        ------[0m [32;1m----[0m
+l-r--           5/18/2026  6:27 PM                [44;1m__pycache__[0m
+la---           5/18/2026  3:12 PM             91 [32;1m__init__.py[0m
+la---           5/18/2026  3:13 PM             96 [32;1m__main__.py[0m
+la---           5/18/2026  5:45 PM           5969 [32;1madapters.py[0m
+la---           5/18/2026  6:23 PM          30275 [32;1mcli.py[0m
+la---           5/18/2026  6:23 PM           8566 [32;1mconfig.py[0m
+la---           5/18/2026  5:44 PM           3751 [32;1mlocks.py[0m
+la---           5/18/2026  5:18 PM           4181 [32;1mmodels.py[0m
+la---           5/18/2026  6:11 PM           3083 [32;1mquality.py[0m
+la---           5/18/2026  5:46 PM           1498 [32;1mrunner.py[0m
+la---           5/18/2026  5:45 PM          12712 [32;1mtasks.py[0m
+la---           5/18/2026  4:17 PM           1896 [32;1mverify.py[0m
+la---           5/18/2026  6:12 PM          25182 [32;1mworkflow.py[0m
+la---           5/18/2026  5:46 PM           5720 [32;1mworkspace.py[0m
+
+
+2026-05-19T05:09:20.253672Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.5 seconds
+Output:
+[31;1mrg: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m [36;1mrg[0m --files[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m ~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mThe term 'rg' is not recognized as a name of a cmdlet, function, script file, or executable program.[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1mCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.[0m
+
+ exited 1 in 1472ms:
+[31;1mrg: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m [36;1mrg[0m --files[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m ~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mThe term 'rg' is not recognized as a name of a cmdlet, function, script file, or executable program.[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1mCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.[0m
+
+codex
+`rg` is not installed here, so I’m using PowerShell-native inspection. The README shows AgentLoop is currently CLI/file-backed, with `.agentloop/tasks/<id>/state.json`, per-task config, artifacts, runtime assignment and run status as the likely UI surface.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content agentloop\\models.py" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content agentloop\\tasks.py" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content agentloop\\runner.py" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1126ms:
+"""Data model helpers for AgentLoop state and config files.
+
+The first phase intentionally uses standard-library dictionaries instead of
+Pydantic so the CLI can run without dependency installation.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any
+
+
+SCHEMA_VERSION = 1
+DEFAULT_MAX_ITERATIONS = 7
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def default_config() -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "default_runtime": "manual",
+        "runtimes": {
+            "manual": {
+                "adapter": "manual",
+                "description": "Write prompts to disk and wait for the user to provide artifacts.",
+            }
+        },
+        "roles": {
+            "analyst": {"runtime": "manual"},
+            "architect": {"runtime": "manual"},
+            "implementer": {"runtime": "manual"},
+            "tester": {"runtime": "manual"},
+            "reviewer": {"runtime": "manual"},
+            "integrator": {"runtime": "manual"},
+        },
+        "test_commands": [],
+        "max_iterations": DEFAULT_MAX_ITERATIONS,
+    }
+
+
+def default_state() -> dict[str, Any]:
+    now = utc_now_iso()
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "task_id": None,
+        "title": None,
+        "status": "CREATED",
+        "current_phase": None,
+        "iteration": 0,
+        "max_iterations": DEFAULT_MAX_ITERATIONS,
+        "requires_human_approval": False,
+        "goal": {
+            "raw_request": None,
+            "problem": None,
+            "desired_outcome": None,
+            "non_goals": [],
+        },
+        "acceptance_criteria": [],
+        "phases": {
+            "analysis": {
+                "status": "pending",
+                "artifact": ".agentloop/artifacts/analysis.md",
+            },
+            "alignment": {
+                "status": "pending",
+                "approved_by": None,
+                "approved_at": None,
+            },
+            "design": {
+                "status": "pending",
+                "artifact": ".agentloop/artifacts/design.md",
+            },
+            "implementation": {"status": "pending"},
+            "testing": {
+                "status": "pending",
+                "artifact": ".agentloop/artifacts/test-plan.md",
+            },
+            "review": {
+                "status": "pending",
+                "last_review": None,
+            },
+        },
+        "agents": [],
+        "created_at": now,
+        "updated_at": now,
+    }
+
+
+def next_action(state: dict[str, Any]) -> str:
+    status = state.get("status")
+    phases = state.get("phases", {}) if isinstance(state.get("phases"), dict) else {}
+    analysis_ref = phases.get("analysis", {}).get("artifact", ".agentloop/artifacts/analysis.md")
+    acceptance_ref = phases.get("alignment", {}).get("artifact", ".agentloop/artifacts/acceptance.md")
+    final_ref = ".agentloop/artifacts/final-report.md"
+    task_id = state.get("task_id")
+    if isinstance(task_id, str) and task_id:
+        final_ref = f".agentloop/tasks/{task_id}/artifacts/final-report.md"
+    if status == "CREATED":
+        return "Run `agentloop start \"<task>\"` to create analysis and acceptance artifacts."
+    if status == "WAITING_FOR_ALIGNMENT":
+        return f"Review `{analysis_ref}` and `{acceptance_ref}`, then run `agentloop approve`."
+    if status == "READY_TO_START":
+        return "Run `agentloop run` to start the design/implementation/testing/review loop."
+    if status in {"DESIGNING", "IMPLEMENTING_AND_TESTING", "REVIEWING"}:
+        return "Run `agentloop run` or wait for the active phase to finish."
+    if status == "WAITING_FOR_HUMAN":
+        return "Review the latest artifact or review report, then run the appropriate resume command."
+    if status == "DONE":
+        return f"Task is complete. Review `{final_ref}`."
+    if status == "BLOCKED":
+        return "Task is blocked. Inspect the current task artifact directory and update the task manually."
+    if status == "CANCELLED":
+        return "Task is cancelled."
+    return "No next action is known for this state."
+
+ succeeded in 1202ms:
+"""Local command execution helpers for AgentLoop."""
+
+from __future__ import annotations
+
+import subprocess
+import time
+from pathlib import Path
+from typing import Any
+
+
+def run_test_commands(
+    root: Path,
+    commands: list[str],
+    iteration: int,
+    task_id: str | None = None,
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    base = root / ".agentloop" / "runs"
+    if task_id:
+        tests_dir = base / task_id / f"{iteration:03d}" / "tests"
+    else:
+        tests_dir = base / f"{iteration:03d}" / "tests"
+    tests_dir.mkdir(parents=True, exist_ok=True)
+
+    for index, command in enumerate(commands, start=1):
+        started = time.monotonic()
+        completed = subprocess.run(
+            command,
+            cwd=root,
+            shell=True,
+            text=True,
+            capture_output=True,
+        )
+        duration_ms = int((time.monotonic() - started) * 1000)
+        log_path = tests_dir / f"{index:02d}-test.log"
+        log_path.write_text(
+            "COMMAND\n"
+            f"{command}\n\n"
+            "STDOUT\n"
+            f"{completed.stdout}\n\n"
+            "STDERR\n"
+            f"{completed.stderr}\n",
+            encoding="utf-8",
+        )
+        results.append(
+            {
+                "command": command,
+                "exit_code": completed.returncode,
+                "duration_ms": duration_ms,
+                "log": str(log_path.relative_to(root)).replace("\\", "/"),
+            }
+        )
+    return results
+
+ succeeded in 1211ms:
+"""Per-task discovery, IO, configuration merge, resolver, and migration."""
+
+from __future__ import annotations
+
+import copy
+import json
+import shutil
+from pathlib import Path
+from typing import Any
+
+from .models import default_config, default_state
+from .workspace import (
+    WorkspaceError,
+    agentloop_path,
+    load_config,
+    state_path,
+    write_json,
+)
+
+
+TERMINAL_STATUSES = {"DONE", "CANCELLED"}
+INACTIVE_STATUSES = {"CREATED"} | TERMINAL_STATUSES
+
+
+def tasks_dir(root: Path) -> Path:
+    return agentloop_path(root) / "tasks"
+
+
+def task_dir(root: Path, task_id: str) -> Path:
+    if not task_id or task_id in {".", ".."} or any(sep in task_id for sep in ["/", "\\"]):
+        raise WorkspaceError(f"Invalid task_id: {task_id}")
+    base = tasks_dir(root)
+    target = (base / task_id).resolve()
+    if not str(target).lower().startswith(str(base.resolve()).lower()):
+        raise WorkspaceError(f"Invalid task path: {task_id}")
+    return target
+
+
+def task_state_path(root: Path, task_id: str) -> Path:
+    return task_dir(root, task_id) / "state.json"
+
+
+def task_config_path(root: Path, task_id: str) -> Path:
+    return task_dir(root, task_id) / "config.json"
+
+
+def list_task_ids(root: Path) -> list[str]:
+    base = tasks_dir(root)
+    if not base.exists():
+        return []
+    return sorted(item.name for item in base.iterdir() if item.is_dir())
+
+
+def load_task_state(root: Path, task_id: str) -> dict[str, Any]:
+    path = task_state_path(root, task_id)
+    if not path.exists():
+        raise WorkspaceError(f"Task state not found: {task_id}")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise WorkspaceError(f"Invalid task state: {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise WorkspaceError(f"Invalid task state: {path}: expected object")
+    return data
+
+
+def save_task_state(root: Path, task_id: str, state: dict[str, Any]) -> None:
+    write_json(task_state_path(root, task_id), state)
+    pointer = _read_pointer(root)
+    current = pointer.get("current_task_id") or pointer.get("task_id")
+    if current is None or current == task_id:
+        # Mirror to legacy global state for backwards compatibility.
+        write_json(state_path(root), state)
+
+
+def _read_pointer(root: Path) -> dict[str, Any]:
+    path = state_path(root)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def set_current_task_id(root: Path, task_id: str | None) -> None:
+    pointer = _read_pointer(root)
+    if not pointer:
+        pointer = default_state()
+    pointer["task_id"] = task_id
+    if task_id:
+        try:
+            state = load_task_state(root, task_id)
+            write_json(state_path(root), state)
+            return
+        except WorkspaceError:
+            pass
+    write_json(state_path(root), pointer)
+
+
+def current_task_id(root: Path) -> str | None:
+    value = _read_pointer(root).get("task_id")
+    return value if isinstance(value, str) and value else None
+
+
+def active_task_ids(root: Path) -> list[str]:
+    out: list[str] = []
+    for tid in list_task_ids(root):
+        try:
+            state = load_task_state(root, tid)
+        except WorkspaceError:
+            continue
+        if state.get("status") not in INACTIVE_STATUSES:
+            out.append(tid)
+    return out
+
+
+def task_snapshot(root: Path, task_id: str) -> dict[str, Any]:
+    try:
+        return load_task_state(root, task_id)
+    except WorkspaceError:
+        return {"task_id": task_id, "title": "-", "status": "UNKNOWN", "iteration": "-"}
+
+
+def resolve_task_id(root: Path, explicit: str | None) -> str:
+    if explicit:
+        # Validate exists
+        task_state_path(root, explicit)
+        if not task_state_path(root, explicit).exists():
+            raise WorkspaceError(f"Task does not exist: {explicit}")
+        return explicit
+    actives = active_task_ids(root)
+    if len(actives) == 1:
+        return actives[0]
+    if not actives:
+        current = current_task_id(root)
+        if current and task_state_path(root, current).exists():
+            return current
+        raise WorkspaceError("No active task. Pass --task-id <id> or run `agentloop start`.")
+    lines = ["multiple active tasks; pass --task-id <id>. Candidates:"]
+    for tid in actives:
+        snap = task_snapshot(root, tid)
+        status = snap.get("status", "-")
+        iteration = snap.get("iteration", "-")
+        max_it = snap.get("max_iterations", "-")
+        lines.append(f"  - {tid}  {status} (it {iteration}/{max_it})")
+    raise WorkspaceError("\n".join(lines))
+
+
+# ---------- per-task config ----------
+
+ALLOWED_TOP_KEYS = {"test_commands", "max_iterations", "roles", "default_runtime"}
+
+
+def load_task_config(root: Path, task_id: str) -> dict[str, Any]:
+    path = task_config_path(root, task_id)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise WorkspaceError(f"Invalid task config: {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise WorkspaceError(f"Invalid task config: {path}: expected object")
+    return data
+
+
+def save_task_config(root: Path, task_id: str, config: dict[str, Any]) -> None:
+    path = task_config_path(root, task_id)
+    if config:
+        write_json(path, config)
+    elif path.exists():
+        path.unlink()
+
+
+def clear_task_config(root: Path, task_id: str) -> None:
+    path = task_config_path(root, task_id)
+    if path.exists():
+        path.unlink()
+
+
+def effective_config(root: Path, task_id: str | None) -> dict[str, Any]:
+    global_cfg: dict[str, Any]
+    try:
+        global_cfg = copy.deepcopy(load_config(root))
+    except WorkspaceError:
+        global_cfg = default_config()
+
+    if not task_id:
+        return global_cfg
+
+    override = load_task_config(root, task_id)
+    if not override:
+        return global_cfg
+
+    merged = copy.deepcopy(global_cfg)
+    if "test_commands" in override:
+        merged["test_commands"] = list(override["test_commands"])
+    if "max_iterations" in override:
+        merged["max_iterations"] = override["max_iterations"]
+    if "default_runtime" in override:
+        merged["default_runtime"] = override["default_runtime"]
+    if "roles" in override and isinstance(override["roles"], dict):
+        roles = merged.setdefault("roles", {})
+        for role, role_cfg in override["roles"].items():
+            base = roles.get(role, {})
+            if isinstance(role_cfg, dict):
+                merged_role = {**base, **role_cfg}
+            else:
+                merged_role = role_cfg
+            roles[role] = merged_role
+    return merged
+
+
+def _validate_patch(patch: dict[str, Any], global_cfg: dict[str, Any]) -> None:
+    unknown = set(patch) - ALLOWED_TOP_KEYS
+    if unknown:
+        raise WorkspaceError(
+            f"Unknown override keys: {', '.join(sorted(unknown))}. "
+            f"Allowed: {', '.join(sorted(ALLOWED_TOP_KEYS))}"
+        )
+    if "test_commands" in patch:
+        value = patch["test_commands"]
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise WorkspaceError("test_commands must be a list of strings.")
+    if "max_iterations" in patch:
+        value = patch["max_iterations"]
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise WorkspaceError("max_iterations must be a positive integer.")
+    runtimes = global_cfg.get("runtimes", {}) if isinstance(global_cfg, dict) else {}
+    if "default_runtime" in patch:
+        if patch["default_runtime"] not in runtimes:
+            raise WorkspaceError(f"Unknown runtime: {patch['default_runtime']}")
+    if "roles" in patch:
+        if not isinstance(patch["roles"], dict):
+            raise WorkspaceError("roles override must be an object.")
+        for role, role_cfg in patch["roles"].items():
+            if not isinstance(role_cfg, dict):
+                raise WorkspaceError(f"roles.{role} must be an object.")
+            runtime_name = role_cfg.get("runtime")
+            if runtime_name is not None and runtime_name not in runtimes:
+                raise WorkspaceError(f"Unknown runtime for role {role}: {runtime_name}")
+
+
+def _set_dotted(target: dict[str, Any], dotted_key: str, value: Any) -> None:
+    parts = dotted_key.split(".")
+    cur = target
+    for part in parts[:-1]:
+        nxt = cur.get(part)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            cur[part] = nxt
+        cur = nxt
+    cur[parts[-1]] = value
+
+
+def _unset_dotted(target: dict[str, Any], dotted_key: str) -> None:
+    parts = dotted_key.split(".")
+    cur = target
+    for part in parts[:-1]:
+        nxt = cur.get(part)
+        if not isinstance(nxt, dict):
+            return
+        cur = nxt
+    cur.pop(parts[-1], None)
+
+
+def apply_task_config_patch(
+    root: Path,
+    task_id: str,
+    key: str,
+    value: Any,
+) -> dict[str, Any]:
+    override = load_task_config(root, task_id)
+    _set_dotted(override, key, value)
+    _validate_patch(override, load_config(root))
+    save_task_config(root, task_id, override)
+    return override
+
+
+def unset_task_config_key(root: Path, task_id: str, key: str) -> dict[str, Any]:
+    override = load_task_config(root, task_id)
+    _unset_dotted(override, key)
+    # Prune empty containers
+    if "roles" in override and isinstance(override["roles"], dict):
+        override["roles"] = {k: v for k, v in override["roles"].items() if v}
+        if not override["roles"]:
+            override.pop("roles")
+    save_task_config(root, task_id, override)
+    return override
+
+
+# ---------- migration ----------
+
+MIGRATION_MARKER = "MIGRATED"
+
+
+def migrate_workspace(root: Path) -> dict[str, Any]:
+    """Idempotent migration to per-task state layout. Returns summary."""
+
+    base = agentloop_path(root)
+    if not base.exists():
+        return {"migrated": False, "reason": "no .agentloop directory"}
+
+    (base / "tasks").mkdir(parents=True, exist_ok=True)
+    (base / "runs").mkdir(parents=True, exist_ok=True)
+    (base / "locks").mkdir(parents=True, exist_ok=True)
+
+    summary: dict[str, Any] = {"copied_state": False, "moved_runs": [], "task_id": None}
+
+    legacy = state_path(root)
+    if legacy.exists():
+        try:
+            data = json.loads(legacy.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict):
+            tid = data.get("task_id")
+            if isinstance(tid, str) and tid:
+                summary["task_id"] = tid
+                per_task = task_state_path(root, tid)
+                if not per_task.exists():
+                    write_json(per_task, data)
+                    summary["copied_state"] = True
+
+    # Move legacy runs/NNN to runs/<current_task_id>/NNN if a current task exists.
+    current = current_task_id(root)
+    runs_dir = base / "runs"
+    if current and runs_dir.exists():
+        for child in list(runs_dir.iterdir()):
+            if not child.is_dir():
+                continue
+            # Iteration dirs are 3-digit numerics. Task ids start with date prefix.
+            if child.name.isdigit():
+                target = runs_dir / current / child.name
+                if not target.exists():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(child), str(target))
+                    summary["moved_runs"].append(child.name)
+
+    (base / MIGRATION_MARKER).write_text("ok\n", encoding="utf-8")
+    return summary
+
+
+# ---------- selectors ----------
+
+
+def select_task_ids(
+    root: Path,
+    *,
+    task_ids: list[str] | None = None,
+    all_tasks: bool = False,
+    statuses: list[str] | None = None,
+) -> list[str]:
+    modes = sum(1 for m in [bool(task_ids), all_tasks, bool(statuses)] if m)
+    if modes == 0:
+        raise WorkspaceError("Selector required: --task-id, --all, or --status.")
+    if modes > 1:
+        raise WorkspaceError("Selectors are mutually exclusive: choose one of --task-id, --all, --status.")
+    if task_ids:
+        for tid in task_ids:
+            if not task_state_path(root, tid).exists():
+                raise WorkspaceError(f"Task does not exist: {tid}")
+        return list(task_ids)
+    if all_tasks:
+        return list_task_ids(root)
+    wanted = {s.upper() for s in (statuses or [])}
+    out = []
+    for tid in list_task_ids(root):
+        snap = task_snapshot(root, tid)
+        if str(snap.get("status", "")).upper() in wanted:
+            out.append(tid)
+    return out
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Select-String -Path agentloop\\workflow.py -Pattern \"runs|runtime|log|artifact|state|status\" -Context 2" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Select-String -Path agentloop\\adapters.py -Pattern \"output|stdout|stderr|artifact|prompt|runs\" -Context 2" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Select-String -Path agentloop\\cli.py -Pattern \"def cmd_tasks|tasks|start|approve|run|status\" -Context 2" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1201ms:
+
+  agentloop\adapters.py:30:
+  agentloop\adapters.py:31:
+> agentloop\adapters.py:32:def role_[7mprompt[0m_path(root: Path, role: str) -> Path:[0m
+> agentloop\adapters.py:33:    return root / ".agentloop" / "[7mprompt[0ms" / f"{role}.md"[0m
+[7m[0m  agentloop\adapters.py:34:[0m
+[7m[0m  agentloop\adapters.py:35:[0m
+  agentloop\adapters.py:36:def role_log_paths(root: Path, iteration: int, role: str, task_id: str | None = None) -> 
+tuple[Path, Path]:
+> agentloop\adapters.py:37:    base = root / ".agentloop" / "[7mruns[0m"[0m
+[7m[0m  agentloop\adapters.py:38:    if task_id:[0m
+[7m[0m  agentloop\adapters.py:39:        run_dir = base / task_id / f"{iteration:03d}"[0m
+  agentloop\adapters.py:41:        run_dir = base / f"{iteration:03d}"
+  agentloop\adapters.py:42:    run_dir.mkdir(parents=True, exist_ok=True)
+> agentloop\adapters.py:43:    return run_dir / f"{role}.[7mstdout[0m.log", run_dir / f"{role}.stderr.log"[0m
+[7m[0m  agentloop\adapters.py:44:[0m
+[7m[0m  agentloop\adapters.py:45:[0m
+  agentloop\adapters.py:58:    role: str,
+  agentloop\adapters.py:59:    iteration: int,
+> agentloop\adapters.py:60:    required_[7martifact[0ms: list[str],[0m
+[7m[0m  agentloop\adapters.py:61:    task_id: str | None = None,[0m
+[7m[0m  agentloop\adapters.py:62:) -> AdapterResult:[0m
+  agentloop\adapters.py:64:    adapter = runtime.get("adapter", "command")
+  agentloop\adapters.py:65:    if adapter == "manual":
+> agentloop\adapters.py:66:        return run_manual_role(root, runtime_name, role, iteration, required_[7martifact[0ms, [0m
+[7m[0mtask_id)[0m
+[7m[0m  agentloop\adapters.py:67:    if adapter == "command":[0m
+> agentloop\adapters.py:68:        return run_command_role(root, runtime_name, runtime, role, iteration, 
+required_[7martifact[0ms, [0m[7m[0mtask_id)[0m
+[7m[0m  agentloop\adapters.py:69:    raise WorkspaceError(f"Unsupported adapter for runtime {runtime_name}: {adapter}")[0m
+[7m[0m  agentloop\adapters.py:70:[0m
+  agentloop\adapters.py:75:    role: str,
+  agentloop\adapters.py:76:    iteration: int,
+> agentloop\adapters.py:77:    required_[7martifact[0ms: list[str],[0m
+[7m[0m  agentloop\adapters.py:78:    task_id: str | None = None,[0m
+[7m[0m  agentloop\adapters.py:79:) -> AdapterResult:[0m
+> agentloop\adapters.py:80:    [7mstdout[0m_log, stderr_log = role_log_paths(root, iteration, role, task_id)
+> agentloop\adapters.py:81:    [7mprompt[0m_path = role_prompt_path(root, role)
+> agentloop\adapters.py:82:    [7mstdout[0m_log.write_text([0m
+[7m[0m  agentloop\adapters.py:83:        f"Manual runtime selected for role: {role}\n"[0m
+> agentloop\adapters.py:84:        f"[7mPrompt[0m file: {relpath(prompt_path, root)}\n"
+> agentloop\adapters.py:85:        "Workflow generated required [7martifact[0ms locally.\n",[0m
+[7m[0m  agentloop\adapters.py:86:        encoding="utf-8",[0m
+[7m[0m  agentloop\adapters.py:87:    )[0m
+> agentloop\adapters.py:88:    [7mstderr[0m_log.write_text("", encoding="utf-8")[0m
+[7m[0m  agentloop\adapters.py:89:    return AdapterResult([0m
+[7m[0m  agentloop\adapters.py:90:        role=role,[0m
+  agentloop\adapters.py:93:        command=None,
+  agentloop\adapters.py:94:        exit_code=0,
+> agentloop\adapters.py:95:        [7mstdout[0m_log=relpath(stdout_log, root),[0m
+> agentloop\adapters.py:96:        [7mstderr[0m_log=relpath(stderr_log, root),
+> agentloop\adapters.py:97:        [7martifact[0ms=required_artifacts,[0m
+[7m[0m  agentloop\adapters.py:98:    )[0m
+[7m[0m  agentloop\adapters.py:99:[0m
+  agentloop\adapters.py:105:    role: str,
+  agentloop\adapters.py:106:    iteration: int,
+> agentloop\adapters.py:107:    required_[7martifact[0ms: list[str],[0m
+[7m[0m  agentloop\adapters.py:108:    task_id: str | None = None,[0m
+[7m[0m  agentloop\adapters.py:109:) -> AdapterResult:[0m
+  agentloop\adapters.py:112:        raise WorkspaceError(f"Command runtime {runtime_name} is missing `command`.")
+  agentloop\adapters.py:113:
+> agentloop\adapters.py:114:    [7mstdout[0m_log, stderr_log = role_log_paths(root, iteration, role, task_id)[0m
+> agentloop\adapters.py:115:    [7mprompt[0m_path = role_prompt_path(root, role)[0m
+[7m[0m  agentloop\adapters.py:116:    values = {[0m
+[7m[0m  agentloop\adapters.py:117:        "cwd": str(root),[0m
+  agentloop\adapters.py:118:        "role": role,
+  agentloop\adapters.py:119:        "iteration": str(iteration),
+> agentloop\adapters.py:120:        "[7mprompt[0m_file": str(prompt_path),[0m
+[7m[0m  agentloop\adapters.py:121:    }[0m
+[7m[0m  agentloop\adapters.py:122:    args = render_args(list(runtime.get("args") or []), values)[0m
+  agentloop\adapters.py:143:            encoding="utf-8",
+  agentloop\adapters.py:144:            errors="replace",
+> agentloop\adapters.py:145:            capture_[7moutput[0m=True,[0m
+[7m[0m  agentloop\adapters.py:146:            timeout=timeout,[0m
+[7m[0m  agentloop\adapters.py:147:        )[0m
+  agentloop\adapters.py:148:    except FileNotFoundError as exc:
+> agentloop\adapters.py:149:        [7mstderr[0m_log.write_text(str(exc), encoding="utf-8")[0m
+[7m [0m[7m [0m[7m[0magentloop\adapters.py:150: [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m[0mraise [0m[7m[0mWorkspaceError(f"Runtime [0m[7m[0mcommand [0m[7m[0mnot [0m[7m[0mfound [0m[7m[0mfor [0m[7m[0m{runtime_name}: [0m[7m[0m{command}") [0m
+[7m[0mfrom [0m[7m[0mexc[0m
+[7m[0m  agentloop\adapters.py:151:    except subprocess.TimeoutExpired as exc:[0m
+> agentloop\adapters.py:152:        [7mstderr[0m_log.write_text(str(exc), encoding="utf-8")
+> agentloop\adapters.py:153:        raise WorkspaceError(f"Role {role} timed out after {timeout} seconds. See 
+{relpath([7mstderr[0m_log, [0m[7m[0mroot)}") [0m[7m[0mfrom [0m[7m[0mexc[0m
+[7m[0m  agentloop\adapters.py:154:    duration_ms = int((time.monotonic() - started) * 1000)[0m
+> agentloop\adapters.py:155:    [7mstdout[0m_log.write_text(completed.stdout, encoding="utf-8")
+> agentloop\adapters.py:156:    [7mstderr[0m_log.write_text(completed.stderr, encoding="utf-8")[0m
+[7m[0m  agentloop\adapters.py:157:[0m
+> agentloop\adapters.py:158:    missing = [[7martifact [0m[7m[0mfor [0m[7m[0martifact [0m[7m[0min [0m[7m[0mrequired_artifacts [0m[7m[0mif [0m[7m[0mnot [0m[7m[0m(root [0m[7m[0m/ [0m
+[7m[0martifact).exists()][0m
+[7m[0m  agentloop\adapters.py:159:    if completed.returncode != 0:[0m
+> agentloop\adapters.py:160:        raise WorkspaceError(f"Role {role} failed with exit code {completed.returncode}. 
+See {relpath([7mstderr[0m_log, [0m[7m[0mroot)}")[0m
+[7m[0m  agentloop\adapters.py:161:    if missing:[0m
+> agentloop\adapters.py:162:        raise WorkspaceError(f"Role {role} did not produce required [7martifact[0ms: [0m[7m[0m{', [0m
+[7m[0m'.join(missing)}")[0m
+[7m[0m  agentloop\adapters.py:163:[0m
+[7m[0m  agentloop\adapters.py:164:    return AdapterResult([0m
+  agentloop\adapters.py:169:        exit_code=completed.returncode,
+  agentloop\adapters.py:170:        duration_ms=duration_ms,
+> agentloop\adapters.py:171:        [7mstdout[0m_log=relpath(stdout_log, root),[0m
+> agentloop\adapters.py:172:        [7mstderr[0m_log=relpath(stderr_log, root),
+> agentloop\adapters.py:173:        [7martifact[0ms=required_artifacts,[0m
+[7m[0m  agentloop\adapters.py:174:    )[0m
+
+
+ succeeded in 1301ms:
+
+  agentloop\workflow.py:8:from typing import Any
+  agentloop\workflow.py:9:
+> agentloop\workflow.py:10:from .adapters import run_role, [7mruntime[0m_for_role[0m
+> agentloop\workflow.py:11:from .models import default_[7mstate[0m, utc_now_iso[0m
+[7m[0m  agentloop\workflow.py:12:from .quality import evaluate_gate, load_review[0m
+[7m[0m  agentloop\workflow.py:13:from .runner import run_test_commands[0m
+  agentloop\workflow.py:16:    agentloop_path,
+  agentloop\workflow.py:17:    load_config,
+> agentloop\workflow.py:18:    load_[7mstate[0m,[0m
+> agentloop\workflow.py:19:    save_[7mstate[0m,
+> agentloop\workflow.py:20:    task_[7martifact[0m_path,
+> agentloop\workflow.py:21:    task_[7martifact[0m_ref,[0m
+[7m[0m  agentloop\workflow.py:22:    write_text,[0m
+[7m[0m  agentloop\workflow.py:23:)[0m
+  agentloop\workflow.py:90:                "verification": verification,
+  agentloop\workflow.py:91:                "required": True,
+> agentloop\workflow.py:92:                "[7mstatus[0m": "pending",[0m
+[7m [0m[7m [0m[7m[0magentloop\workflow.py:93: [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m[0m"evidence": [0m[7m[0macceptance_ref [0m[7m[0mif [0m[7m[0mverification [0m[7m[0m== [0m[7m[0m"functional_review" [0m[7m[0melse [0m
+[7m[0m"configured [0m[7m[0mtest [0m[7m[0mcommand [0m[7m[0moutput",[0m
+[7m[0m  agentloop\workflow.py:94:            }[0m
+  agentloop\workflow.py:100:            "verification": "human_review",
+  agentloop\workflow.py:101:            "required": True,
+> agentloop\workflow.py:102:            "[7mstatus[0m": "pending",[0m
+[7m[0m  agentloop\workflow.py:103:            "evidence": analysis_ref,[0m
+[7m[0m  agentloop\workflow.py:104:        }[0m
+  agentloop\workflow.py:107:
+  agentloop\workflow.py:108:
+> agentloop\workflow.py:109:def task_id_or_error([7mstate[0m: dict[str, Any]) -> str:[0m
+> agentloop\workflow.py:110:    task_id = [7mstate[0m.get("task_id")[0m
+[7m[0m  agentloop\workflow.py:111:    if not isinstance(task_id, str) or not task_id:[0m
+[7m[0m  agentloop\workflow.py:112:        raise WorkspaceError("Current task does not have a task_id.")[0m
+  agentloop\workflow.py:114:
+  agentloop\workflow.py:115:
+> agentloop\workflow.py:116:def [7martifact[0m_ref(state: dict[str, Any], name: str) -> str:[0m
+> agentloop\workflow.py:117:    return task_[7martifact[0m_ref(task_id_or_error(state), name)[0m
+[7m[0m  agentloop\workflow.py:118:[0m
+[7m[0m  agentloop\workflow.py:119:[0m
+> agentloop\workflow.py:120:def [7martifact[0m_file(root: Path, state: dict[str, Any], name: str) -> Path:
+> agentloop\workflow.py:121:    return task_[7martifact[0m_path(root, task_id_or_error(state), name)[0m
+[7m[0m  agentloop\workflow.py:122:[0m
+[7m[0m  agentloop\workflow.py:123:[0m
+  agentloop\workflow.py:126:
+  agentloop\workflow.py:127:
+> agentloop\workflow.py:128:def prepare_analyst_prompt(root: Path, [7mstate[0m: dict[str, Any]) -> None:[0m
+> agentloop\workflow.py:129:    request = [7mstate[0m.get("goal", [0m[7m[0m{}).get("raw_request") [0m[7m[0mor [0m[7m[0mstate.get("title") [0m[7m[0mor [0m[7m[0m"Untitled [0m
+[7m[0mtask"[0m
+> agentloop\workflow.py:130:    analysis_ref = [7martifact[0m_ref(state, "analysis.md")
+> agentloop\workflow.py:131:    acceptance_ref = [7martifact[0m_ref(state, "acceptance.md")
+> agentloop\workflow.py:132:    acceptance_json_ref = [7martifact[0m_ref(state, "acceptance.json")[0m
+[7m[0m  agentloop\workflow.py:133:    write_role_prompt([0m
+[7m[0m  agentloop\workflow.py:134:        root,[0m
+  agentloop\workflow.py:142:        f"- Write structured acceptance criteria JSON to `{acceptance_json_ref}`.\n\n"
+  agentloop\workflow.py:143:        "The JSON must be an object with `acceptance_criteria`, an array of objects 
+containing: "
+> agentloop\workflow.py:144:        "id, description, verification, required, [7mstatus[0m, [0m[7m[0mevidence. [0m[7m[0mUse [0m[7m[0mstatus [0m
+[7m[0m`pending`.\n"[0m
+[7m [0m[7m [0m[7m[0magentloop\workflow.py:145: [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m[0m"Stop [0m[7m[0mafter [0m[7m[0mproducing [0m[7m[0mthese [0m[7m[0mfiles; [0m[7m[0mexecution [0m[7m[0mstarts [0m[7m[0monly [0m[7m[0mafter [0m[7m[0mrequester [0m
+[7m[0mapproval.\n",[0m
+[7m[0m  agentloop\workflow.py:146:    )[0m
+  agentloop\workflow.py:147:
+  agentloop\workflow.py:148:
+> agentloop\workflow.py:149:def prepare_role_prompt(root: Path, [7mstate[0m: [0m[7m[0mdict[str, [0m[7m[0mAny], [0m[7m[0mrole: [0m[7m[0mstr, [0m[7m[0miteration: [0m[7m[0mint, [0m
+[7m[0mreview_name: [0m[7m[0mstr [0m[7m[0m| [0m[7m[0mNone [0m[7m[0m= [0m[7m[0mNone) [0m[7m[0m-> [0m[7m[0mNone:[0m
+> agentloop\workflow.py:150:    request = [7mstate[0m.get("goal", [0m[7m[0m{}).get("raw_request") [0m[7m[0mor [0m[7m[0mstate.get("title") [0m[7m[0mor [0m[7m[0m"Untitled [0m
+[7m[0mtask"[0m
+> agentloop\workflow.py:151:    design_ref = [7martifact[0m_ref(state, "design.md")
+> agentloop\workflow.py:152:    test_plan_ref = [7martifact[0m_ref(state, "test-plan.md")
+> agentloop\workflow.py:153:    final_ref = [7martifact[0m_ref(state, "final-report.md")
+> agentloop\workflow.py:154:    review_ref = [7martifact[0m_ref(state, review_name or f"review-{iteration:03d}.json")
+> agentloop\workflow.py:155:    [7martifact[0m_dir_ref = task_artifact_ref(task_id_or_error(state), "")[0m
+[7m[0m  agentloop\workflow.py:156:[0m
+[7m[0m  agentloop\workflow.py:157:    common = ([0m
+  agentloop\workflow.py:158:        f"Task: {request}\n"
+  agentloop\workflow.py:159:        f"Iteration: {iteration}\n"
+> agentloop\workflow.py:160:        f"Task [7martifact[0m directory: `{artifact_dir_ref}`\n"[0m
+> agentloop\workflow.py:161:        "Use paths exactly as written. Do not write task [7martifact[0ms [0m[7m[0mto [0m
+[7m[0m`.agentloop/artifacts/`.\n"[0m
+[7m[0m  agentloop\workflow.py:162:    )[0m
+[7m[0m  agentloop\workflow.py:163:    prompts = {[0m
+  agentloop\workflow.py:199:def draft_acceptance(raw_request: str, criteria: list[dict[str, Any]], analysis_ref: str) 
+-> str:
+  agentloop\workflow.py:200:    rows = "\n".join(
+> agentloop\workflow.py:201:        "| {id} | {required} | {verification} | {description} | {[7mstatus[0m} [0m[7m[0m| [0m[7m[0m{evidence} [0m
+[7m[0m|".format([0m
+[7m[0m  agentloop\workflow.py:202:            id=item.get("id"),[0m
+[7m[0m  agentloop\workflow.py:203:            required="yes" if item.get("required", True) else "no",[0m
+  agentloop\workflow.py:204:            verification=item.get("verification", "review"),
+  agentloop\workflow.py:205:            description=str(item.get("description", "")).replace("|", "\\|"),
+> agentloop\workflow.py:206:            [7mstatus[0m=item.get("status", "pending"),[0m
+[7m[0m  agentloop\workflow.py:207:            evidence=item.get("evidence", ""),[0m
+[7m[0m  agentloop\workflow.py:208:        )[0m
+  agentloop\workflow.py:217:## Draft Criteria
+  agentloop\workflow.py:218:
+> agentloop\workflow.py:219:| ID | Required | Verification | Criterion | [7mStatus[0m | Evidence |[0m
+[7m[0m  agentloop\workflow.py:220:| --- | --- | --- | --- | --- | --- |[0m
+[7m[0m  agentloop\workflow.py:221:{rows}[0m
+  agentloop\workflow.py:231:
+  agentloop\workflow.py:232:
+> agentloop\workflow.py:233:def draft_design([7mstate[0m: dict[str, Any], iteration: int) -> str:[0m
+> agentloop\workflow.py:234:    request = [7mstate[0m.get("goal", [0m[7m[0m{}).get("raw_request") [0m[7m[0mor [0m[7m[0mstate.get("title") [0m[7m[0mor [0m[7m[0m"Untitled [0m
+[7m[0mtask"[0m
+> agentloop\workflow.py:235:    [7martifact[0m_dir_ref = task_artifact_ref(task_id_or_error(state), "")[0m
+[7m[0m  agentloop\workflow.py:236:    return f"""# Design[0m
+[7m[0m  agentloop\workflow.py:237:[0m
+  agentloop\workflow.py:246:## Approach
+  agentloop\workflow.py:247:
+> agentloop\workflow.py:248:AgentLoop will keep orchestration [7mlog[0mic [0m[7m[0mlocal [0m[7m[0mand [0m[7m[0magent-agnostic. [0m[7m[0mThe [0m[7m[0mworkflow [0m[7m[0mengine [0m[7m[0mowns [0m
+[7m[0mtask [0m[7m[0mstate, [0m[7m[0martifacts, [0m[7m[0mreview [0m[7m[0mgate [0m[7m[0mdecisions, [0m[7m[0mand [0m[7m[0mbounded [0m[7m[0miteration. [0m[7m[0mCoding [0m[7m[0magents [0m[7m[0mare [0m[7m[0mreplaceable [0m[7m[0mruntimes [0m[7m[0mconnected [0m
+[7m[0mthrough [0m[7m[0mprompt [0m[7m[0mfiles, [0m[7m[0martifacts, [0m[7m[0mlogs, [0m[7m[0mand [0m[7m[0mstructured [0m[7m[0mJSON [0m[7m[0moutputs.[0m
+[7m[0m  agentloop\workflow.py:249:[0m
+> agentloop\workflow.py:250:## [7mRuntime[0m Boundary[0m
+[7m[0m  agentloop\workflow.py:251:[0m
+[7m [0m[7m [0m[7m[0magentloop\workflow.py:252:- [0m[7m[0mCore [0m[7m[0mworkflow [0m[7m[0mcode [0m[7m[0mmust [0m[7m[0mnot [0m[7m[0mimport [0m[7m[0mor [0m[7m[0mdepend [0m[7m[0mon [0m[7m[0mCodex, [0m[7m[0mClaude [0m[7m[0mCode, [0m[7m[0mCopilot, [0m[7m[0mor [0m[7m[0many [0m
+[7m[0mother [0m[7m[0mspecific [0m[7m[0mcoding [0m[7m[0magent.[0m
+> agentloop\workflow.py:253:- [7mRuntime[0m configuration selects which external agent handles each role.
+> agentloop\workflow.py:254:- The `manual` [7mruntime [0m[7m[0mremains [0m[7m[0mvalid [0m[7m[0mfor [0m[7m[0menvironments [0m[7m[0mwhere [0m[7m[0man [0m[7m[0magent [0m[7m[0mcannot [0m[7m[0mbe [0m[7m[0minvoked [0m
+[7m[0mdirectly.[0m
+[7m[0m  agentloop\workflow.py:255:[0m
+[7m[0m  agentloop\workflow.py:256:## Files And Ownership[0m
+  agentloop\workflow.py:257:
+> agentloop\workflow.py:258:- `agentloop/workflow.py`: workflow [7mstate[0m transitions.[0m
+[7m[0m  agentloop\workflow.py:259:- `agentloop/quality.py`: review JSON parsing and gate decisions.[0m
+[7m[0m  agentloop\workflow.py:260:- `agentloop/runner.py`: local command execution for tests.[0m
+> agentloop\workflow.py:261:- `{[7martifact[0m_dir_ref}`: durable workflow artifacts for this task.[0m
+[7m[0m  agentloop\workflow.py:262:[0m
+[7m[0m  agentloop\workflow.py:263:## Test Strategy[0m
+  agentloop\workflow.py:264:
+> agentloop\workflow.py:265:- Unit tests cover CLI [7mstate[0m transitions and artifact generation.[0m
+[7m[0m  agentloop\workflow.py:266:- Configured test commands are run during `agentloop run` when present.[0m
+[7m[0m  agentloop\workflow.py:267:- Review JSON records test evidence and acceptance results.[0m
+  agentloop\workflow.py:269:
+  agentloop\workflow.py:270:
+> agentloop\workflow.py:271:def draft_test_plan([7mstate[0m: dict[str, Any], test_results: list[dict[str, Any]]) -> str:[0m
+[7m[0m  agentloop\workflow.py:272:    commands = test_results or [][0m
+[7m[0m  agentloop\workflow.py:273:    command_lines = "\n".join([0m
+> agentloop\workflow.py:274:        f"- `{item['command']}` -> exit {item['exit_code']} ({item['[7mlog[0m']})" [0m[7m[0mfor [0m[7m[0mitem [0m[7m[0min [0m
+[7m[0mcommands[0m
+[7m[0m  agentloop\workflow.py:275:    ) or "- No test commands configured."[0m
+[7m[0m  agentloop\workflow.py:276:    return f"""# Test Plan[0m
+  agentloop\workflow.py:278:## Scope
+  agentloop\workflow.py:279:
+> agentloop\workflow.py:280:Validate the AgentLoop local workflow through [7mstate[0m files, artifacts, and command behavior.[0m
+[7m[0m  agentloop\workflow.py:281:[0m
+[7m[0m  agentloop\workflow.py:282:## Checks[0m
+  agentloop\workflow.py:283:
+> agentloop\workflow.py:284:- `agentloop start` creates analysis and acceptance [7martifact[0ms.[0m
+[7m[0m  agentloop\workflow.py:285:- `agentloop approve` moves the task to `READY_TO_START`.[0m
+> agentloop\workflow.py:286:- `agentloop run` creates design, test-plan, review, and final-report [7martifact[0ms.[0m
+[7m[0m  agentloop\workflow.py:287:- Review JSON can be parsed and evaluated by the quality gate.[0m
+[7m[0m  agentloop\workflow.py:288:[0m
+  agentloop\workflow.py:293:
+  agentloop\workflow.py:294:
+> agentloop\workflow.py:295:def manual_review([7mstate[0m: [0m[7m[0mdict[str, [0m[7m[0mAny], [0m[7m[0mtest_results: [0m[7m[0mlist[dict[str, [0m[7m[0mAny]]) [0m[7m[0m-> [0m[7m[0mdict[str, [0m
+[7m[0mAny]:[0m
+[7m[0m  agentloop\workflow.py:296:    test_failure = any(item.get("exit_code") not in {0, None} for item in test_results)[0m
+[7m[0m  agentloop\workflow.py:297:    acceptance_results = [][0m
+> agentloop\workflow.py:298:    for criterion in [7mstate[0m.get("acceptance_criteria", []):
+> agentloop\workflow.py:299:        [7mstatus[0m = criterion.get("status")[0m
+[7m[0m  agentloop\workflow.py:300:        if criterion.get("id") in {"AC-1", "AC-2", "AC-3", "AC-4"} and not test_failure:[0m
+> agentloop\workflow.py:301:            [7mstatus[0m = "passed"[0m
+[7m[0m  agentloop\workflow.py:302:        acceptance_results.append([0m
+[7m[0m  agentloop\workflow.py:303:            {[0m
+  agentloop\workflow.py:304:                "criteria_id": criterion.get("id"),
+> agentloop\workflow.py:305:                "[7mstatus[0m": status or "pending",[0m
+[7m[0m  agentloop\workflow.py:306:                "evidence": criterion.get("evidence"),[0m
+[7m[0m  agentloop\workflow.py:307:            }[0m
+  agentloop\workflow.py:320:                    "text": "Configured tests must pass before approval.",
+  agentloop\workflow.py:321:                    "required_action": "Fix failing tests and rerun `agentloop run`.",
+> agentloop\workflow.py:322:                    "[7mstatus[0m": "open",[0m
+[7m[0m  agentloop\workflow.py:323:                }[0m
+[7m[0m  agentloop\workflow.py:324:            ],[0m
+  agentloop\workflow.py:329:    return {
+  agentloop\workflow.py:330:        "decision": "APPROVED",
+> agentloop\workflow.py:331:        "summary": "Manual [7mruntime [0m[7m[0mgenerated [0m[7m[0mrequired [0m[7m[0mPhase [0m[7m[0m3 [0m[7m[0martifacts [0m[7m[0mand [0m[7m[0mno [0m[7m[0mconfigured [0m
+[7m[0mtests [0m[7m[0mfailed.",[0m
+[7m[0m  agentloop\workflow.py:332:        "open_medium_high_count": 0,[0m
+[7m[0m  agentloop\workflow.py:333:        "comments": [],[0m
+  agentloop\workflow.py:337:
+  agentloop\workflow.py:338:
+> agentloop\workflow.py:339:def draft_final_report([7mstate[0m: dict[str, Any], review: dict[str, Any]) -> str:[0m
+> agentloop\workflow.py:340:    review_[7martifact [0m[7m[0m= [0m[7m[0mstate.get("phases", [0m[7m[0m{}).get("review", [0m[7m[0m{}).get("last_review") [0m[7m[0mor [0m
+[7m[0martifact_ref(state, [0m[7m[0m"review-001.json")[0m
+[7m[0m  agentloop\workflow.py:341:    return f"""# Final Report[0m
+[7m[0m  agentloop\workflow.py:342:[0m
+  agentloop\workflow.py:343:## Task
+  agentloop\workflow.py:344:
+> agentloop\workflow.py:345:{[7mstate[0m.get('title')}[0m
+[7m[0m  agentloop\workflow.py:346:[0m
+[7m[0m  agentloop\workflow.py:347:## Result[0m
+  agentloop\workflow.py:353:{review.get('summary')}
+  agentloop\workflow.py:354:
+> agentloop\workflow.py:355:## [7mArtifact[0ms[0m
+[7m[0m  agentloop\workflow.py:356:[0m
+> agentloop\workflow.py:357:- `{[7martifact[0m_ref(state, "analysis.md")}`
+> agentloop\workflow.py:358:- `{[7martifact[0m_ref(state, "acceptance.md")}`
+> agentloop\workflow.py:359:- `{[7martifact[0m_ref(state, "design.md")}`
+> agentloop\workflow.py:360:- `{[7martifact[0m_ref(state, "test-plan.md")}`
+> agentloop\workflow.py:361:- `{review_[7martifact[0m}`[0m
+[7m[0m  agentloop\workflow.py:362:[0m
+[7m[0m  agentloop\workflow.py:363:## Residual Risk[0m
+  agentloop\workflow.py:364:
+> agentloop\workflow.py:365:- The MVP still uses the manual [7mruntime[0m; [0m[7m[0mreal [0m[7m[0mcoding [0m[7m[0magent [0m[7m[0madapters [0m[7m[0mare [0m[7m[0mconfigured [0m[7m[0min [0m
+[7m[0mlater [0m[7m[0mphases.[0m
+[7m[0m  agentloop\workflow.py:366:"""[0m
+[7m[0m  agentloop\workflow.py:367:[0m
+  agentloop\workflow.py:368:
+  agentloop\workflow.py:369:def role_uses_manual(config: dict[str, Any], role: str) -> bool:
+> agentloop\workflow.py:370:    _, [7mruntime[0m = runtime_for_role(config, role)[0m
+> agentloop\workflow.py:371:    return [7mruntime[0m.get("adapter", "command") == "manual"[0m
+[7m[0m  agentloop\workflow.py:372:[0m
+[7m[0m  agentloop\workflow.py:373:[0m
+> agentloop\workflow.py:374:def record_agent_result([7mstate[0m: dict[str, Any], result: dict[str, Any]) -> None:
+> agentloop\workflow.py:375:    [7mstate[0m.setdefault("agents", []).append(result)[0m
+[7m[0m  agentloop\workflow.py:376:[0m
+[7m[0m  agentloop\workflow.py:377:[0m
+  agentloop\workflow.py:398:                "verification": str(item.get("verification") or "review"),
+  agentloop\workflow.py:399:                "required": bool(item.get("required", True)),
+> agentloop\workflow.py:400:                "[7mstatus[0m": str(item.get("status") or "pending"),[0m
+[7m[0m  agentloop\workflow.py:401:                "evidence": str(item.get("evidence") or ""),[0m
+[7m[0m  agentloop\workflow.py:402:            }[0m
+  agentloop\workflow.py:414:    task_id = create_task_id(request)
+  agentloop\workflow.py:415:    now = utc_now_iso()
+> agentloop\workflow.py:416:    [7mstate[0m = default_state()[0m
+> agentloop\workflow.py:417:    [7mstate[0m["task_id"] = task_id[0m
+[7m[0m  agentloop\workflow.py:418:    config = effective_config(root, task_id)[0m
+> agentloop\workflow.py:419:    analysis_ref = task_[7martifact[0m_ref(task_id, "analysis.md")
+> agentloop\workflow.py:420:    acceptance_ref = task_[7martifact[0m_ref(task_id, "acceptance.md")
+> agentloop\workflow.py:421:    acceptance_json_ref = task_[7martifact[0m_ref(task_id, "acceptance.json")
+> agentloop\workflow.py:422:    [7mstate[0m["title"] = request[:80]
+> agentloop\workflow.py:423:    [7mstate[0m["status"] = "WAITING_FOR_ALIGNMENT"
+> agentloop\workflow.py:424:    [7mstate[0m["current_phase"] = "alignment"
+> agentloop\workflow.py:425:    [7mstate[0m["iteration"] = 0
+> agentloop\workflow.py:426:    [7mstate[0m["requires_human_approval"] = True
+> agentloop\workflow.py:427:    [7mstate[0m["goal"] = {[0m
+[7m[0m  agentloop\workflow.py:428:        "raw_request": request,[0m
+[7m[0m  agentloop\workflow.py:429:        "problem": None,[0m
+  agentloop\workflow.py:431:        "non_goals": [],
+  agentloop\workflow.py:432:    }
+> agentloop\workflow.py:433:    [7mstate[0m["acceptance_criteria"] = [][0m
+> agentloop\workflow.py:434:    [7mstate[0m["phases"]["analysis"]["status"] = "completed"
+> agentloop\workflow.py:435:    [7mstate[0m["phases"]["analysis"]["artifact"] = analysis_ref
+> agentloop\workflow.py:436:    [7mstate[0m["phases"]["alignment"]["status"] = "waiting_for_approval"
+> agentloop\workflow.py:437:    [7mstate[0m["phases"]["alignment"]["artifact"] = acceptance_ref
+> agentloop\workflow.py:438:    [7mstate[0m["phases"]["design"]["artifact"] = task_artifact_ref(task_id, "design.md")
+> agentloop\workflow.py:439:    [7mstate[0m["phases"]["testing"]["artifact"] = task_artifact_ref(task_id, "test-plan.md")
+> agentloop\workflow.py:440:    [7mstate[0m["agents"] = []
+> agentloop\workflow.py:441:    [7mstate[0m["updated_at"] = now[0m
+[7m[0m  agentloop\workflow.py:442:[0m
+> agentloop\workflow.py:443:    task_[7martifact[0m_path(root, [0m[7m[0mtask_id, [0m[7m[0m"analysis.md").parent.mkdir(parents=True, [0m
+[7m[0mexist_ok=True)[0m
+> agentloop\workflow.py:444:    prepare_analyst_prompt(root, [7mstate[0m)[0m
+[7m[0m  agentloop\workflow.py:445:    manual_criteria = draft_custom_acceptance_items(request, analysis_ref, acceptance_ref)[0m
+[7m[0m  agentloop\workflow.py:446:    if role_uses_manual(config, "analyst"):[0m
+> agentloop\workflow.py:447:        write_text(task_[7martifact[0m_path(root, [0m[7m[0mtask_id, [0m[7m[0m"analysis.md"), [0m
+[7m[0mdraft_analysis(request))[0m
+> agentloop\workflow.py:448:        write_text(task_[7martifact[0m_path(root, [0m[7m[0mtask_id, [0m[7m[0m"acceptance.json"), [0m
+[7m[0mjson.dumps({"acceptance_criteria": [0m[7m[0mmanual_criteria}, [0m[7m[0mindent=2) [0m[7m[0m+ [0m[7m[0m"\n")[0m
+> agentloop\workflow.py:449:        write_text(task_[7martifact[0m_path(root, [0m[7m[0mtask_id, [0m[7m[0m"acceptance.md"), [0m
+[7m[0mdraft_acceptance(request, [0m[7m[0mmanual_criteria, [0m[7m[0manalysis_ref))[0m
+[7m[0m  agentloop\workflow.py:450:    record_agent_result([0m
+> agentloop\workflow.py:451:        [7mstate[0m,[0m
+[7m [0m[7m [0m[7m[0magentloop\workflow.py:452: [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m[0mrun_role(root, [0m[7m[0mconfig, [0m[7m[0m"analyst", [0m[7m[0m0, [0m[7m[0m[analysis_ref, [0m[7m[0macceptance_ref, [0m
+[7m[0macceptance_json_ref], [0m[7m[0mtask_id=task_id),[0m
+[7m[0m  agentloop\workflow.py:453:    )[0m
+> agentloop\workflow.py:454:    [7mstate[0m["acceptance_criteria"] [0m[7m[0m= [0m[7m[0mload_acceptance_criteria(task_artifact_path(root, [0m
+[7m[0mtask_id, [0m[7m[0m"acceptance.json"))[0m
+[7m[0m  agentloop\workflow.py:455:    # Make this task the current one (updates legacy pointer + per-task file).[0m
+[7m[0m  agentloop\workflow.py:456:    set_current_task_id(root, task_id)[0m
+> agentloop\workflow.py:457:    save_[7mstate[0m(root, state)
+> agentloop\workflow.py:458:    return [7mstate[0m
+[7m[0m  agentloop\workflow.py:459:[0m
+[7m[0m  agentloop\workflow.py:460:[0m
+  agentloop\workflow.py:461:def approve_task(root: Path, approved_by: str = "requester", task_id: str | None = None) 
+-> dict[str, Any]:
+> agentloop\workflow.py:462:    from .tasks import load_task_[7mstate[0m, resolve_task_id, save_task_state[0m
+[7m[0m  agentloop\workflow.py:463:[0m
+[7m[0m  agentloop\workflow.py:464:    try:[0m
+  agentloop\workflow.py:465:        tid = resolve_task_id(root, task_id)
+  agentloop\workflow.py:466:    except WorkspaceError:
+> agentloop\workflow.py:467:        legacy = load_[7mstate[0m(root)[0m
+> agentloop\workflow.py:468:        [7mstatus[0m = legacy.get("status")
+> agentloop\workflow.py:469:        if [7mstatus[0m != "WAITING_FOR_ALIGNMENT":
+> agentloop\workflow.py:470:            raise WorkspaceError(f"Cannot approve while [7mstatus[0m is {status}.")[0m
+[7m[0m  agentloop\workflow.py:471:        raise[0m
+> agentloop\workflow.py:472:    [7mstate[0m = load_task_state(root, tid)
+> agentloop\workflow.py:473:    if [7mstate[0m.get("status") != "WAITING_FOR_ALIGNMENT":
+> agentloop\workflow.py:474:        raise WorkspaceError(f"Cannot approve while [7mstatus[0m is {state.get('status')}.")[0m
+[7m[0m  agentloop\workflow.py:475:[0m
+[7m[0m  agentloop\workflow.py:476:    now = utc_now_iso()[0m
+> agentloop\workflow.py:477:    [7mstate[0m["status"] = "READY_TO_START"
+> agentloop\workflow.py:478:    [7mstate[0m["current_phase"] = "start"
+> agentloop\workflow.py:479:    [7mstate[0m["requires_human_approval"] = False
+> agentloop\workflow.py:480:    [7mstate[0m["phases"]["alignment"]["status"] = "approved"
+> agentloop\workflow.py:481:    [7mstate[0m["phases"]["alignment"]["approved_by"] = approved_by
+> agentloop\workflow.py:482:    [7mstate[0m["phases"]["alignment"]["approved_at"] = now
+> agentloop\workflow.py:483:    [7mstate[0m["updated_at"] = now
+> agentloop\workflow.py:484:    save_task_[7mstate[0m(root, tid, state)
+> agentloop\workflow.py:485:    return [7mstate[0m
+[7m[0m  agentloop\workflow.py:486:[0m
+[7m[0m  agentloop\workflow.py:487:[0m
+  agentloop\workflow.py:488:def cancel_task(root: Path, cancelled_by: str = "requester", task_id: str | None = None) 
+-> dict[str, Any]:
+> agentloop\workflow.py:489:    from .tasks import load_task_[7mstate[0m, resolve_task_id, save_task_state[0m
+[7m[0m  agentloop\workflow.py:490:[0m
+[7m[0m  agentloop\workflow.py:491:    tid: str[0m
+  agentloop\workflow.py:494:    except WorkspaceError:
+  agentloop\workflow.py:495:        # Backwards-compatible behavior: when no task at all, fall through to legacy load.
+> agentloop\workflow.py:496:        legacy = load_[7mstate[0m(root)[0m
+> agentloop\workflow.py:497:        [7mstatus[0m = legacy.get("status")
+> agentloop\workflow.py:498:        if [7mstatus[0m in {"CREATED", "DONE", "CANCELLED"}:
+> agentloop\workflow.py:499:            raise WorkspaceError(f"Cannot cancel while [7mstatus[0m is {status}.")[0m
+[7m[0m  agentloop\workflow.py:500:        raise[0m
+[7m[0m  agentloop\workflow.py:501:[0m
+> agentloop\workflow.py:502:    [7mstate[0m = load_task_state(root, tid)
+> agentloop\workflow.py:503:    [7mstatus[0m = state.get("status")
+> agentloop\workflow.py:504:    if [7mstatus[0m in {"CREATED", "DONE", "CANCELLED"}:
+> agentloop\workflow.py:505:        raise WorkspaceError(f"Cannot cancel while [7mstatus[0m is {status}.")[0m
+[7m[0m  agentloop\workflow.py:506:[0m
+[7m[0m  agentloop\workflow.py:507:    now = utc_now_iso()[0m
+> agentloop\workflow.py:508:    [7mstate[0m["status"] = "CANCELLED"
+> agentloop\workflow.py:509:    [7mstate[0m["current_phase"] = "cancelled"
+> agentloop\workflow.py:510:    [7mstate[0m["requires_human_approval"] = False
+> agentloop\workflow.py:511:    [7mstate[0m["cancelled_by"] = cancelled_by
+> agentloop\workflow.py:512:    [7mstate[0m["cancelled_at"] = now
+> agentloop\workflow.py:513:    [7mstate[0m["updated_at"] = now
+> agentloop\workflow.py:514:    save_task_[7mstate[0m(root, tid, state)
+> agentloop\workflow.py:515:    return [7mstate[0m
+[7m[0m  agentloop\workflow.py:516:[0m
+[7m[0m  agentloop\workflow.py:517:[0m
+  agentloop\workflow.py:518:def run_one_iteration(root: Path, task_id: str | None = None) -> dict[str, Any]:
+> agentloop\workflow.py:519:    from .tasks import effective_config, load_task_[7mstate[0m, resolve_task_id, save_task_state[0m
+[7m[0m  agentloop\workflow.py:520:[0m
+[7m[0m  agentloop\workflow.py:521:    tid = resolve_task_id(root, task_id)[0m
+> agentloop\workflow.py:522:    [7mstate[0m = load_task_state(root, tid)[0m
+[7m[0m  agentloop\workflow.py:523:    config = effective_config(root, tid)[0m
+> agentloop\workflow.py:524:    [7mstatus[0m = state.get("status")
+> agentloop\workflow.py:525:    if [7mstatus[0m not in {"READY_TO_START", "DESIGNING"}:
+> agentloop\workflow.py:526:        raise WorkspaceError(f"Cannot run while [7mstatus[0m is {status}.")[0m
+[7m[0m  agentloop\workflow.py:527:[0m
+> agentloop\workflow.py:528:    iteration = int([7mstate[0m.get("iteration") or 0) + 1
+> agentloop\workflow.py:529:    max_iterations = int([7mstate[0m.get("max_iterations") or config.get("max_iterations") or 7)[0m
+[7m[0m  agentloop\workflow.py:530:    if iteration > max_iterations:[0m
+> agentloop\workflow.py:531:        [7mstate[0m["status"] = "BLOCKED"
+> agentloop\workflow.py:532:        [7mstate[0m["current_phase"] = "blocked"
+> agentloop\workflow.py:533:        [7mstate[0m["updated_at"] = utc_now_iso()
+> agentloop\workflow.py:534:        save_task_[7mstate[0m(root, tid, state)
+> agentloop\workflow.py:535:        return [7mstate[0m
+[7m[0m  agentloop\workflow.py:536:[0m
+> agentloop\workflow.py:537:    [7mstate[0m["iteration"] = iteration
+> agentloop\workflow.py:538:    [7mstate[0m["status"] = "DESIGNING"
+> agentloop\workflow.py:539:    [7mstate[0m["current_phase"] = "design"
+> agentloop\workflow.py:540:    [7mstate[0m["phases"]["design"]["status"] = "in_progress"
+> agentloop\workflow.py:541:    [7mstate[0m["updated_at"] = utc_now_iso()
+> agentloop\workflow.py:542:    save_task_[7mstate[0m(root, tid, state)[0m
+[7m[0m  agentloop\workflow.py:543:[0m
+> agentloop\workflow.py:544:    design_ref = [7martifact[0m_ref(state, "design.md")
+> agentloop\workflow.py:545:    prepare_role_prompt(root, [7mstate[0m, "architect", iteration)[0m
+[7m[0m  agentloop\workflow.py:546:    if role_uses_manual(config, "architect"):[0m
+> agentloop\workflow.py:547:        write_text([7martifact[0m_file(root, state, "design.md"), draft_design(state, iteration))[0m
+[7m[0m  agentloop\workflow.py:548:    record_agent_result([0m
+> agentloop\workflow.py:549:        [7mstate[0m,[0m
+[7m[0m  agentloop\workflow.py:550:        run_role(root, config, "architect", iteration, [design_ref], task_id=tid),[0m
+[7m[0m  agentloop\workflow.py:551:    )[0m
+> agentloop\workflow.py:552:    [7mstate[0m["phases"]["design"]["status"] = "completed"
+> agentloop\workflow.py:553:    [7mstate[0m["status"] = "IMPLEMENTING_AND_TESTING"
+> agentloop\workflow.py:554:    [7mstate[0m["current_phase"] = "testing"
+> agentloop\workflow.py:555:    [7mstate[0m["phases"]["implementation"]["status"] = "completed"
+> agentloop\workflow.py:556:    [7mstate[0m["phases"]["testing"]["status"] = "in_progress"
+> agentloop\workflow.py:557:    [7mstate[0m["updated_at"] = utc_now_iso()
+> agentloop\workflow.py:558:    save_task_[7mstate[0m(root, tid, state)[0m
+[7m[0m  agentloop\workflow.py:559:[0m
+> agentloop\workflow.py:560:    prepare_role_prompt(root, [7mstate[0m, "implementer", iteration)
+> agentloop\workflow.py:561:    record_agent_result([7mstate[0m, [0m[7m[0mrun_role(root, [0m[7m[0mconfig, [0m[7m[0m"implementer", [0m[7m[0miteration, [0m[7m[0m[], [0m
+[7m[0mtask_id=tid))[0m
+[7m [0m[7m [0m[7m[0magentloop\workflow.py:562: [0m[7m [0m[7m [0m[7m [0m[7m[0mtest_results [0m[7m[0m= [0m[7m[0mrun_test_commands(root, [0m[7m[0mlist(config.get("test_commands") [0m[7m[0mor [0m[7m[0m[]), [0m
+[7m[0miteration, [0m[7m[0mtask_id=tid)[0m
+> agentloop\workflow.py:563:    test_plan_ref = [7martifact[0m_ref(state, "test-plan.md")
+> agentloop\workflow.py:564:    prepare_role_prompt(root, [7mstate[0m, "tester", iteration)[0m
+[7m[0m  agentloop\workflow.py:565:    if role_uses_manual(config, "tester"):[0m
+> agentloop\workflow.py:566:        write_text([7martifact[0m_file(root, [0m[7m[0mstate, [0m[7m[0m"test-plan.md"), [0m[7m[0mdraft_test_plan(state, [0m
+[7m[0mtest_results))[0m
+[7m[0m  agentloop\workflow.py:567:    record_agent_result([0m
+> agentloop\workflow.py:568:        [7mstate[0m,[0m
+[7m[0m  agentloop\workflow.py:569:        run_role(root, config, "tester", iteration, [test_plan_ref], task_id=tid),[0m
+[7m[0m  agentloop\workflow.py:570:    )[0m
+> agentloop\workflow.py:571:    [7mstate[0m["phases"]["testing"]["status"] = "completed"
+> agentloop\workflow.py:572:    [7mstate[0m["status"] = "REVIEWING"
+> agentloop\workflow.py:573:    [7mstate[0m["current_phase"] = "review"
+> agentloop\workflow.py:574:    [7mstate[0m["phases"]["review"]["status"] = "in_progress"
+> agentloop\workflow.py:575:    [7mstate[0m["updated_at"] = utc_now_iso()
+> agentloop\workflow.py:576:    save_task_[7mstate[0m(root, tid, state)[0m
+[7m[0m  agentloop\workflow.py:577:[0m
+[7m[0m  agentloop\workflow.py:578:    review_name = f"review-{iteration:03d}.json"[0m
+> agentloop\workflow.py:579:    review_ref = [7martifact[0m_ref(state, review_name)
+> agentloop\workflow.py:580:    review_path = [7martifact[0m_file(root, state, review_name)
+> agentloop\workflow.py:581:    prepare_role_prompt(root, [7mstate[0m, "reviewer", iteration, review_name=review_name)[0m
+[7m[0m  agentloop\workflow.py:582:    if role_uses_manual(config, "reviewer"):[0m
+> agentloop\workflow.py:583:        review_data = manual_review([7mstate[0m, test_results)[0m
+[7m[0m  agentloop\workflow.py:584:        write_text(review_path, json.dumps(review_data, indent=2) + "\n")[0m
+[7m[0m  agentloop\workflow.py:585:    record_agent_result([0m
+> agentloop\workflow.py:586:        [7mstate[0m,[0m
+[7m[0m  agentloop\workflow.py:587:        run_role(root, config, "reviewer", iteration, [review_ref], task_id=tid),[0m
+[7m[0m  agentloop\workflow.py:588:    )[0m
+  agentloop\workflow.py:589:    review = load_review(review_path)
+> agentloop\workflow.py:590:    gate = evaluate_gate([7mstate[0m, review)[0m
+[7m[0m  agentloop\workflow.py:591:[0m
+> agentloop\workflow.py:592:    [7mstate[0m["phases"]["review"]["last_review"] = review_ref
+> agentloop\workflow.py:593:    [7mstate[0m["phases"]["review"]["status"] = gate.lower()[0m
+[7m[0m  agentloop\workflow.py:594:    for result in review.get("acceptance_results", []):[0m
+> agentloop\workflow.py:595:        for criterion in [7mstate[0m.get("acceptance_criteria", []):[0m
+[7m[0m  agentloop\workflow.py:596:            if criterion.get("id") == result.get("criteria_id"):[0m
+> agentloop\workflow.py:597:                criterion["[7mstatus[0m"] = result.get("status", criterion.get("status"))[0m
+[7m[0m  agentloop\workflow.py:598:                criterion["evidence"] = result.get("evidence", criterion.get("evidence"))[0m
+[7m[0m  agentloop\workflow.py:599:[0m
+  agentloop\workflow.py:600:    if gate == "APPROVED":
+> agentloop\workflow.py:601:        [7mstate[0m["status"] = "DONE"[0m
+> agentloop\workflow.py:602:        [7mstate[0m["current_phase"] = "done"
+> agentloop\workflow.py:603:        final_ref = [7martifact[0m_ref(state, "final-report.md")
+> agentloop\workflow.py:604:        prepare_role_prompt(root, [7mstate[0m, "integrator", iteration)[0m
+[7m[0m  agentloop\workflow.py:605:        if role_uses_manual(config, "integrator"):[0m
+> agentloop\workflow.py:606:            write_text([7martifact[0m_file(root, [0m[7m[0mstate, [0m[7m[0m"final-report.md"), [0m
+[7m[0mdraft_final_report(state, [0m[7m[0mreview))[0m
+[7m[0m  agentloop\workflow.py:607:        record_agent_result([0m
+> agentloop\workflow.py:608:            [7mstate[0m,[0m
+[7m[0m  agentloop\workflow.py:609:            run_role(root, config, "integrator", iteration, [final_ref], task_id=tid),[0m
+[7m[0m  agentloop\workflow.py:610:        )[0m
+  agentloop\workflow.py:611:    elif gate == "BLOCKED":
+> agentloop\workflow.py:612:        [7mstate[0m["status"] = "WAITING_FOR_HUMAN"[0m
+> agentloop\workflow.py:613:        [7mstate[0m["current_phase"] = "human_review"
+> agentloop\workflow.py:614:        [7mstate[0m["requires_human_approval"] = True[0m
+[7m[0m  agentloop\workflow.py:615:    else:[0m
+[7m[0m  agentloop\workflow.py:616:        if iteration >= max_iterations:[0m
+> agentloop\workflow.py:617:            [7mstate[0m["status"] = "BLOCKED"
+> agentloop\workflow.py:618:            [7mstate[0m["current_phase"] = "blocked"[0m
+[7m[0m  agentloop\workflow.py:619:        else:[0m
+> agentloop\workflow.py:620:            [7mstate[0m["status"] = "DESIGNING"
+> agentloop\workflow.py:621:            [7mstate[0m["current_phase"] = "design"
+> agentloop\workflow.py:622:    [7mstate[0m["updated_at"] = utc_now_iso()
+> agentloop\workflow.py:623:    save_task_[7mstate[0m(root, tid, state)
+> agentloop\workflow.py:624:    return [7mstate[0m
+[7m[0m  agentloop\workflow.py:625:[0m
+[7m[0m  agentloop\workflow.py:626:[0m
+  agentloop\workflow.py:627:def run_task(root: Path, task_id: str | None = None) -> dict[str, Any]:
+> agentloop\workflow.py:628:    from .tasks import load_task_[7mstate[0m, resolve_task_id[0m
+[7m[0m  agentloop\workflow.py:629:[0m
+[7m[0m  agentloop\workflow.py:630:    tid = resolve_task_id(root, task_id)[0m
+> agentloop\workflow.py:631:    [7mstate[0m = load_task_state(root, tid)
+> agentloop\workflow.py:632:    if [7mstate[0m.get("status") not in {"READY_TO_START", "DESIGNING"}:
+> agentloop\workflow.py:633:        raise WorkspaceError(f"Cannot run while [7mstatus[0m is {state.get('status')}.")[0m
+[7m[0m  agentloop\workflow.py:634:[0m
+> agentloop\workflow.py:635:    while [7mstate[0m.get("status") in {"READY_TO_START", "DESIGNING"}:
+> agentloop\workflow.py:636:        previous_iteration = int([7mstate[0m.get("iteration") or 0)
+> agentloop\workflow.py:637:        [7mstate[0m = run_one_iteration(root, tid)
+> agentloop\workflow.py:638:        if [7mstate[0m.get("status") != "DESIGNING":[0m
+[7m[0m  agentloop\workflow.py:639:            break[0m
+> agentloop\workflow.py:640:        if int([7mstate[0m.get("iteration") or 0) <= previous_iteration:[0m
+[7m [0m[7m [0m[7m[0magentloop\workflow.py:641: [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m[0mraise [0m[7m[0mWorkspaceError("Iteration [0m[7m[0mdid [0m[7m[0mnot [0m[7m[0madvance; [0m[7m[0mrefusing [0m[7m[0mto [0m[7m[0mcontinue [0m
+[7m[0mautomatic [0m[7m[0mloop.")[0m
+> agentloop\workflow.py:642:    return [7mstate[0m
+
+
+ succeeded in 1397ms:
+
+  agentloop\cli.py:12:from typing import Any, Callable, Sequence
+  agentloop\cli.py:13:
+> agentloop\cli.py:14:from .config import add_command_[7mrun[0mtime, [0m[7m[0madd_preset_runtime, [0m[7m[0massign_all_runtime, [0m[7m[0massign_runtime, [0m
+[7m[0mdetect_runtimes, [0m[7m[0mlist_runtimes, [0m[7m[0mset_default_runtime[0m
+[7m[0m  agentloop\cli.py:15:from .locks import LockHeld, lock_path, task_lock[0m
+[7m[0m  agentloop\cli.py:16:from .models import default_state, next_action[0m
+> agentloop\cli.py:17:from .[7mtasks[0m import (
+> agentloop\cli.py:18:    INACTIVE_[7mSTATUS[0mES,[0m
+[7m[0m  agentloop\cli.py:19:    active_task_ids,[0m
+[7m[0m  agentloop\cli.py:20:    apply_task_config_patch,[0m
+  agentloop\cli.py:35:    unset_task_config_key,
+  agentloop\cli.py:36:)
+> agentloop\cli.py:37:from .verify import verify_[7mrun[0mtime[0m
+[7m [0m[7m [0m[7m[0magentloop\cli.py:38:from [0m[7m[0m.workspace [0m[7m[0mimport [0m[7m[0mWorkspaceError, [0m[7m[0magentloop_path, [0m[7m[0minit_workspace, [0m[7m[0mload_config, [0m[7m[0mload_state, [0m
+[7m[0msave_state[0m
+> agentloop\cli.py:39:from .workflow import [7mapprove[0m_task, cancel_task, run_task, start_task[0m
+[7m[0m  agentloop\cli.py:40:[0m
+[7m[0m  agentloop\cli.py:41:[0m
+  agentloop\cli.py:58:def _add_selector_arguments(parser: argparse.ArgumentParser) -> None:
+  agentloop\cli.py:59:    parser.add_argument("--task-id", dest="task_ids", action="append", default=[], help="Target 
+task id (repeatable).")
+> agentloop\cli.py:60:    parser.add_argument("--all", dest="all_[7mtasks[0m", [0m[7m[0maction="store_true", [0m[7m[0mhelp="Target [0m[7m[0mevery [0m[7m[0mtask [0m
+[7m[0min [0m[7m[0mthe [0m[7m[0mworkspace.")[0m
+> agentloop\cli.py:61:    parser.add_argument("--[7mstatus[0m", [0m[7m[0mdest="statuses", [0m[7m[0maction="append", [0m[7m[0mdefault=[], [0m[7m[0mhelp="Target [0m
+[7m[0mevery [0m[7m[0mtask [0m[7m[0mwith [0m[7m[0mthis [0m[7m[0mstatus [0m[7m[0m(repeatable).")[0m
+> agentloop\cli.py:62:    parser.add_argument("--dry-[7mrun[0m", [0m[7m[0maction="store_true", [0m[7m[0mhelp="Print [0m[7m[0mthe [0m[7m[0mselection [0m[7m[0mwithout [0m
+[7m[0macting.")[0m
+[7m[0m  agentloop\cli.py:63:[0m
+[7m[0m  agentloop\cli.py:64:[0m
+  agentloop\cli.py:66:    parser = argparse.ArgumentParser(
+  agentloop\cli.py:67:        prog="agentloop",
+> agentloop\cli.py:68:        description="Local, agent-agnostic orchestration for coding [7mtasks[0m.",[0m
+[7m[0m  agentloop\cli.py:69:    )[0m
+[7m [0m[7m [0m[7m[0magentloop\cli.py:70: [0m[7m [0m[7m [0m[7m [0m[7m[0mparser.add_argument("--root", [0m[7m[0mdefault=".", [0m[7m[0mhelp="Workspace [0m[7m[0mroot. [0m[7m[0mDefaults [0m[7m[0mto [0m[7m[0mthe [0m[7m[0mcurrent [0m
+[7m[0mdirectory.")[0m
+  agentloop\cli.py:73:
+  agentloop\cli.py:74:    init_parser = subparsers.add_parser("init", help="Initialize .agentloop in the workspace.")
+> agentloop\cli.py:75:    init_parser.add_argument("--detect-[7mrun[0mtimes", [0m[7m[0maction="store_true", [0m[7m[0mhelp="Detect [0m[7m[0mlocal [0m
+[7m[0mCodex/Claude/Copilot [0m[7m[0mruntimes [0m[7m[0mafter [0m[7m[0minit.")[0m
+> agentloop\cli.py:76:    init_parser.add_argument("--replace-[7mrun[0mtimes", [0m[7m[0maction="store_true", [0m[7m[0mhelp="Replace [0m[7m[0mexisting [0m
+[7m[0mdetected [0m[7m[0mruntime [0m[7m[0mentries [0m[7m[0mduring [0m[7m[0m--detect-runtimes.")[0m
+> agentloop\cli.py:77:    [7mstatus[0m_parser = subparsers.add_parser("status", help="Show task status.")
+> agentloop\cli.py:78:    _add_task_id_argument([7mstatus[0m_parser)[0m
+[7m[0m  agentloop\cli.py:79:[0m
+> agentloop\cli.py:80:    [7mtasks[0m_parser [0m[7m[0m= [0m[7m[0msubparsers.add_parser("tasks", [0m[7m[0mhelp="Inventory, [0m[7m[0mbatch [0m[7m[0mlifecycle, [0m[7m[0mper-task [0m
+[7m[0mconfig, [0m[7m[0mlocks.")[0m
+> agentloop\cli.py:81:    [7mtasks[0m_subparsers = tasks_parser.add_subparsers(dest="tasks_command")[0m
+[7m[0m  agentloop\cli.py:82:[0m
+> agentloop\cli.py:83:    list_parser = [7mtasks[0m_subparsers.add_parser("list", help="List AgentLoop tasks.")
+> agentloop\cli.py:84:    list_parser.add_argument("--[7mstatus[0m", [0m[7m[0mdest="statuses", [0m[7m[0maction="append", [0m[7m[0mdefault=[], [0m
+[7m[0mhelp="Filter [0m[7m[0mby [0m[7m[0mstatus [0m[7m[0m(repeatable).")[0m
+[7m[0m  agentloop\cli.py:85:    list_parser.add_argument("--json", dest="as_json", action="store_true", help="Emit JSON.")[0m
+[7m[0m  agentloop\cli.py:86:[0m
+> agentloop\cli.py:87:    [7mtasks[0m_delete_parser [0m[7m[0m= [0m[7m[0mtasks_subparsers.add_parser("delete", [0m[7m[0mhelp="Delete [0m[7m[0mone [0m[7m[0mtask [0m[7m[0mby [0m
+[7m[0mtask_id.")[0m
+> agentloop\cli.py:88:    [7mtasks[0m_delete_parser.add_argument("task_id", help="Task id to delete.")
+> agentloop\cli.py:89:    [7mtasks[0m_subparsers.add_parser("delete-all", [0m[7m[0maliases=["clear"], [0m[7m[0mhelp="Delete [0m[7m[0mall [0m[7m[0mtasks [0m[7m[0mand [0m
+[7m[0mreset [0m[7m[0mcurrent [0m[7m[0mstate.")[0m
+[7m[0m  agentloop\cli.py:90:[0m
+[7m[0m  agentloop\cli.py:91:    # Batch lifecycle[0m
+> agentloop\cli.py:92:    for op in ("[7mapprove[0m", "cancel"):
+> agentloop\cli.py:93:        sp = [7mtasks[0m_subparsers.add_parser(op, help=f"Batch {op} multiple tasks.")[0m
+[7m[0m  agentloop\cli.py:94:        _add_selector_arguments(sp)[0m
+[7m[0m  agentloop\cli.py:95:        sp.add_argument("--by", default="requester", help=f"Name recorded as {op}-er.")[0m
+> agentloop\cli.py:96:    [7mrun[0m_batch = tasks_subparsers.add_parser("run", help="Batch run multiple tasks.")
+> agentloop\cli.py:97:    _add_selector_arguments([7mrun[0m_batch)
+> agentloop\cli.py:98:    [7mrun[0m_batch.add_argument("--wait", [0m[7m[0maction="store_true", [0m[7m[0mhelp="Wait [0m[7m[0mfor [0m[7m[0mper-task [0m[7m[0mlock [0m[7m[0minstead [0m
+[7m[0mof [0m[7m[0mfailing [0m[7m[0mfast.")[0m
+> agentloop\cli.py:99:    [7mrun[0m_batch.add_argument("--parallel", [0m[7m[0mtype=int, [0m[7m[0mdefault=1, [0m[7m[0mhelp="Number [0m[7m[0mof [0m[7m[0mconcurrent [0m[7m[0mruns [0m
+[7m[0m(default [0m[7m[0m1).")[0m
+[7m[0m  agentloop\cli.py:100:[0m
+> agentloop\cli.py:101:    unlock_parser = [7mtasks[0m_subparsers.add_parser("unlock", help="Remove a stale task lock.")[0m
+[7m[0m  agentloop\cli.py:102:    unlock_parser.add_argument("task_id", help="Task id to unlock.")[0m
+[7m[0m  agentloop\cli.py:103:[0m
+> agentloop\cli.py:104:    [7mtasks[0m_subparsers.add_parser("migrate", help="Run workspace migration (idempotent).")[0m
+[7m[0m  agentloop\cli.py:105:[0m
+[7m[0m  agentloop\cli.py:106:    # Config subgroup[0m
+> agentloop\cli.py:107:    config_parser = [7mtasks[0m_subparsers.add_parser("config", help="Per-task config overrides.")[0m
+[7m[0m  agentloop\cli.py:108:    config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)[0m
+[7m [0m[7m [0m[7m[0magentloop\cli.py:109: [0m[7m [0m[7m [0m[7m [0m[7m[0mcfg_show [0m[7m[0m= [0m[7m[0mconfig_subparsers.add_parser("show", [0m[7m[0mhelp="Show [0m[7m[0mper-task [0m[7m[0mconfig [0m[7m[0mor [0m[7m[0meffective [0m
+[7m[0mmerged [0m[7m[0mconfig.")[0m
+  agentloop\cli.py:110:    cfg_show.add_argument("task_id")
+  agentloop\cli.py:111:    cfg_show.add_argument("--effective", action="store_true", help="Show merged effective 
+config instead of the raw override.")
+> agentloop\cli.py:112:    cfg_set = config_subparsers.add_parser("set", help="Set a per-task config key on one or 
+more [7mtasks[0m.")[0m
+[7m[0m  agentloop\cli.py:113:    _add_selector_arguments(cfg_set)[0m
+> agentloop\cli.py:114:    cfg_set.add_argument("key", help="Dotted key, e.g. test_commands, max_iterations, 
+roles.reviewer.[7mrun[0mtime")[0m
+[7m[0m  agentloop\cli.py:115:    cfg_set.add_argument("value", help="Value (string by default).")[0m
+[7m [0m[7m [0m[7m[0magentloop\cli.py:116: [0m[7m [0m[7m [0m[7m [0m[7m[0mcfg_set.add_argument("--json", [0m[7m[0mdest="value_is_json", [0m[7m[0maction="store_true", [0m[7m[0mhelp="Treat [0m[7m[0mvalue [0m
+[7m[0mas [0m[7m[0mJSON.")[0m
+> agentloop\cli.py:117:    cfg_unset = config_subparsers.add_parser("unset", help="Remove a per-task config key on one 
+or more [7mtasks[0m.")[0m
+[7m[0m  agentloop\cli.py:118:    _add_selector_arguments(cfg_unset)[0m
+[7m[0m  agentloop\cli.py:119:    cfg_unset.add_argument("key")[0m
+  agentloop\cli.py:121:    _add_selector_arguments(cfg_clear)
+  agentloop\cli.py:122:
+> agentloop\cli.py:123:    [7mstart[0m_parser [0m[7m[0m= [0m[7m[0msubparsers.add_parser("start", [0m[7m[0mhelp="Start [0m[7m[0ma [0m[7m[0mtask [0m[7m[0mand [0m[7m[0mdraft [0m[7m[0manalysis [0m
+[7m[0martifacts.")[0m
+> agentloop\cli.py:124:    [7mstart[0m_parser.add_argument("task", help="Task request to analyze.")[0m
+[7m[0m  agentloop\cli.py:125:[0m
+> agentloop\cli.py:126:    [7mapprove[0m_parser [0m[7m[0m= [0m[7m[0msubparsers.add_parser("approve", [0m[7m[0mhelp="Approve [0m[7m[0mthe [0m[7m[0manalysis [0m[7m[0mand [0m[7m[0macceptance [0m
+[7m[0mcriteria.")[0m
+> agentloop\cli.py:127:    _add_task_id_argument([7mapprove[0m_parser)
+> agentloop\cli.py:128:    [7mapprove[0m_parser.add_argument("--by", [0m[7m[0mdefault="requester", [0m[7m[0mhelp="Name [0m[7m[0mto [0m[7m[0mrecord [0m[7m[0mas [0m[7m[0mthe [0m
+[7m[0mapprover. [0m[7m[0mDefaults [0m[7m[0mto [0m[7m[0mrequester.")[0m
+[7m[0m  agentloop\cli.py:129:[0m
+[7m[0m  agentloop\cli.py:130:    cancel_parser = subparsers.add_parser("cancel", help="Cancel a task.")[0m
+  agentloop\cli.py:132:    cancel_parser.add_argument("--by", default="requester", help="Name to record as the 
+canceller.")
+  agentloop\cli.py:133:
+> agentloop\cli.py:134:    [7mrun[0m_parser = subparsers.add_parser("run", help="Run or resume the design/test/review loop.")[0m
+> agentloop\cli.py:135:    _add_task_id_argument([7mrun[0m_parser)
+> agentloop\cli.py:136:    [7mrun[0m_parser.add_argument("--wait", [0m[7m[0maction="store_true", [0m[7m[0mhelp="Wait [0m[7m[0mfor [0m[7m[0mper-task [0m[7m[0mlock [0m[7m[0minstead [0m
+[7m[0mof [0m[7m[0mfailing [0m[7m[0mfast.")[0m
+[7m[0m  agentloop\cli.py:137:[0m
+> agentloop\cli.py:138:    [7mrun[0mtime_parser = subparsers.add_parser("runtime", help="Manage coding agent runtimes.")
+> agentloop\cli.py:139:    [7mrun[0mtime_subparsers = runtime_parser.add_subparsers(dest="runtime_command", required=True)[0m
+[7m[0m  agentloop\cli.py:140:[0m
+> agentloop\cli.py:141:    [7mrun[0mtime_subparsers.add_parser("list", help="List configured runtimes and role assignments.")
+> agentloop\cli.py:142:    detect_parser = [7mrun[0mtime_subparsers.add_parser("detect", [0m[7m[0mhelp="Detect [0m[7m[0mlocal [0m
+[7m[0mCodex/Claude/Copilot [0m[7m[0mruntime [0m[7m[0mcommands.")[0m
+> agentloop\cli.py:143:    detect_parser.add_argument("--replace", action="store_true", help="Replace existing 
+detected [7mrun[0mtime [0m[7m[0mentries.")[0m
+[7m[0m  agentloop\cli.py:144:[0m
+> agentloop\cli.py:145:    add_command_parser = [7mrun[0mtime_subparsers.add_parser("add-command", [0m[7m[0mhelp="Add [0m[7m[0ma [0m[7m[0mcommand-based [0m
+[7m[0mruntime.")[0m
+> agentloop\cli.py:146:    add_command_parser.add_argument("name", help="[7mRun[0mtime name.")
+> agentloop\cli.py:147:    add_command_parser.add_argument("--command", dest="[7mrun[0mtime_executable", [0m[7m[0mrequired=True, [0m
+[7m[0mhelp="Executable [0m[7m[0mto [0m[7m[0mrun.")[0m
+[7m [0m[7m [0m[7m[0magentloop\cli.py:148: [0m[7m [0m[7m [0m[7m [0m[7m[0madd_command_parser.add_argument("--arg", [0m[7m[0maction="append", [0m[7m[0mdefault=[], [0m[7m[0mhelp="Argument [0m
+[7m[0m(repeatable). [0m[7m[0mSupports [0m[7m[0m{prompt_file}, [0m[7m[0m{cwd}, [0m[7m[0m{role}, [0m[7m[0m{iteration}.")[0m
+[7m[0m  agentloop\cli.py:149:    add_command_parser.add_argument("--args", default=None, help="Shell-like argument string.")[0m
+  agentloop\cli.py:153:    add_command_parser.add_argument("--replace", action="store_true")
+  agentloop\cli.py:154:
+> agentloop\cli.py:155:    add_preset_parser = [7mrun[0mtime_subparsers.add_parser("add-preset", [0m[7m[0mhelp="Add [0m[7m[0ma [0m[7m[0mbuilt-in [0m
+[7m[0mruntime [0m[7m[0mpreset.")[0m
+[7m[0m  agentloop\cli.py:156:    add_preset_parser.add_argument("preset")[0m
+[7m[0m  agentloop\cli.py:157:    add_preset_parser.add_argument("--assign", action="append", default=[])[0m
+  agentloop\cli.py:160:    add_preset_parser.add_argument("--replace", action="store_true")
+  agentloop\cli.py:161:
+> agentloop\cli.py:162:    assign_parser = [7mrun[0mtime_subparsers.add_parser("assign", help="Assign a runtime to a role.")[0m
+[7m[0m  agentloop\cli.py:163:    assign_parser.add_argument("role")[0m
+> agentloop\cli.py:164:    assign_parser.add_argument("[7mrun[0mtime")[0m
+[7m[0m  agentloop\cli.py:165:[0m
+> agentloop\cli.py:166:    assign_all_parser = [7mrun[0mtime_subparsers.add_parser("assign-all", [0m[7m[0mhelp="Assign [0m[7m[0ma [0m[7m[0mruntime [0m[7m[0mto [0m
+[7m[0mall [0m[7m[0mroles.")[0m
+> agentloop\cli.py:167:    assign_all_parser.add_argument("[7mrun[0mtime")[0m
+[7m[0m  agentloop\cli.py:168:    assign_all_parser.add_argument("--except", dest="except_roles", action="append", default=[])[0m
+[7m[0m  agentloop\cli.py:169:[0m
+> agentloop\cli.py:170:    default_parser = [7mrun[0mtime_subparsers.add_parser("set-default", [0m[7m[0mhelp="Set [0m[7m[0mthe [0m[7m[0mdefault [0m
+[7m[0mruntime.")[0m
+> agentloop\cli.py:171:    default_parser.add_argument("[7mrun[0mtime")[0m
+[7m[0m  agentloop\cli.py:172:[0m
+> agentloop\cli.py:173:    verify_parser = [7mrun[0mtime_subparsers.add_parser("verify", [0m[7m[0mhelp="Verify [0m[7m[0ma [0m[7m[0mcommand [0m[7m[0mruntime [0m[7m[0mcan [0m
+[7m[0mproduce [0m[7m[0mAgentLoop [0m[7m[0martifacts.")[0m
+> agentloop\cli.py:174:    verify_parser.add_argument("[7mrun[0mtime")[0m
+[7m[0m  agentloop\cli.py:175:    verify_parser.add_argument("--timeout-seconds", type=int, default=300)[0m
+[7m[0m  agentloop\cli.py:176:[0m
+  agentloop\cli.py:189:    installed = set(result.get("installed", []) or [])
+  agentloop\cli.py:190:    skipped = set(result.get("skipped", []) or [])
+> agentloop\cli.py:191:    print("[7mRun[0mtime detection:")[0m
+[7m[0m  agentloop\cli.py:192:    if not detected:[0m
+[7m[0m  agentloop\cli.py:193:        print("  detected: none")[0m
+> agentloop\cli.py:194:        print("  next: use `python -m agentloop [7mrun[0mtime [0m[7m[0madd-command [0m[7m[0m...` [0m[7m[0mto [0m[7m[0mconfigure [0m[7m[0ma [0m[7m[0mruntime [0m
+[7m[0mmanually")[0m
+[7m[0m  agentloop\cli.py:195:        return[0m
+> agentloop\cli.py:196:    for name, [7mrun[0mtime in sorted(detected.items()):
+> agentloop\cli.py:197:        [7mstatus[0m = "installed" if name in installed else "skipped"[0m
+[7m[0m  agentloop\cli.py:198:        if name in skipped:[0m
+> agentloop\cli.py:199:            [7mstatus[0m = "skipped existing"
+> agentloop\cli.py:200:        print(f"  - {name}: {[7mstatus[0m} command={runtime.get('command')}")[0m
+[7m[0m  agentloop\cli.py:201:    print("  next:")[0m
+> agentloop\cli.py:202:    print("    python -m agentloop [7mrun[0mtime assign-all <runtime>")
+> agentloop\cli.py:203:    print("    python -m agentloop [7mrun[0mtime verify <runtime> --timeout-seconds 120")[0m
+[7m[0m  agentloop\cli.py:204:[0m
+[7m[0m  agentloop\cli.py:205:[0m
+> agentloop\cli.py:206:def cmd_init(root: Path, detect: bool = False, replace_[7mrun[0mtimes: bool = False) -> int:[0m
+[7m[0m  agentloop\cli.py:207:    result = init_workspace(root)[0m
+[7m[0m  agentloop\cli.py:208:    print("AgentLoop initialized.")[0m
+  agentloop\cli.py:216:            print(f"  - {item}")
+  agentloop\cli.py:217:    if detect:
+> agentloop\cli.py:218:        print_detect_summary(detect_[7mrun[0mtimes(root, replace=replace_runtimes))[0m
+[7m[0m  agentloop\cli.py:219:    return 0[0m
+[7m[0m  agentloop\cli.py:220:[0m
+  agentloop\cli.py:221:
+> agentloop\cli.py:222:def cmd_[7mstatus[0m(root: Path, explicit_task: str | None) -> int:[0m
+[7m[0m  agentloop\cli.py:223:    if explicit_task:[0m
+[7m[0m  agentloop\cli.py:224:        tid = resolve_task_id(root, explicit_task)[0m
+  agentloop\cli.py:233:            state = load_state(root)
+  agentloop\cli.py:234:            config = load_config(root)
+> agentloop\cli.py:235:    print("AgentLoop [7mstatus[0m")[0m
+[7m[0m  agentloop\cli.py:236:    print(f"  task_id: {state.get('task_id') or '-'}")[0m
+[7m[0m  agentloop\cli.py:237:    print(f"  title: {state.get('title') or '-'}")[0m
+> agentloop\cli.py:238:    print(f"  [7mstatus[0m: {state.get('status')}")[0m
+[7m[0m  agentloop\cli.py:239:    print(f"  current_phase: {state.get('current_phase') or '-'}")[0m
+[7m [0m[7m [0m[7m[0magentloop\cli.py:240: [0m[7m [0m[7m [0m[7m [0m[7m[0mprint(f" [0m[7m [0m[7m[0miteration: [0m[7m[0m{state.get('iteration', [0m[7m[0m0)}/{state.get('max_iterations', [0m
+[7m[0mconfig.get('max_iterations', [0m[7m[0m'-'))}")[0m
+> agentloop\cli.py:241:    print(f"  default_[7mrun[0mtime: {config.get('default_runtime', '-')}")[0m
+[7m[0m  agentloop\cli.py:242:    print(f"  next_action: {next_action(state)}")[0m
+[7m[0m  agentloop\cli.py:243:    return 0[0m
+  agentloop\cli.py:244:
+  agentloop\cli.py:245:
+> agentloop\cli.py:246:# ---------- [7mtasks[0m subgroup ----------[0m
+[7m[0m  agentloop\cli.py:247:[0m
+[7m[0m  agentloop\cli.py:248:[0m
+> agentloop\cli.py:249:[7mdef cmd_tasks[0m_list(root: Path, statuses: list[str], as_json: bool) -> int:[0m
+[7m[0m  agentloop\cli.py:250:    current = current_task_id(root)[0m
+> agentloop\cli.py:251:    wanted = {s.upper() for s in [7mstatus[0mes}[0m
+[7m[0m  agentloop\cli.py:252:    rows: list[dict[str, Any]] = [][0m
+[7m[0m  agentloop\cli.py:253:    for tid in list_task_ids(root):[0m
+  agentloop\cli.py:254:        snap = task_snapshot(root, tid)
+> agentloop\cli.py:255:        if wanted and str(snap.get("[7mstatus[0m", "")).upper() not in wanted:[0m
+[7m[0m  agentloop\cli.py:256:            continue[0m
+[7m[0m  agentloop\cli.py:257:        rows.append(snap)[0m
+  agentloop\cli.py:262:                "task_id": r.get("task_id"),
+  agentloop\cli.py:263:                "title": r.get("title"),
+> agentloop\cli.py:264:                "[7mstatus[0m": r.get("status"),[0m
+[7m[0m  agentloop\cli.py:265:                "iteration": r.get("iteration"),[0m
+[7m[0m  agentloop\cli.py:266:                "max_iterations": r.get("max_iterations"),[0m
+  agentloop\cli.py:271:        return 0
+  agentloop\cli.py:272:
+> agentloop\cli.py:273:    print("AgentLoop [7mtasks[0m")[0m
+[7m[0m  agentloop\cli.py:274:    if not rows:[0m
+[7m[0m  agentloop\cli.py:275:        print("  - none")[0m
+  agentloop\cli.py:282:        tid = snap.get("task_id")
+  agentloop\cli.py:283:        print(f"  {marker} {tid}")
+> agentloop\cli.py:284:        print(f"      [7mstatus[0m: {snap.get('status', '-')}")[0m
+[7m [0m[7m [0m[7m[0magentloop\cli.py:285: [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m[0mprint(f" [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m[0miteration: [0m[7m[0m{snap.get('iteration', [0m[7m[0m'-')}/{snap.get('max_iterations', [0m
+[7m[0m'-')}")[0m
+[7m[0m  agentloop\cli.py:286:        print(f"      title: {title}")[0m
+> agentloop\cli.py:287:        print(f"      artifacts: .agentloop/[7mtasks[0m/{tid}/artifacts/")[0m
+[7m[0m  agentloop\cli.py:288:    return 0[0m
+[7m[0m  agentloop\cli.py:289:[0m
+  agentloop\cli.py:303:
+  agentloop\cli.py:304:
+> agentloop\cli.py:305:def clear_[7mrun[0m_and_global_artifacts(root: Path) -> None:[0m
+> agentloop\cli.py:306:    for name in ["[7mrun[0ms", "artifacts"]:[0m
+[7m[0m  agentloop\cli.py:307:        path = agentloop_path(root) / name[0m
+[7m[0m  agentloop\cli.py:308:        if path.exists():[0m
+  agentloop\cli.py:311:
+  agentloop\cli.py:312:
+> agentloop\cli.py:313:[7mdef cmd_tasks[0m_delete(root: Path, task_id: str) -> int:[0m
+[7m[0m  agentloop\cli.py:314:    current = current_task_id(root)[0m
+[7m[0m  agentloop\cli.py:315:    deleted = delete_task_dir(root, task_id)[0m
+  agentloop\cli.py:324:
+  agentloop\cli.py:325:
+> agentloop\cli.py:326:[7mdef cmd_tasks[0m_delete_all(root: Path) -> int:[0m
+> agentloop\cli.py:327:    [7mtasks[0m = list_task_ids(root)
+> agentloop\cli.py:328:    for tid in [7mtasks[0m:[0m
+[7m[0m  agentloop\cli.py:329:        delete_task_dir(root, tid)[0m
+> agentloop\cli.py:330:    clear_[7mrun[0m_and_global_artifacts(root)[0m
+[7m[0m  agentloop\cli.py:331:    reset_current_state(root)[0m
+> agentloop\cli.py:332:    print("AgentLoop [7mtasks[0m deleted.")
+> agentloop\cli.py:333:    print(f"  deleted: {len([7mtasks[0m)}")
+> agentloop\cli.py:334:    print("  [7mstatus[0m: CREATED")[0m
+[7m[0m  agentloop\cli.py:335:    return 0[0m
+[7m[0m  agentloop\cli.py:336:[0m
+  agentloop\cli.py:337:
+> agentloop\cli.py:338:[7mdef cmd_tasks[0m_unlock(root: Path, task_id: str) -> int:[0m
+[7m[0m  agentloop\cli.py:339:    path = lock_path(root, task_id)[0m
+[7m[0m  agentloop\cli.py:340:    if not path.exists():[0m
+  agentloop\cli.py:346:
+  agentloop\cli.py:347:
+> agentloop\cli.py:348:[7mdef cmd_tasks[0m_migrate(root: Path) -> int:[0m
+[7m[0m  agentloop\cli.py:349:    summary = migrate_workspace(root)[0m
+[7m[0m  agentloop\cli.py:350:    print("AgentLoop workspace migrated.")[0m
+  agentloop\cli.py:360:        root,
+  agentloop\cli.py:361:        task_ids=list(getattr(args, "task_ids", []) or []),
+> agentloop\cli.py:362:        all_[7mtasks[0m=bool(getattr(args, "all_tasks", False)),[0m
+> agentloop\cli.py:363:        [7mstatus[0mes=list(getattr(args, "statuses", []) or []),[0m
+[7m[0m  agentloop\cli.py:364:    )[0m
+[7m[0m  agentloop\cli.py:365:[0m
+  agentloop\cli.py:368:    print(f"AgentLoop batch {label}:")
+  agentloop\cli.py:369:    failures = 0
+> agentloop\cli.py:370:    for [7mstatus[0m, tid, message in results:[0m
+> agentloop\cli.py:371:        print(f"  - {[7mstatus[0m:5s}  {tid}  {message}")
+> agentloop\cli.py:372:        if [7mstatus[0m != "ok":[0m
+[7m[0m  agentloop\cli.py:373:            failures += 1[0m
+[7m[0m  agentloop\cli.py:374:    print(f"  total: {len(results)}  ok: {len(results) - failures}  error: {failures}")[0m
+  agentloop\cli.py:376:
+  agentloop\cli.py:377:
+> agentloop\cli.py:378:def _[7mrun[0m_batch_op([0m
+[7m[0m  agentloop\cli.py:379:    root: Path,[0m
+[7m[0m  agentloop\cli.py:380:    selection: list[str],[0m
+  agentloop\cli.py:384:    parallel: int = 1,
+  agentloop\cli.py:385:) -> list[tuple[str, str, str]]:
+> agentloop\cli.py:386:    def [7mrun[0mner(tid: str) -> tuple[str, str, str]:[0m
+[7m[0m  agentloop\cli.py:387:        try:[0m
+[7m[0m  agentloop\cli.py:388:            with task_lock(root, tid, blocking=blocking):[0m
+  agentloop\cli.py:393:
+  agentloop\cli.py:394:    if parallel <= 1:
+> agentloop\cli.py:395:        return [[7mrun[0mner(tid) for tid in selection][0m
+[7m[0m  agentloop\cli.py:396:    with ThreadPoolExecutor(max_workers=parallel) as pool:[0m
+> agentloop\cli.py:397:        return list(pool.map([7mrun[0mner, selection))[0m
+[7m[0m  agentloop\cli.py:398:[0m
+[7m[0m  agentloop\cli.py:399:[0m
+> agentloop\cli.py:400:[7mdef cmd_tasks[0m_batch_approve(root: Path, args: argparse.Namespace) -> int:[0m
+[7m[0m  agentloop\cli.py:401:    selection = _resolve_selection(root, args)[0m
+> agentloop\cli.py:402:    if args.dry_[7mrun[0m:
+> agentloop\cli.py:403:        print("dry-[7mrun[0m selection:")[0m
+[7m[0m  agentloop\cli.py:404:        for tid in selection:[0m
+[7m[0m  agentloop\cli.py:405:            print(f"  - {tid}")[0m
+  agentloop\cli.py:407:
+  agentloop\cli.py:408:    def op(tid: str) -> str:
+> agentloop\cli.py:409:        [7mapprove[0m_task(root, approved_by=args.by, task_id=tid)[0m
+> agentloop\cli.py:410:        return "[7mapprove[0md"[0m
+[7m[0m  agentloop\cli.py:411:[0m
+> agentloop\cli.py:412:    return _print_batch_summary("[7mapprove[0m", _run_batch_op(root, selection, op=op))[0m
+[7m[0m  agentloop\cli.py:413:[0m
+[7m[0m  agentloop\cli.py:414:[0m
+> agentloop\cli.py:415:[7mdef cmd_tasks[0m_batch_cancel(root: Path, args: argparse.Namespace) -> int:[0m
+[7m[0m  agentloop\cli.py:416:    selection = _resolve_selection(root, args)[0m
+> agentloop\cli.py:417:    if args.dry_[7mrun[0m:
+> agentloop\cli.py:418:        print("dry-[7mrun[0m selection:")[0m
+[7m[0m  agentloop\cli.py:419:        for tid in selection:[0m
+[7m[0m  agentloop\cli.py:420:            print(f"  - {tid}")[0m
+  agentloop\cli.py:425:        return "cancelled"
+  agentloop\cli.py:426:
+> agentloop\cli.py:427:    return _print_batch_summary("cancel", _[7mrun[0m_batch_op(root, selection, op=op))[0m
+[7m[0m  agentloop\cli.py:428:[0m
+[7m[0m  agentloop\cli.py:429:[0m
+> agentloop\cli.py:430:[7mdef cmd_tasks[0m_batch_run(root: Path, args: argparse.Namespace) -> int:[0m
+[7m[0m  agentloop\cli.py:431:    selection = _resolve_selection(root, args)[0m
+> agentloop\cli.py:432:    if args.dry_[7mrun[0m:
+> agentloop\cli.py:433:        print("dry-[7mrun[0m selection:")[0m
+[7m[0m  agentloop\cli.py:434:        for tid in selection:[0m
+[7m[0m  agentloop\cli.py:435:            print(f"  - {tid}")[0m
+  agentloop\cli.py:437:
+  agentloop\cli.py:438:    def op(tid: str) -> str:
+> agentloop\cli.py:439:        state = [7mrun[0m_task(root, task_id=tid)[0m
+> agentloop\cli.py:440:        return f"[7mstatus[0m: {state.get('status')} iteration: {state.get('iteration')}"[0m
+[7m[0m  agentloop\cli.py:441:[0m
+> agentloop\cli.py:442:    results = _[7mrun[0m_batch_op([0m
+[7m[0m  agentloop\cli.py:443:        root,[0m
+[7m[0m  agentloop\cli.py:444:        selection,[0m
+  agentloop\cli.py:447:        parallel=max(1, args.parallel),
+  agentloop\cli.py:448:    )
+> agentloop\cli.py:449:    return _print_batch_summary("[7mrun[0m", results)[0m
+[7m[0m  agentloop\cli.py:450:[0m
+[7m[0m  agentloop\cli.py:451:[0m
+  agentloop\cli.py:464:
+  agentloop\cli.py:465:
+> agentloop\cli.py:466:[7mdef cmd_tasks[0m_config_show(root: Path, task_id: str, show_effective: bool) -> int:[0m
+[7m[0m  agentloop\cli.py:467:    resolved = resolve_task_id(root, task_id)[0m
+[7m[0m  agentloop\cli.py:468:    if show_effective:[0m
+  agentloop\cli.py:474:
+  agentloop\cli.py:475:
+> agentloop\cli.py:476:[7mdef cmd_tasks[0m_config_set(root: Path, args: argparse.Namespace) -> int:[0m
+[7m[0m  agentloop\cli.py:477:    selection = _resolve_selection(root, args)[0m
+[7m[0m  agentloop\cli.py:478:    value = _parse_value(args.value, args.value_is_json)[0m
+> agentloop\cli.py:479:    if args.dry_[7mrun[0m:
+> agentloop\cli.py:480:        print("dry-[7mrun[0m:")[0m
+[7m[0m  agentloop\cli.py:481:        for tid in selection:[0m
+[7m[0m  agentloop\cli.py:482:            print(f"  - set {tid}.{args.key} = {value!r}")[0m
+  agentloop\cli.py:487:        return f"set {args.key}"
+  agentloop\cli.py:488:
+> agentloop\cli.py:489:    return _print_batch_summary("config set", _[7mrun[0m_batch_op(root, selection, op=op))[0m
+[7m[0m  agentloop\cli.py:490:[0m
+[7m[0m  agentloop\cli.py:491:[0m
+> agentloop\cli.py:492:[7mdef cmd_tasks[0m_config_unset(root: Path, args: argparse.Namespace) -> int:[0m
+[7m[0m  agentloop\cli.py:493:    selection = _resolve_selection(root, args)[0m
+> agentloop\cli.py:494:    if args.dry_[7mrun[0m:
+> agentloop\cli.py:495:        print("dry-[7mrun[0m:")[0m
+[7m[0m  agentloop\cli.py:496:        for tid in selection:[0m
+[7m[0m  agentloop\cli.py:497:            print(f"  - unset {tid}.{args.key}")[0m
+  agentloop\cli.py:502:        return f"unset {args.key}"
+  agentloop\cli.py:503:
+> agentloop\cli.py:504:    return _print_batch_summary("config unset", _[7mrun[0m_batch_op(root, selection, op=op))[0m
+[7m[0m  agentloop\cli.py:505:[0m
+[7m[0m  agentloop\cli.py:506:[0m
+> agentloop\cli.py:507:[7mdef cmd_tasks[0m_config_clear(root: Path, args: argparse.Namespace) -> int:[0m
+[7m[0m  agentloop\cli.py:508:    selection = _resolve_selection(root, args)[0m
+> agentloop\cli.py:509:    if args.dry_[7mrun[0m:
+> agentloop\cli.py:510:        print("dry-[7mrun[0m:")[0m
+[7m[0m  agentloop\cli.py:511:        for tid in selection:[0m
+[7m[0m  agentloop\cli.py:512:            print(f"  - clear {tid}")[0m
+  agentloop\cli.py:517:        return "cleared"
+  agentloop\cli.py:518:
+> agentloop\cli.py:519:    return _print_batch_summary("config clear", _[7mrun[0m_batch_op(root, selection, op=op))[0m
+[7m[0m  agentloop\cli.py:520:[0m
+[7m[0m  agentloop\cli.py:521:[0m
+  agentloop\cli.py:523:
+  agentloop\cli.py:524:
+> agentloop\cli.py:525:def cmd_[7mstart[0m(root: Path, task: str) -> int:[0m
+> agentloop\cli.py:526:    state = [7mstart[0m_task(root, task)[0m
+[7m[0m  agentloop\cli.py:527:    analysis = state.get("phases", {}).get("analysis", {}).get("artifact")[0m
+[7m[0m  agentloop\cli.py:528:    acceptance = state.get("phases", {}).get("alignment", {}).get("artifact")[0m
+> agentloop\cli.py:529:    print("AgentLoop task [7mstart[0med.")[0m
+[7m[0m  agentloop\cli.py:530:    print(f"  task_id: {state.get('task_id')}")[0m
+> agentloop\cli.py:531:    print("  [7mstatus[0m: WAITING_FOR_ALIGNMENT")[0m
+[7m[0m  agentloop\cli.py:532:    print("  artifacts:")[0m
+[7m[0m  agentloop\cli.py:533:    print(f"    - {analysis}")[0m
+  agentloop\cli.py:537:
+  agentloop\cli.py:538:
+> agentloop\cli.py:539:def cmd_[7mapprove[0m(root: Path, approved_by: str, task_id: str | None) -> int:[0m
+> agentloop\cli.py:540:    state = [7mapprove[0m_task(root, approved_by=approved_by, task_id=task_id)
+> agentloop\cli.py:541:    print("AgentLoop alignment [7mapprove[0md.")[0m
+[7m[0m  agentloop\cli.py:542:    print(f"  task_id: {state.get('task_id')}")[0m
+> agentloop\cli.py:543:    print(f"  [7mapprove[0md_by: {approved_by}")
+> agentloop\cli.py:544:    print("  [7mstatus[0m: READY_TO_START")[0m
+[7m[0m  agentloop\cli.py:545:    print(f"  next_action: {next_action(state)}")[0m
+[7m[0m  agentloop\cli.py:546:    return 0[0m
+  agentloop\cli.py:552:    print(f"  task_id: {state.get('task_id')}")
+  agentloop\cli.py:553:    print(f"  cancelled_by: {cancelled_by}")
+> agentloop\cli.py:554:    print("  [7mstatus[0m: CANCELLED")[0m
+[7m[0m  agentloop\cli.py:555:    print(f"  next_action: {next_action(state)}")[0m
+[7m[0m  agentloop\cli.py:556:    return 0[0m
+  agentloop\cli.py:557:
+  agentloop\cli.py:558:
+> agentloop\cli.py:559:def cmd_[7mrun[0m(root: Path, task_id: str | None, wait: bool) -> int:[0m
+[7m[0m  agentloop\cli.py:560:    tid = resolve_task_id(root, task_id)[0m
+[7m[0m  agentloop\cli.py:561:    try:[0m
+  agentloop\cli.py:562:        with task_lock(root, tid, blocking=wait):
+> agentloop\cli.py:563:            state = [7mrun[0m_task(root, task_id=tid)[0m
+[7m[0m  agentloop\cli.py:564:    except LockHeld as exc:[0m
+[7m[0m  agentloop\cli.py:565:        print(f"error: {exc}", file=sys.stderr)[0m
+  agentloop\cli.py:566:        return 2
+> agentloop\cli.py:567:    print("AgentLoop [7mrun[0m completed.")[0m
+[7m[0m  agentloop\cli.py:568:    print(f"  task_id: {state.get('task_id')}")[0m
+> agentloop\cli.py:569:    print(f"  [7mstatus[0m: {state.get('status')}")[0m
+[7m[0m  agentloop\cli.py:570:    print(f"  current_phase: {state.get('current_phase')}")[0m
+[7m[0m  agentloop\cli.py:571:    print(f"  iteration: {state.get('iteration')}/{state.get('max_iterations')}")[0m
+  agentloop\cli.py:577:
+  agentloop\cli.py:578:
+> agentloop\cli.py:579:# ---------- [7mrun[0mtime commands (unchanged) ----------[0m
+[7m[0m  agentloop\cli.py:580:[0m
+[7m[0m  agentloop\cli.py:581:[0m
+> agentloop\cli.py:582:def cmd_[7mrun[0mtime_list(root: Path) -> int:
+> agentloop\cli.py:583:    config = list_[7mrun[0mtimes(root)
+> agentloop\cli.py:584:    print("AgentLoop [7mrun[0mtimes")
+> agentloop\cli.py:585:    print(f"  default_[7mrun[0mtime: {config.get('default_runtime', '-')}")
+> agentloop\cli.py:586:    print("  [7mrun[0mtimes:")
+> agentloop\cli.py:587:    for name, [7mrun[0mtime in sorted(config.get("runtimes", {}).items()):
+> agentloop\cli.py:588:        adapter = [7mrun[0mtime.get("adapter", "command") if isinstance(runtime, dict) else "-"
+> agentloop\cli.py:589:        command = [7mrun[0mtime.get("command", "") if isinstance(runtime, dict) else ""[0m
+[7m[0m  agentloop\cli.py:590:        suffix = f" command={command}" if command else ""[0m
+[7m[0m  agentloop\cli.py:591:        print(f"    - {name}: adapter={adapter}{suffix}")[0m
+  agentloop\cli.py:592:    print("  roles:")
+  agentloop\cli.py:593:    for role, role_config in sorted(config.get("roles", {}).items()):
+> agentloop\cli.py:594:        [7mrun[0mtime [0m[7m[0m= [0m[7m[0mrole_config.get("runtime", [0m[7m[0mconfig.get("default_runtime", [0m[7m[0m"-")) [0m[7m[0mif [0m
+[7m[0misinstance(role_config, [0m[7m[0mdict) [0m[7m[0melse [0m[7m[0m"-"[0m
+> agentloop\cli.py:595:        print(f"    - {role}: {[7mrun[0mtime}")[0m
+[7m[0m  agentloop\cli.py:596:    return 0[0m
+[7m[0m  agentloop\cli.py:597:[0m
+  agentloop\cli.py:598:
+> agentloop\cli.py:599:def cmd_[7mrun[0mtime_detect(root: Path, replace: bool) -> int:[0m
+> agentloop\cli.py:600:    print_detect_summary(detect_[7mrun[0mtimes(root, replace=replace))[0m
+[7m[0m  agentloop\cli.py:601:    return 0[0m
+[7m[0m  agentloop\cli.py:602:[0m
+  agentloop\cli.py:603:
+> agentloop\cli.py:604:def cmd_[7mrun[0mtime_add_command(root: Path, args: argparse.Namespace) -> int:[0m
+> agentloop\cli.py:605:    [7mrun[0mtime_args = list(args.arg or [])[0m
+[7m[0m  agentloop\cli.py:606:    if args.args:[0m
+> agentloop\cli.py:607:        [7mrun[0mtime_args.extend(shlex.split(args.args))
+> agentloop\cli.py:608:    config = add_command_[7mrun[0mtime([0m
+[7m[0m  agentloop\cli.py:609:        root,[0m
+[7m[0m  agentloop\cli.py:610:        name=args.name,[0m
+> agentloop\cli.py:611:        command=args.[7mrun[0mtime_executable,
+> agentloop\cli.py:612:        args=[7mrun[0mtime_args,[0m
+[7m[0m  agentloop\cli.py:613:        stdin_file=args.stdin_file,[0m
+[7m[0m  agentloop\cli.py:614:        timeout_seconds=args.timeout_seconds,[0m
+  agentloop\cli.py:616:        replace=args.replace,
+  agentloop\cli.py:617:    )
+> agentloop\cli.py:618:    print("[7mRun[0mtime added.")[0m
+[7m[0m  agentloop\cli.py:619:    print(f"  name: {args.name}")[0m
+[7m[0m  agentloop\cli.py:620:    print("  adapter: command")[0m
+> agentloop\cli.py:621:    print(f"  command: {args.[7mrun[0mtime_executable}")
+> agentloop\cli.py:622:    print(f"  args: {[7mrun[0mtime_args}")[0m
+[7m[0m  agentloop\cli.py:623:    if args.stdin_file:[0m
+[7m[0m  agentloop\cli.py:624:        print(f"  stdin_file: {args.stdin_file}")[0m
+> agentloop\cli.py:625:    print(f"  default_[7mrun[0mtime: {config.get('default_runtime')}")[0m
+[7m[0m  agentloop\cli.py:626:    return 0[0m
+[7m[0m  agentloop\cli.py:627:[0m
+  agentloop\cli.py:628:
+> agentloop\cli.py:629:def cmd_[7mrun[0mtime_add_preset(root: Path, args: argparse.Namespace) -> int:[0m
+> agentloop\cli.py:630:    config = add_preset_[7mrun[0mtime([0m
+[7m[0m  agentloop\cli.py:631:        root,[0m
+[7m[0m  agentloop\cli.py:632:        preset=args.preset,[0m
+  agentloop\cli.py:636:        replace=args.replace,
+  agentloop\cli.py:637:    )
+> agentloop\cli.py:638:    print("[7mRun[0mtime preset added.")[0m
+[7m[0m  agentloop\cli.py:639:    print(f"  preset: {args.preset}")[0m
+> agentloop\cli.py:640:    print(f"  default_[7mrun[0mtime: {config.get('default_runtime')}")[0m
+[7m[0m  agentloop\cli.py:641:    if args.assign_all:[0m
+[7m[0m  agentloop\cli.py:642:        print("  assigned: all roles")[0m
+  agentloop\cli.py:648:
+  agentloop\cli.py:649:
+> agentloop\cli.py:650:def cmd_[7mrun[0mtime_assign(root: Path, role: str, runtime: str) -> int:[0m
+> agentloop\cli.py:651:    assign_[7mrun[0mtime(root, role, runtime)
+> agentloop\cli.py:652:    print("[7mRun[0mtime assigned.")[0m
+[7m[0m  agentloop\cli.py:653:    print(f"  role: {role}")[0m
+> agentloop\cli.py:654:    print(f"  [7mrun[0mtime: {runtime}")[0m
+[7m[0m  agentloop\cli.py:655:    return 0[0m
+[7m[0m  agentloop\cli.py:656:[0m
+  agentloop\cli.py:657:
+> agentloop\cli.py:658:def cmd_[7mrun[0mtime_assign_all(root: Path, runtime: str, except_roles: list[str]) -> int:[0m
+> agentloop\cli.py:659:    assign_all_[7mrun[0mtime(root, runtime, except_roles=except_roles)
+> agentloop\cli.py:660:    print("[7mRun[0mtime assigned to roles.")
+> agentloop\cli.py:661:    print(f"  [7mrun[0mtime: {runtime}")[0m
+[7m[0m  agentloop\cli.py:662:    if except_roles:[0m
+[7m[0m  agentloop\cli.py:663:        print(f"  except: {', '.join(except_roles)}")[0m
+  agentloop\cli.py:667:
+  agentloop\cli.py:668:
+> agentloop\cli.py:669:def cmd_[7mrun[0mtime_set_default(root: Path, runtime: str) -> int:[0m
+> agentloop\cli.py:670:    set_default_[7mrun[0mtime(root, runtime)
+> agentloop\cli.py:671:    print("Default [7mrun[0mtime updated.")
+> agentloop\cli.py:672:    print(f"  default_[7mrun[0mtime: {runtime}")[0m
+[7m[0m  agentloop\cli.py:673:    return 0[0m
+[7m[0m  agentloop\cli.py:674:[0m
+  agentloop\cli.py:675:
+> agentloop\cli.py:676:def cmd_[7mrun[0mtime_verify(root: Path, runtime: str, timeout_seconds: int) -> int:[0m
+> agentloop\cli.py:677:    result = verify_[7mrun[0mtime(root, runtime, timeout_seconds=timeout_seconds)
+> agentloop\cli.py:678:    print("[7mRun[0mtime verified.")
+> agentloop\cli.py:679:    print(f"  [7mrun[0mtime: {runtime}")[0m
+[7m[0m  agentloop\cli.py:680:    print(f"  exit_code: {result.get('exit_code')}")[0m
+[7m[0m  agentloop\cli.py:681:    print(f"  stdout_log: {result.get('stdout_log')}")[0m
+  agentloop\cli.py:682:    print(f"  stderr_log: {result.get('stderr_log')}")
+> agentloop\cli.py:683:    print("  artifact: .agentloop/artifacts/[7mrun[0mtime-verify.txt")[0m
+[7m[0m  agentloop\cli.py:684:    return 0[0m
+[7m[0m  agentloop\cli.py:685:[0m
+  agentloop\cli.py:701:    try:
+  agentloop\cli.py:702:        if args.command == "init":
+> agentloop\cli.py:703:            return cmd_init(root, detect=args.detect_[7mrun[0mtimes, [0m
+[7m[0mreplace_runtimes=args.replace_runtimes)[0m
+> agentloop\cli.py:704:        if args.command == "[7mstatus[0m":
+> agentloop\cli.py:705:            return cmd_[7mstatus[0m(root, _resolve_task_arg(args))
+> agentloop\cli.py:706:        if args.command == "[7mtasks[0m":
+> agentloop\cli.py:707:            if args.[7mtasks[0m_command in {None, "list"}:
+> agentloop\cli.py:708:                [7mstatus[0mes = list(getattr(args, "statuses", []) or [])[0m
+[7m[0m  agentloop\cli.py:709:                as_json = bool(getattr(args, "as_json", False))[0m
+> agentloop\cli.py:710:                return cmd_[7mtasks[0m_list(root, statuses, as_json)
+> agentloop\cli.py:711:            if args.[7mtasks[0m_command == "delete":
+> agentloop\cli.py:712:                return cmd_[7mtasks[0m_delete(root, args.task_id)
+> agentloop\cli.py:713:            if args.[7mtasks[0m_command in {"delete-all", "clear"}:
+> agentloop\cli.py:714:                return cmd_[7mtasks[0m_delete_all(root)
+> agentloop\cli.py:715:            if args.[7mtasks[0m_command == "unlock":
+> agentloop\cli.py:716:                return cmd_[7mtasks[0m_unlock(root, args.task_id)
+> agentloop\cli.py:717:            if args.[7mtasks[0m_command == "migrate":
+> agentloop\cli.py:718:                return cmd_[7mtasks[0m_migrate(root)
+> agentloop\cli.py:719:            if args.[7mtasks[0m_command == "approve":
+> agentloop\cli.py:720:                return cmd_[7mtasks[0m_batch_approve(root, args)
+> agentloop\cli.py:721:            if args.[7mtasks[0m_command == "cancel":
+> agentloop\cli.py:722:                return cmd_[7mtasks[0m_batch_cancel(root, args)
+> agentloop\cli.py:723:            if args.[7mtasks[0m_command == "run":
+> agentloop\cli.py:724:                return cmd_[7mtasks[0m_batch_run(root, args)
+> agentloop\cli.py:725:            if args.[7mtasks[0m_command == "config":[0m
+[7m[0m  agentloop\cli.py:726:                if args.config_command == "show":[0m
+> agentloop\cli.py:727:                    return cmd_[7mtasks[0m_config_show(root, args.task_id, args.effective)[0m
+[7m[0m  agentloop\cli.py:728:                if args.config_command == "set":[0m
+> agentloop\cli.py:729:                    return cmd_[7mtasks[0m_config_set(root, args)[0m
+[7m[0m  agentloop\cli.py:730:                if args.config_command == "unset":[0m
+> agentloop\cli.py:731:                    return cmd_[7mtasks[0m_config_unset(root, args)[0m
+[7m[0m  agentloop\cli.py:732:                if args.config_command == "clear":[0m
+> agentloop\cli.py:733:                    return cmd_[7mtasks[0m_config_clear(root, args)
+> agentloop\cli.py:734:        if args.command == "[7mstart[0m":
+> agentloop\cli.py:735:            return cmd_[7mstart[0m(root, args.task)
+> agentloop\cli.py:736:        if args.command == "[7mapprove[0m":
+> agentloop\cli.py:737:            return cmd_[7mapprove[0m(root, args.by, _resolve_task_arg(args))[0m
+[7m[0m  agentloop\cli.py:738:        if args.command == "cancel":[0m
+[7m[0m  agentloop\cli.py:739:            return cmd_cancel(root, args.by, _resolve_task_arg(args))[0m
+> agentloop\cli.py:740:        if args.command == "[7mrun[0m":
+> agentloop\cli.py:741:            return cmd_[7mrun[0m(root, _resolve_task_arg(args), args.wait)
+> agentloop\cli.py:742:        if args.command == "[7mrun[0mtime":
+> agentloop\cli.py:743:            if args.[7mrun[0mtime_command == "list":
+> agentloop\cli.py:744:                return cmd_[7mrun[0mtime_list(root)
+> agentloop\cli.py:745:            if args.[7mrun[0mtime_command == "detect":
+> agentloop\cli.py:746:                return cmd_[7mrun[0mtime_detect(root, args.replace)
+> agentloop\cli.py:747:            if args.[7mrun[0mtime_command == "add-command":
+> agentloop\cli.py:748:                return cmd_[7mrun[0mtime_add_command(root, args)
+> agentloop\cli.py:749:            if args.[7mrun[0mtime_command == "add-preset":
+> agentloop\cli.py:750:                return cmd_[7mrun[0mtime_add_preset(root, args)
+> agentloop\cli.py:751:            if args.[7mrun[0mtime_command == "assign":
+> agentloop\cli.py:752:                return cmd_[7mrun[0mtime_assign(root, args.role, args.runtime)
+> agentloop\cli.py:753:            if args.[7mrun[0mtime_command == "assign-all":
+> agentloop\cli.py:754:                return cmd_[7mrun[0mtime_assign_all(root, args.runtime, list(args.except_roles or []))
+> agentloop\cli.py:755:            if args.[7mrun[0mtime_command == "set-default":
+> agentloop\cli.py:756:                return cmd_[7mrun[0mtime_set_default(root, args.runtime)
+> agentloop\cli.py:757:            if args.[7mrun[0mtime_command == "verify":
+> agentloop\cli.py:758:                return cmd_[7mrun[0mtime_verify(root, args.runtime, args.timeout_seconds)[0m
+[7m[0m  agentloop\cli.py:759:    except WorkspaceError as exc:[0m
+[7m[0m  agentloop\cli.py:760:        print(f"error: {exc}", file=sys.stderr)[0m
+
+
+codex
+I’ve got enough context now. The acceptance criteria will focus on a task-management UI over the existing file-backed task model: create/list/detail/update/delete, lifecycle actions, progress visibility from `state.json`, and runtime/test output from `.agentloop/runs`.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "@'
+*** Begin Patch
+*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/analysis.md
++# Analysis
++
++## Goal
++
++Build a usable UI product shape for AgentLoop centered on task management. The UI should let a user create, view, update, and delete AgentLoop tasks, inspect each task's latest lifecycle progress, and read the latest runtime/test return output without needing to manually browse "'`.agentloop` files or run CLI status commands.
++
++The product should feel like a local task operations console for AgentLoop: a task list for scanning work, a detail view for one task, explicit lifecycle controls, editable task configuration where appropriate, and runtime output panels that expose the most recent role/test results.
++
++## Non-Goals
++
++- Do not implement remote/cloud orchestration, multi-user collaboration, authentication, or hosted deployment unless later requested.
++- Do not replace the existing AgentLoop workflow engine or runtime adapter model.
++- Do not invent a separate task storage system when the existing `.agentloop/tasks/<task_id>/state.json`, `config.json`, artifacts, and `.agentloop/runs/` files are the source of truth.
++- Do not require users to understand the full AgentLoop internal lifecycle before they can manage tasks.
++- Do not add generic dashboard features that are not tied to task CRUD, progress, lifecycle control, or runtime output visibility.
++
++## Assumptions
++
++- The first UI can be local-first and workspace-scoped, consistent with AgentLoop'"'s file-backed design.
++- Existing CLI/workflow functions can be reused behind the UI for creating tasks, approving/canceling/running tasks, deleting tasks, and reading task snapshots.
++- A task's latest progress can be derived from "'`state.json` fields such as `status`, `current_phase`, `iteration`, `max_iterations`, `requires_human_approval`, `phases`, `updated_at`, and `acceptance_criteria`.
++- Runtime returns are available through `state.agents` plus stdout/stderr log files under `.agentloop/runs/<task_id>/<iteration>/`, and test command output is available under `.agentloop/runs/<task_id>/<iteration>/tests/`.
++- The UI does not need real-time streaming in the first pass if it can refresh and show the latest persisted state and logs after workflow actions complete.
++- CRUD means create task, read/list task details, update task metadata/configuration where AgentLoop already supports safe updates, and delete tasks.
++
++## Risks
++
++- Long-running `agentloop run` calls may block a simple web request if the UI invokes workflow execution synchronously.
++- Reading logs directly from disk can expose very large outputs; the UI should truncate, paginate, or otherwise bound displayed content.
++- Concurrent CLI and UI operations could race on the same task; the UI should respect existing task locks and show lock/error states clearly.
++- Delete operations are destructive because they remove task state and artifacts; the UI needs confirmation and clear task identity before deletion.
++- Editing task state directly would be risky; updates should use existing task config and workflow APIs instead of arbitrary JSON mutation.
++- Existing task artifacts may be missing or malformed, so the UI must degrade gracefully when state, config, artifacts, or logs are unavailable.
++
++## Open Questions
++
++- Should the UI be implemented as a Python-served local web app inside the existing package, a static frontend with a small local API, or another product form?
++- Should `run` actions execute synchronously with a loading state, or should the UI introduce background execution/job tracking?
++- Which task fields should be user-editable beyond per-task config: title, raw request, max iterations, test commands, role runtime overrides, or only config fields already supported by the CLI?
++- Should runtime output show only the latest role/test logs, or provide an iteration/role log history browser?
++- Should task creation immediately call `start_task` and produce analysis/acceptance artifacts, matching CLI behavior, or create a draft task before analysis?
++- What level of visual verification is expected for the UI: unit tests only, local browser smoke test, or screenshot-based checks?
+*** End Patch
+'"'@ | apply_patch" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+2026-05-19T05:09:56.278764Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.5 seconds
+Output:
+Error: --codex-run-as-apply-patch requires a UTF-8 PATCH argument.
+
+ exited 1 in 1456ms:
+Error: --codex-run-as-apply-patch requires a UTF-8 PATCH argument.
+
+codex
+The first patch attempt hit a PowerShell encoding quirk with `apply_patch`. I’m retrying with an ASCII-only patch invocation so the files are created cleanly.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "apply_patch @'
+*** Begin Patch
+*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/analysis.md
++# Analysis
++
++## Goal
++
++Build a usable UI product shape for AgentLoop centered on task management. The UI should let a user create, view, update, and delete AgentLoop tasks, inspect each task's latest lifecycle progress, and read the latest runtime/test return output without needing to manually browse "'`.agentloop` files or run CLI status commands.
++
++The product should feel like a local task operations console for AgentLoop: a task list for scanning work, a detail view for one task, explicit lifecycle controls, editable task configuration where appropriate, and runtime output panels that expose the most recent role/test results.
++
++## Non-Goals
++
++- Do not implement remote/cloud orchestration, multi-user collaboration, authentication, or hosted deployment unless later requested.
++- Do not replace the existing AgentLoop workflow engine or runtime adapter model.
++- Do not invent a separate task storage system when the existing `.agentloop/tasks/<task_id>/state.json`, `config.json`, artifacts, and `.agentloop/runs/` files are the source of truth.
++- Do not require users to understand the full AgentLoop internal lifecycle before they can manage tasks.
++- Do not add generic dashboard features that are not tied to task CRUD, progress, lifecycle control, or runtime output visibility.
++
++## Assumptions
++
++- The first UI can be local-first and workspace-scoped, consistent with AgentLoop'"'s file-backed design.
++- Existing CLI/workflow functions can be reused behind the UI for creating tasks, approving/canceling/running tasks, deleting tasks, and reading task snapshots.
++- A task's latest progress can be derived from "'`state.json` fields such as `status`, `current_phase`, `iteration`, `max_iterations`, `requires_human_approval`, `phases`, `updated_at`, and `acceptance_criteria`.
++- Runtime returns are available through `state.agents` plus stdout/stderr log files under `.agentloop/runs/<task_id>/<iteration>/`, and test command output is available under `.agentloop/runs/<task_id>/<iteration>/tests/`.
++- The UI does not need real-time streaming in the first pass if it can refresh and show the latest persisted state and logs after workflow actions complete.
++- CRUD means create task, read/list task details, update task metadata/configuration where AgentLoop already supports safe updates, and delete tasks.
++
++## Risks
++
++- Long-running `agentloop run` calls may block a simple web request if the UI invokes workflow execution synchronously.
++- Reading logs directly from disk can expose very large outputs; the UI should truncate, paginate, or otherwise bound displayed content.
++- Concurrent CLI and UI operations could race on the same task; the UI should respect existing task locks and show lock/error states clearly.
++- Delete operations are destructive because they remove task state and artifacts; the UI needs confirmation and clear task identity before deletion.
++- Editing task state directly would be risky; updates should use existing task config and workflow APIs instead of arbitrary JSON mutation.
++- Existing task artifacts may be missing or malformed, so the UI must degrade gracefully when state, config, artifacts, or logs are unavailable.
++
++## Open Questions
++
++- Should the UI be implemented as a Python-served local web app inside the existing package, a static frontend with a small local API, or another product form?
++- Should `run` actions execute synchronously with a loading state, or should the UI introduce background execution/job tracking?
++- Which task fields should be user-editable beyond per-task config: title, raw request, max iterations, test commands, role runtime overrides, or only config fields already supported by the CLI?
++- Should runtime output show only the latest role/test logs, or provide an iteration/role log history browser?
++- Should task creation immediately call `start_task` and produce analysis/acceptance artifacts, matching CLI behavior, or create a draft task before analysis?
++- What level of visual verification is expected for the UI: unit tests only, local browser smoke test, or screenshot-based checks?
+*** End Patch
+'"'@" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+2026-05-19T05:10:11.772553Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.3 seconds
+Output:
+Invalid patch: The last line of the patch must be '*** End Patch'
+
+ exited 1 in 1288ms:
+Invalid patch: The last line of the patch must be '*** End Patch'
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$OutputEncoding = [System.Text.UTF8Encoding]::new(); @'"'
+*** Begin Patch
+*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test.txt
++test
+*** End Patch
+'@ | apply_patch" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+2026-05-19T05:10:22.279651Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.4 seconds
+Output:
+Error: --codex-run-as-apply-patch requires a UTF-8 PATCH argument.
+
+ exited 1 in 1420ms:
+Error: --codex-run-as-apply-patch requires a UTF-8 PATCH argument.
+
+codex
+`apply_patch` is available but the wrapper is strict about how PowerShell passes patch text. I’m switching to a direct here-string argument form and will remove the temporary probe if it appears.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'apply_patch @"
+*** Begin Patch
+*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test.txt
++test
+*** End Patch
+"@' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+2026-05-19T05:10:32.309430Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.4 seconds
+Output:
+Invalid patch: The last line of the patch must be '*** End Patch'
+
+ exited 1 in 1357ms:
+Invalid patch: The last line of the patch must be '*** End Patch'
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$patch = "*** Begin Patch`n*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test.txt`n+test`n*** End Patch"; apply_patch $patch' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+2026-05-19T05:10:39.456125Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.5 seconds
+Output:
+Invalid patch: The last line of the patch must be '*** End Patch'
+
+ exited 1 in 1499ms:
+Invalid patch: The last line of the patch must be '*** End Patch'
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'Get-Command apply_patch | Format-List *' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1453ms:
+
+[32;1mHelpUri            : [0m
+[32;1mFileVersionInfo    : [0mFile:             C:\Users\chenlujiao\.codex\tmp\arg0\codex-arg0cx24Oj\apply_patch.bat
+                     InternalName:     
+                     OriginalFilename: 
+                     FileVersion:      
+                     FileDescription:  
+                     Product:          
+                     ProductVersion:   
+                     Debug:            False
+                     Patched:          False
+                     PreRelease:       False
+                     PrivateBuild:     False
+                     SpecialBuild:     False
+                     Language:         
+                     
+[32;1mPath               : [0mC:\Users\chenlujiao\.codex\tmp\arg0\codex-arg0cx24Oj\apply_patch.bat
+[32;1mExtension          : [0m.bat
+[32;1mDefinition         : [0mC:\Users\chenlujiao\.codex\tmp\arg0\codex-arg0cx24Oj\apply_patch.bat
+[32;1mSource             : [0mC:\Users\chenlujiao\.codex\tmp\arg0\codex-arg0cx24Oj\apply_patch.bat
+[32;1mVersion            : [0m0.0.0.0
+[32;1mVisibility         : [0mPublic
+[32;1mOutputType         : [0m{System.String}
+[32;1mName               : [0mapply_patch.bat
+[32;1mCommandType        : [0mApplication
+[32;1mModuleName         : [0m
+[32;1mModule             : [0m
+[32;1mRemotingCapability : [0mPowerShell
+[32;1mParameters         : [0m
+[32;1mParameterSets      : [0m
+
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "bash -lc \"apply_patch <<'PATCH'
+*** Begin Patch
+*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test.txt
++test
+*** End Patch
+PATCH\"" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+2026-05-19T05:10:59.487920Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.2 seconds
+Output:
+W i n d o w s   S u b s y s t e m   f o r   L i n u x   h a s   n o   i n s t a l l e d   d i s t r i b u t i o n s . 
+ 
+ 
+ 
+ U s e   ' w s l . e x e   - - l i s t   - - o n l i n e '   t o   l i s t   a v a i l a b l e   d i s t r i b u t i o n s 
+ 
+ a n d   ' w s l . e x e   - - i n s t a l l   < D i s t r o > '   t o   i n s t a l l . 
+ 
+ 
+ 
+ D i s t r i b u t i o n s   c a n   a l s o   b e   i n s t a l l e d   b y   v i s i t i n g   t h e   M i c r o s o f t   S t o r e : 
+ 
+ h t t p s : / / a k a . m s / w s l s t o r e 
+ 
+ E r r o r   c o d e :   B a s h / S e r v i c e / C r e a t e I n s t a n c e / G e t D e f a u l t D i s t r o / W S L _ E _ D E F A U L T _ D I S T R O _ N O T _ F O U N D 
+ 
+ 
+ exited 1 in 1164ms:
+W i n d o w s   S u b s y s t e m   f o r   L i n u x   h a s   n o   i n s t a l l e d   d i s t r i b u t i o n s . 
+ 
+ 
+ 
+ U s e   ' w s l . e x e   - - l i s t   - - o n l i n e '   t o   l i s t   a v a i l a b l e   d i s t r i b u t i o n s 
+ 
+ a n d   ' w s l . e x e   - - i n s t a l l   < D i s t r o > '   t o   i n s t a l l . 
+ 
+ 
+ 
+ D i s t r i b u t i o n s   c a n   a l s o   b e   i n s t a l l e d   b y   v i s i t i n g   t h e   M i c r o s o f t   S t o r e : 
+ 
+ h t t p s : / / a k a . m s / w s l s t o r e 
+ 
+ E r r o r   c o d e :   B a s h / S e r v i c e / C r e a t e I n s t a n c e / G e t D e f a u l t D i s t r o / W S L _ E _ D E F A U L T _ D I S T R O _ N O T _ F O U N D 
+ 
+ 
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'Get-Content (Get-Command apply_patch).Path' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1099ms:
+@echo off
+"C:\Users\chenlujiao\AppData\Roaming\npm\node_modules\@openai\codex\node_modules\@openai\codex-win32-x64\vendor\x86_64-pc-windows-msvc\codex\codex.exe" --codex-run-as-apply-patch %*
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$exe = '"'C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe'
+"'$patch = @'"'
+*** Begin Patch
+*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test.txt
++test
+*** End Patch
+'@
+"'$p = Start-Process -FilePath $exe -ArgumentList @('"'--codex-run-as-apply-patch', "'$patch) -NoNewWindow -Wait -PassThru
+exit $p.ExitCode' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+2026-05-19T05:11:14.618044Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 2.3 seconds
+Output:
+Invalid patch: The first line of the patch must be '*** Begin Patch'
+
+ exited 1 in 2316ms:
+Invalid patch: The first line of the patch must be '*** Begin Patch'
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$exe = '"'C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe'
+"'$lines = @('"'*** Begin Patch','*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test.txt','+test','*** End Patch')
+"'$patch = [string]::Join("`n", $lines)
+& $exe --codex-run-as-apply-patch $patch' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1692ms:
+Success. Updated the following files:
+A .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test.txt
+
+codex
+I found the working `apply_patch` path and confirmed it with a small probe file. I’m now applying the real artifact patch and removing that probe in the same scoped edit.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$exe = '"'C:\\Users\\chenlujiao\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\codex\\codex.exe'
+"'$lines = @(
+'"'*** Begin Patch',
+'*** Delete File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test.txt',
+'*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/analysis.md',
+'+# Analysis',
+'+',
+'+## Goal',
+'+',
+'+Build a usable UI product shape for AgentLoop centered on task management. The UI should let a user create, view, update, and delete AgentLoop tasks, inspect each task''s latest lifecycle progress, and read the latest runtime/test return output without needing to manually browse "'`.agentloop` files or run CLI status commands.'"',
+'+',
+'+The product should feel like a local task operations console for AgentLoop: a task list for scanning work, a detail view for one task, explicit lifecycle controls, editable task configuration where appropriate, and runtime output panels that expose the most recent role/test results.',
+'+',
+'+## Non-Goals',
+'+',
+'+- Do not implement remote/cloud orchestration, multi-user collaboration, authentication, or hosted deployment unless later requested.',
+'+- Do not replace the existing AgentLoop workflow engine or runtime adapter model.',
+'+- Do not invent a separate task storage system when the existing "'`.agentloop/tasks/<task_id>/state.json`, `config.json`, artifacts, and `.agentloop/runs/` files are the source of truth.'"',
+'+- Do not require users to understand the full AgentLoop internal lifecycle before they can manage tasks.',
+'+- Do not add generic dashboard features that are not tied to task CRUD, progress, lifecycle control, or runtime output visibility.',
+'+',
+'+## Assumptions',
+'+',
+'+- The first UI can be local-first and workspace-scoped, consistent with AgentLoop''s file-backed design.',
+'+- Existing CLI/workflow functions can be reused behind the UI for creating tasks, approving/canceling/running tasks, deleting tasks, and reading task snapshots.',
+'+- A task''s latest progress can be derived from "'`state.json` fields such as `status`, `current_phase`, `iteration`, `max_iterations`, `requires_human_approval`, `phases`, `updated_at`, and `acceptance_criteria`.'"',
+'+- Runtime returns are available through "'`state.agents` plus stdout/stderr log files under `.agentloop/runs/<task_id>/<iteration>/`, and test command output is available under `.agentloop/runs/<task_id>/<iteration>/tests/`.'"',
+'+- The UI does not need real-time streaming in the first pass if it can refresh and show the latest persisted state and logs after workflow actions complete.',
+'+- CRUD means create task, read/list task details, update task metadata/configuration where AgentLoop already supports safe updates, and delete tasks.',
+'+',
+'+## Risks',
+'+',
+'+- Long-running "'`agentloop run` calls may block a simple web request if the UI invokes workflow execution synchronously.'"',
+'+- Reading logs directly from disk can expose very large outputs; the UI should truncate, paginate, or otherwise bound displayed content.',
+'+- Concurrent CLI and UI operations could race on the same task; the UI should respect existing task locks and show lock/error states clearly.',
+'+- Delete operations are destructive because they remove task state and artifacts; the UI needs confirmation and clear task identity before deletion.',
+'+- Editing task state directly would be risky; updates should use existing task config and workflow APIs instead of arbitrary JSON mutation.',
+'+- Existing task artifacts may be missing or malformed, so the UI must degrade gracefully when state, config, artifacts, or logs are unavailable.',
+'+',
+'+## Open Questions',
+'+',
+'+- Should the UI be implemented as a Python-served local web app inside the existing package, a static frontend with a small local API, or another product form?',
+'+- Should "'`run` actions execute synchronously with a loading state, or should the UI introduce background execution/job tracking?'"',
+'+- Which task fields should be user-editable beyond per-task config: title, raw request, max iterations, test commands, role runtime overrides, or only config fields already supported by the CLI?',
+'+- Should runtime output show only the latest role/test logs, or provide an iteration/role log history browser?',
+'+- Should task creation immediately call "'`start_task` and produce analysis/acceptance artifacts, matching CLI behavior, or create a draft task before analysis?'"',
+'+- What level of visual verification is expected for the UI: unit tests only, local browser smoke test, or screenshot-based checks?',
+'*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.md',
+'+# Acceptance Criteria',
+'+',
+'+| ID | Required | Verification | Criterion | Status | Evidence |',
+'+| --- | --- | --- | --- | --- | --- |',
+'+| AC-1 | yes | functional test or browser smoke test | The UI provides a task list that reads existing AgentLoop tasks from "'`.agentloop/tasks`, shows each task'"''s id, title, status, phase, iteration progress, updated time, and clearly indicates the current task when known. | pending | UI task list rendering with seeded task states |',
+'+| AC-2 | yes | functional test | A user can create a new task from the UI by entering a task request; creation uses AgentLoop''s existing task start behavior and results in a new task directory with "'`state.json`, `analysis.md`, `acceptance.md`, and `acceptance.json`. | pending | Created task files and UI confirmation |'"',
+'+| AC-3 | yes | functional test or browser smoke test | A user can open a task detail view that shows the task request/title, status, current phase, iteration count, approval requirement, phase statuses, acceptance criteria, and available artifact links or previews. | pending | Detail view rendering for a task with artifacts |',
+'+| AC-4 | yes | functional test | A user can update supported per-task settings from the UI, at minimum "'`max_iterations` and `test_commands`, using existing AgentLoop config validation and persisting changes to the task'"''s "'`config.json`. | pending | Updated `config.json` and reflected UI state |'"',
+'+| AC-5 | yes | functional test | A user can delete a task from the UI after explicit confirmation; the task disappears from the list and its task directory is removed using the same safety boundaries as existing task deletion behavior. | pending | Deleted task no longer listed and directory removed |',
+'+| AC-6 | yes | functional test | The UI exposes valid lifecycle actions for the selected task, including approve when waiting for alignment, cancel when cancellable, and run/resume when ready, while disabling or explaining invalid actions based on current status. | pending | Status-specific action availability and state transitions |',
+'+| AC-7 | yes | functional test or browser smoke test | The UI shows the latest task progress after lifecycle actions by refreshing persisted state fields, including status, current phase, phase statuses, iteration/max iteration, and acceptance criteria statuses. | pending | State change visible after approve/run/cancel |',
+'+| AC-8 | yes | functional test | The UI shows runtime return information for the latest relevant iteration, including role, runtime, command when available, exit code, duration when available, produced artifacts, and readable stdout/stderr log content or clear missing-log messages. | pending | Latest "'`state.agents` entries and runtime log display |'"',
+'+| AC-9 | yes | functional test | The UI shows local test command output for the latest iteration when present, including command, exit code, duration, and log content from "'`.agentloop/runs/<task_id>/<iteration>/tests/`. | pending | Test log display for a task with configured tests |'"',
+'+| AC-10 | yes | review and functional test | The implementation handles missing or malformed task files, missing artifacts, empty runtime logs, and long logs without crashing; long log content is bounded in the UI. | pending | Error/empty-state cases covered by test or manual verification |',
+'+| AC-11 | yes | automated tests | Core task UI data-loading and mutation paths are covered by tests that use temporary workspaces and do not depend on a user''s real "'`.agentloop` data. | pending | Test suite output |'"',
+'+| AC-12 | yes | manual review | The UI is task-management first: first screen is the usable task console, not a marketing page, and it uses clear controls for task CRUD, lifecycle actions, progress, and runtime output. | pending | Manual UI review |',
+'*** Add File: .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.json',
+'+{',
+'+  \"acceptance_criteria\": [',
+'+    {',
+'+      \"id\": \"AC-1\",',
+'+      \"description\": \"The UI provides a task list that reads existing AgentLoop tasks from "'`.agentloop/tasks`, shows each task'"''s id, title, status, phase, iteration progress, updated time, and clearly indicates the current task when known.\",',
+'+      \"verification\": \"functional test or browser smoke test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"UI task list rendering with seeded task states\"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-2\",',
+'+      \"description\": \"A user can create a new task from the UI by entering a task request; creation uses AgentLoop''s existing task start behavior and results in a new task directory with "'`state.json`, `analysis.md`, `acceptance.md`, and `acceptance.json`.",'"',
+'+      \"verification\": \"functional test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Created task files and UI confirmation\"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-3\",',
+'+      \"description\": \"A user can open a task detail view that shows the task request/title, status, current phase, iteration count, approval requirement, phase statuses, acceptance criteria, and available artifact links or previews.\",',
+'+      \"verification\": \"functional test or browser smoke test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Detail view rendering for a task with artifacts\"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-4\",',
+'+      \"description\": \"A user can update supported per-task settings from the UI, at minimum "'`max_iterations` and `test_commands`, using existing AgentLoop config validation and persisting changes to the task'"''s "'`config.json`.",'"',
+'+      \"verification\": \"functional test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Updated "'`config.json` and reflected UI state"'"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-5\",',
+'+      \"description\": \"A user can delete a task from the UI after explicit confirmation; the task disappears from the list and its task directory is removed using the same safety boundaries as existing task deletion behavior.\",',
+'+      \"verification\": \"functional test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Deleted task no longer listed and directory removed\"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-6\",',
+'+      \"description\": \"The UI exposes valid lifecycle actions for the selected task, including approve when waiting for alignment, cancel when cancellable, and run/resume when ready, while disabling or explaining invalid actions based on current status.\",',
+'+      \"verification\": \"functional test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Status-specific action availability and state transitions\"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-7\",',
+'+      \"description\": \"The UI shows the latest task progress after lifecycle actions by refreshing persisted state fields, including status, current phase, phase statuses, iteration/max iteration, and acceptance criteria statuses.\",',
+'+      \"verification\": \"functional test or browser smoke test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"State change visible after approve/run/cancel\"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-8\",',
+'+      \"description\": \"The UI shows runtime return information for the latest relevant iteration, including role, runtime, command when available, exit code, duration when available, produced artifacts, and readable stdout/stderr log content or clear missing-log messages.\",',
+'+      \"verification\": \"functional test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Latest "'`state.agents` entries and runtime log display"'"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-9\",',
+'+      \"description\": \"The UI shows local test command output for the latest iteration when present, including command, exit code, duration, and log content from "'`.agentloop/runs/<task_id>/<iteration>/tests/`.",'"',
+'+      \"verification\": \"functional test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Test log display for a task with configured tests\"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-10\",',
+'+      \"description\": \"The implementation handles missing or malformed task files, missing artifacts, empty runtime logs, and long logs without crashing; long log content is bounded in the UI.\",',
+'+      \"verification\": \"review and functional test\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Error/empty-state cases covered by test or manual verification\"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-11\",',
+'+      \"description\": \"Core task UI data-loading and mutation paths are covered by tests that use temporary workspaces and do not depend on a user''s real "'`.agentloop` data.",'"',
+'+      \"verification\": \"automated tests\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Test suite output\"',
+'+    },',
+'+    {',
+'+      \"id\": \"AC-12\",',
+'+      \"description\": \"The UI is task-management first: first screen is the usable task console, not a marketing page, and it uses clear controls for task CRUD, lifecycle actions, progress, and runtime output.\",',
+'+      \"verification\": \"manual review\",',
+'+      \"required\": true,',
+'+      \"status\": \"pending\",',
+'+      \"evidence\": \"Manual UI review\"',
+'+    }',
+'+  ]',
+'+}',
+'*** End Patch'
+)
+"'$patch = [string]::Join("`n", $lines)
+& $exe --codex-run-as-apply-patch $patch' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 2066ms:
+Success. Updated the following files:
+A .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/analysis.md
+A .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.md
+A .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.json
+D .agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/test.txt
+
+codex
+The three requested artifacts are written. I’m doing a quick read/JSON parse check now, limited to verifying the files exist and the JSON schema shape is valid.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-ChildItem -Force .agentloop\\tasks\\20260519-050850-agentloop-ui-crud-runtime\\artifacts" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$json = Get-Content .agentloop'"\\tasks\\20260519-050850-agentloop-ui-crud-runtime\\artifacts\\acceptance.json -Raw | ConvertFrom-Json; "'$json.acceptance_criteria | Select-Object -First 1 | Format-List; '"'count=' + "'$json.acceptance_criteria.Count' in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content .agentloop\\tasks\\20260519-050850-agentloop-ui-crud-runtime\\artifacts\\analysis.md -TotalCount 8" in C:\Users\chenlujiao\OneDrive - Microsoft\Documents\AutoPilot
+ succeeded in 1324ms:
+# Analysis
+
+## Goal
+
+Build a usable UI product shape for AgentLoop centered on task management. The UI should let a user create, view, update, and delete AgentLoop tasks, inspect each task's latest lifecycle progress, and read the latest runtime/test return output without needing to manually browse `.agentloop` files or run CLI status commands.
+
+The product should feel like a local task operations console for AgentLoop: a task list for scanning work, a detail view for one task, explicit lifecycle controls, editable task configuration where appropriate, and runtime output panels that expose the most recent role/test results.
+
+
+ succeeded in 1341ms:
+
+    Directory: C:\Users\chenlujiao\OneDrive - 
+Microsoft\Documents\AutoPilot\.agentloop\tasks\20260519-050850-agentloop-ui-crud-runtime\artifacts
+
+[32;1mMode   [0m[32;1m              LastWriteTime[0m[32;1m         Length[0m[32;1m Name[0m
+[32;1m----   [0m [32;1m             -------------[0m [32;1m        ------[0m [32;1m----[0m
+-a---           5/19/2026  1:12 PM           5129 acceptance.json
+-a---           5/19/2026  1:12 PM           3757 acceptance.md
+-a---           5/19/2026  1:12 PM           4057 analysis.md
+
+
+ succeeded in 1326ms:
+
+[32;1mid           : [0mAC-1
+[32;1mdescription  : [0mThe UI provides a task list that reads existing AgentLoop tasks from `.agentloop/tasks`, shows each 
+               task's id, title, status, phase, iteration progress, updated time, and clearly indicates the current 
+               task when known.
+[32;1mverification : [0mfunctional test or browser smoke test
+[32;1mrequired     : [0mTrue
+[32;1mstatus       : [0mpending
+[32;1mevidence     : [0mUI task list rendering with seeded task states
+
+count=12
+
+codex
+Created the requested task-specific artifacts and stopped before execution:
+
+- [analysis.md](</C:/Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/analysis.md>)
+- [acceptance.md](</C:/Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.md>)
+- [acceptance.json](</C:/Users/chenlujiao/OneDrive - Microsoft/Documents/AutoPilot/.agentloop/tasks/20260519-050850-agentloop-ui-crud-runtime/artifacts/acceptance.json>)
+
+Validation done: the JSON parses successfully and contains 12 `pending` acceptance criteria.
+tokens used
+1,327,615

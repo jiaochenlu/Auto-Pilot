@@ -1,0 +1,82 @@
+{
+  "decision": "APPROVED",
+  "summary": "Iteration 2 resolves the previous AC-9 gap. The AgentLoop Task Console now supports task CRUD, detail/progress views, lifecycle actions, per-task config updates, artifact previews, agent runtime output, and structured local test output with command, exit_code, duration_ms, and bounded logs. Focused UI/API tests and the full repository test suite both passed with exit_code 0.",
+  "open_medium_high_count": 0,
+  "comments": [],
+  "acceptance_results": [
+    {
+      "criteria_id": "AC-1",
+      "status": "passed",
+      "evidence": "build_task_list and the UI task list read .agentloop/tasks and expose task_id, title, status, current_phase, iteration/max_iterations, updated_at, current marker, and lock/error state. Covered by test_task_list_marks_current_and_handles_malformed_state and HTTP /api/tasks coverage."
+    },
+    {
+      "criteria_id": "AC-2",
+      "status": "passed",
+      "evidence": "create_task uses start_task and produces the expected task artifacts. Covered by test_create_task_uses_workflow_artifacts and POST /api/tasks integration coverage."
+    },
+    {
+      "criteria_id": "AC-3",
+      "status": "passed",
+      "evidence": "build_task_detail returns task title/request, status, phase, iteration count, approval flag, phase statuses, acceptance criteria, artifact previews, runtime, config, and actions; the Overview, Artifacts, Config, and Runtime tabs render these fields. Covered by UI/API detail tests and source review."
+    },
+    {
+      "criteria_id": "AC-4",
+      "status": "passed",
+      "evidence": "PATCH /api/tasks/<task_id>/config supports max_iterations and test_commands and persists them to the per-task config.json through existing validation paths. Covered by test_patch_config_and_delete_task and HTTP integration coverage."
+    },
+    {
+      "criteria_id": "AC-5",
+      "status": "passed",
+      "evidence": "DELETE /api/tasks/<task_id> requires exact task id confirmation, removes the task directory within the .agentloop/tasks boundary, and rejects incorrect confirmation. Covered by test_patch_config_and_delete_task and HTTP integration coverage."
+    },
+    {
+      "criteria_id": "AC-6",
+      "status": "passed",
+      "evidence": "available_actions exposes approve, run, cancel, delete, and config action state with disabled reasons when invalid or locked. Covered by test_actions_reflect_status and source review of lifecycle buttons."
+    },
+    {
+      "criteria_id": "AC-7",
+      "status": "passed",
+      "evidence": "Lifecycle API mutations return fresh task detail and the frontend reloads task list/detail after approve, run, and cancel. Action state transition after approve is covered by test_actions_reflect_status."
+    },
+    {
+      "criteria_id": "AC-8",
+      "status": "passed",
+      "evidence": "latest_runtime_summary returns latest iteration agent entries with role, runtime, adapter, command, exit_code, duration_ms, artifacts, bounded stdout, and bounded stderr; renderRuntime displays this data. Covered by test_detail_includes_artifacts_runtime_and_test_logs."
+    },
+    {
+      "criteria_id": "AC-9",
+      "status": "passed",
+      "evidence": "Iteration 2 now merges structured review test_results with latest iteration test logs and renders command, exit_code, duration_ms, and log content. Covered by test_detail_merges_structured_test_result_metadata, test_detail_includes_structured_test_result_with_missing_log, and full-suite execution."
+    },
+    {
+      "criteria_id": "AC-10",
+      "status": "passed",
+      "evidence": "Malformed task state, missing logs, missing artifacts, and long logs are handled with error or missing payloads and bounded_text/bounded_workspace_file limits. Covered by malformed-state and missing-log tests plus source review."
+    },
+    {
+      "criteria_id": "AC-11",
+      "status": "passed",
+      "evidence": "Core UI/API loading and mutation tests use TemporaryDirectory workspaces and do not depend on the user's real .agentloop data. Both focused and full automated suites passed with exit_code 0."
+    },
+    {
+      "criteria_id": "AC-12",
+      "status": "passed",
+      "evidence": "Manual source review of index.html, app.js, and styles.css confirms the first screen is a task-management console with task list, create, search/filter, detail, CRUD/lifecycle controls, config, artifacts, progress, and runtime output rather than a marketing page."
+    }
+  ],
+  "test_results": [
+    {
+      "command": "python -m unittest tests.test_ui_api -v",
+      "exit_code": 0,
+      "duration_ms": 2581,
+      "summary": "Ran 8 tests; OK. Covered task list/current marker, create artifacts, detail runtime/log data, structured test result metadata, missing test logs, config patching, deletion confirmation, action states, and HTTP/static endpoints."
+    },
+    {
+      "command": "python -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "duration_ms": 25038,
+      "summary": "Ran 58 tests; OK. Full repository suite passed, including UI/API, multitask lifecycle, runtime CLI, adapters, quality gates, and verify tests."
+    }
+  ]
+}

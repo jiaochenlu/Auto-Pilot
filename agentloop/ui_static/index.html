@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgentLoop Task Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <header class="sidebar-header">
+          <div>
+            <h1>AgentLoop</h1>
+            <p>Task Console</p>
+          </div>
+          <div class="header-actions">
+            <button id="settingsBtn" class="icon-button" title="Settings">⚙</button>
+            <button id="refreshBtn" class="icon-button" title="Refresh">↻</button>
+          </div>
+        </header>
+
+        <div class="toolbar">
+          <button id="newTaskBtn" class="primary">New task</button>
+          <input id="searchInput" type="search" placeholder="Search tasks" />
+        </div>
+
+        <div class="segments" id="statusFilter">
+          <button data-filter="all" class="active">All</button>
+          <button data-filter="active">Active</button>
+          <button data-filter="waiting">Waiting</button>
+          <button data-filter="running">Running</button>
+          <button data-filter="done">Done</button>
+        </div>
+
+        <div id="taskList" class="task-list" aria-live="polite"></div>
+      </aside>
+
+      <main class="main">
+        <section class="detail-panel">
+          <div id="banner" class="banner hidden"></div>
+          <header class="detail-header">
+            <div>
+              <div class="eyebrow" id="taskIdLabel">No task selected</div>
+              <h2 id="taskTitle">Select a task</h2>
+              <div class="meta" id="taskMeta"></div>
+            </div>
+            <div class="actions">
+              <button id="approveBtn">Approve</button>
+              <button id="cancelBtn">Cancel</button>
+              <button id="deleteBtn" class="danger">Delete</button>
+            </div>
+          </header>
+
+          <div class="tabs" id="detailTabs">
+            <button data-tab="overview" class="active">Overview</button>
+            <button data-tab="artifacts">Artifacts</button>
+            <button data-tab="config">Config</button>
+            <button data-tab="runtime">Runtime</button>
+          </div>
+
+          <div id="overviewTab" class="tab-panel active">
+            <section id="analysisReviewPanel" class="analysis-review-panel hidden"></section>
+            <section id="humanReviewPanel" class="human-review-panel hidden"></section>
+            <div class="split">
+              <section>
+                <h3>Goal</h3>
+                <pre id="goalText" class="copy-block"></pre>
+              </section>
+              <section>
+                <h3>Phases</h3>
+                <div id="phaseList" class="phase-list"></div>
+              </section>
+            </div>
+            <section>
+              <h3 class="section-head">Acceptance <span id="acceptanceCount" class="section-count"></span></h3>
+              <div id="acceptanceList" class="acceptance-list"></div>
+            </section>
+          </div>
+
+          <div id="artifactsTab" class="tab-panel">
+            <div id="artifactList" class="artifact-list"></div>
+          </div>
+
+          <div id="configTab" class="tab-panel">
+            <form id="configForm" class="config-form">
+              <label>
+                <span>Max iterations</span>
+                <input id="maxIterationsInput" type="number" min="1" />
+              </label>
+              <div>
+                <div class="field-row">
+                  <span>Test commands</span>
+                  <button type="button" id="addCommandBtn">Add</button>
+                </div>
+                <div id="commandsList" class="commands-list"></div>
+              </div>
+              <button class="primary" type="submit">Save config</button>
+            </form>
+          </div>
+
+          <div id="runtimeTab" class="tab-panel">
+            <div id="iterationBar" class="iteration-bar"></div>
+            <div class="runtime-layout">
+              <div id="runtimeTabs" class="runtime-tabs"></div>
+              <div id="runtimeContent" class="runtime-content"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="createDialog" class="wide-dialog horizontal-dialog">
+      <form id="createForm" class="dialog-form">
+        <div class="dialog-title-row">
+          <h3>New task</h3>
+          <button type="button" class="icon-button" title="Close" onclick="this.closest('dialog').close()">×</button>
+        </div>
+        <div id="createError" class="dialog-error hidden"></div>
+        <div class="dialog-cols">
+          <section class="dialog-col">
+            <label class="dialog-field-label" for="requestInput">Describe the task</label>
+            <textarea id="requestInput" rows="10" placeholder="What should the agent do?"></textarea>
+          </section>
+          <section class="dialog-col">
+            <div class="dialog-field-label">
+              <span>Role runtimes</span>
+              <span class="task-sub">applies to this task</span>
+            </div>
+            <div id="createRuntimeList" class="role-runtime-list"></div>
+          </section>
+        </div>
+        <menu>
+          <button type="button" value="cancel" onclick="this.closest('dialog').close()">Cancel</button>
+          <button id="createSubmitBtn" type="submit" class="primary" value="default">Create</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="settingsDialog" class="horizontal-dialog settings-dialog">
+      <form method="dialog" class="dialog-form">
+        <div class="dialog-title-row">
+          <h3>Settings</h3>
+          <button type="button" class="icon-button" title="Close" onclick="this.closest('dialog').close()">×</button>
+        </div>
+        <div class="settings-layout">
+          <nav class="settings-nav" id="settingsTabs" aria-label="Settings sections">
+            <button type="button" data-settings-tab="usage" class="active">Usage</button>
+            <button type="button" data-settings-tab="runtime">Runtime</button>
+          </nav>
+          <div class="settings-content">
+            <section id="settingsUsageTab" class="settings-panel active">
+              <div id="usageStats" class="settings-grid"></div>
+            </section>
+            <section id="settingsRuntimeTab" class="settings-panel">
+              <div class="settings-section">
+                <h3>Injected runtimes</h3>
+                <div id="runtimeCatalog" class="runtime-catalog"></div>
+              </div>
+              <div class="settings-section">
+                <h3>Default role runtimes</h3>
+                <div id="roleDefaults" class="role-runtime-list readonly"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="deleteDialog" class="horizontal-dialog delete-dialog">
+      <form method="dialog" id="deleteForm" class="dialog-form">
+        <div class="dialog-cols delete-cols">
+          <aside class="delete-aside">
+            <div class="delete-icon" aria-hidden="true">!</div>
+            <div>
+              <h3>Delete task</h3>
+              <p>This cannot be undone. Type the full task id to confirm.</p>
+            </div>
+          </aside>
+          <section class="dialog-col">
+            <code id="deleteTaskId"></code>
+            <input id="deleteConfirmInput" autocomplete="off" placeholder="Task id" />
+            <menu>
+              <button type="button" value="cancel" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="danger" value="default">Delete</button>
+            </menu>
+          </section>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

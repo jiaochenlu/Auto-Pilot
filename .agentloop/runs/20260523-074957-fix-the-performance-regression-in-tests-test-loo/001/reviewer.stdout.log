@@ -1,0 +1,5 @@
+Review written to `review-001.json` with decision **BLOCKED**.
+
+Static inspection confirms the fix is correct: the implementation uses an O(n) count-then-filter approach (duplicate_transactions.py:10-21), preserves the `(account_id, merchant, amount_cents)` key, and a focused regression test enforces a `<= 3n` `_duplicate_key` call budget on 500 transactions. AC-4 and AC-5 pass on functional review.
+
+However, pytest could not be executed — every `python -m pytest …` invocation was denied by the environment ("This command requires approval"), so AC-1, AC-2, and AC-3 have no exit_code 0 evidence. Per the reviewer policy ("Do not use APPROVED if any required automated/unit/test acceptance criterion lacks an executed test result with exit_code 0"), the decision is BLOCKED pending approval to run pytest.

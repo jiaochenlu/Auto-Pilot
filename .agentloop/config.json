@@ -48,22 +48,22 @@
   },
   "roles": {
     "analyst": {
-      "runtime": "claude-code"
+      "runtime": "codex"
     },
     "architect": {
-      "runtime": "claude-code"
+      "runtime": "codex"
     },
     "implementer": {
-      "runtime": "claude-code"
+      "runtime": "codex"
     },
     "tester": {
-      "runtime": "claude-code"
+      "runtime": "codex"
     },
     "reviewer": {
-      "runtime": "claude-code"
+      "runtime": "codex"
     },
     "integrator": {
-      "runtime": "claude-code"
+      "runtime": "codex"
     }
   },
   "test_commands": [
