@@ -103,6 +103,87 @@ def append_analysis_answers(analysis: str, questions: list[dict[str, Any]]) -> s
     return "\n".join(lines) + "\n"
 
 
+def draft_final_analysis(raw_request: str, questions: list[dict[str, Any]]) -> str:
+    base = draft_analysis(raw_request).rstrip()
+    answered = append_analysis_answers(base, questions).rstrip() if questions else base
+    return f"""{answered}
+
+## Final Analysis
+
+AgentLoop has no remaining blocking open questions for this task. Execution can proceed after requester approval of the implementation design, acceptance criteria, and test plan.
+
+## Verification Plan
+
+- Use task-specific automated tests when the request changes code, fixes a bug, or addresses performance.
+- Record exact commands, exit codes, and evidence in the task artifacts before reviewer approval.
+- Do not mark the task done unless required acceptance criteria have passing evidence or a documented human-review decision.
+"""
+
+
+def draft_execution_design(state: dict[str, Any]) -> str:
+    request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
+    criteria = state.get("acceptance_criteria") or []
+    criteria_lines = "\n".join(f"- {item.get('id')}: {item.get('description')}" for item in criteria) or "- No acceptance criteria recorded."
+    return f"""# Implementation Design
+
+## Task
+
+{request}
+
+## Scope
+
+- Inspect the files and subsystems directly implied by the request.
+- Keep edits limited to the requested behavior and its focused tests.
+- Preserve existing public behavior unless an acceptance criterion explicitly changes it.
+
+## Acceptance Targets
+
+{criteria_lines}
+
+## Execution Approach
+
+1. Tester authors focused regression or validation tests before implementation when the task changes code behavior.
+2. Implementer makes the smallest scoped change that satisfies the accepted criteria.
+3. Tester runs focused checks and records evidence.
+4. Reviewer verifies acceptance criteria, test evidence, and scope before completion.
+
+## Risks
+
+- Missing or weak tests can hide regressions.
+- Performance tasks need measurable evidence instead of subjective speed claims.
+- If implementation reveals new ambiguity, AgentLoop should pause for Human Review instead of widening scope silently.
+"""
+
+
+def draft_pre_approval_test_plan(state: dict[str, Any]) -> str:
+    request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
+    criteria = state.get("acceptance_criteria") or []
+    automated = [item for item in criteria if str(item.get("verification") or "").lower() in {"automated_test", "unit_test", "test"}]
+    automated_lines = "\n".join(f"- {item.get('id')}: {item.get('evidence') or item.get('description')}" for item in automated)
+    if not automated_lines:
+        automated_lines = "- No automated acceptance criterion was inferred; reviewer should require manual evidence or request a focused test if code behavior changes."
+    return f"""# Test Plan
+
+## Task
+
+{request}
+
+## Pre-Implementation Test Authoring
+
+- Before implementation, tester should create or update focused tests that capture the requested behavior.
+- For bug, regression, performance, slow, or timeout tasks, the test plan must include a regression or performance signal before reviewer approval.
+
+## Required Evidence
+
+{automated_lines}
+
+## Reviewer Gate
+
+- Approval is blocked unless required automated criteria have passing command evidence.
+- If a test cannot run, reviewer must report `CHANGES_REQUIRED` or `BLOCKED` with the reason.
+"""
+
+
 def requirement_fragments(raw_request: str) -> list[str]:
     normalized = re.sub(r"[\r\n]+", " ", raw_request.strip())
     parts = re.split(r"[;；。.!?？]+|要求[:：]", normalized)

@@ -50,8 +50,12 @@ class UIApiTests(unittest.TestCase):
 
             reviewed = submit_analysis_review_api(root, task_id, {"by": "ui", "answers": {"Q-2": "UI files."}})
             self.assertEqual(reviewed["state"]["status"], "WAITING_FOR_ALIGNMENT")
+            self.assertTrue(reviewed["execution_approval"]["required"])
             analysis = (artifact_dir / "analysis.md").read_text(encoding="utf-8")
             self.assertIn("User Answers", analysis)
+            self.assertIn("Final Analysis", analysis)
+            self.assertTrue((artifact_dir / "design.md").exists())
+            self.assertTrue((artifact_dir / "test-plan.md").exists())
 
     def test_create_task_accepts_role_runtime_overrides(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -331,6 +335,10 @@ class UIApiTests(unittest.TestCase):
                 self.assertEqual(status, 200)
                 self.assertIn("text/html", content_type)
                 self.assertIn("AgentLoop Task Console", html)
+                self.assertIn('id="deleteError"', html)
+                self.assertIn('id="deleteSubmitBtn"', html)
+                self.assertNotIn('id="deleteConfirmInput"', html)
+                self.assertNotIn('method="dialog" id="deleteForm"', html)
 
                 status, detail, _ = request("/api/tasks", "POST", {"request": "manage UI tasks"})
                 self.assertEqual(status, 201)

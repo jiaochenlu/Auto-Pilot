@@ -156,6 +156,7 @@ function renderDetail() {
   $("taskTitle").textContent = task.title || task.task_id;
   $("taskMeta").innerHTML = `<span class="${statusClass(task.status)}">${escapeHtml(task.status)}</span> ${escapeHtml(task.current_phase || "-")} · ${task.iteration ?? "-"}/${task.max_iterations ?? "-"} · updated ${escapeHtml(task.updated_at || "-")}`;
   setAction("approveBtn", detail.actions.approve, () => mutate("approve"));
+  $("approveBtn").textContent = "Approve and run";
   setAction("cancelBtn", detail.actions.cancel, () => mutate("cancel"));
   setAction("deleteBtn", detail.actions.delete, openDeleteDialog);
   renderOverview(detail);
@@ -174,6 +175,7 @@ function setAction(id, action, handler) {
 function renderOverview(detail) {
   const task = detail.state;
   renderAnalysisReview(detail);
+  renderExecutionApproval(detail);
   renderHumanReview(detail);
   $("goalText").textContent = task.goal?.raw_request || task.title || "";
   const phaseList = $("phaseList");
@@ -236,13 +238,13 @@ function renderAnalysisReview(detail) {
         <h3>Analysis review</h3>
         <p>${escapeHtml(review.meaning || "Review the initial analysis before approval.")}</p>
       </div>
-      <span class="badge status-WAITING_FOR_ALIGNMENT">REVIEW BEFORE APPROVAL</span>
+      <span class="badge status-WAITING_FOR_ANALYSIS_REVIEW">NEEDS ANSWERS</span>
     </div>
     <div class="question-list">
-      ${questions.length ? questions.map(renderAnalysisQuestion).join("") : '<div class="task-sub">No open questions. Continue to prepare final approval.</div>'}
+      ${questions.length ? questions.map(renderAnalysisQuestion).join("") : '<div class="task-sub">No open questions. Continue analysis to prepare the approval package.</div>'}
     </div>
     <div class="analysis-review-actions">
-      <button id="submitAnalysisReviewBtn" class="primary" type="button">Continue to approval</button>
+      <button id="submitAnalysisReviewBtn" class="primary" type="button">Continue analysis</button>
     </div>`;
   $("submitAnalysisReviewBtn").addEventListener("click", submitAnalysisReview);
 }
@@ -265,7 +267,7 @@ async function submitAnalysisReview() {
   }
   const btn = $("submitAnalysisReviewBtn");
   btn.disabled = true;
-  btn.textContent = "Preparing approval...";
+  btn.textContent = "Continuing analysis...";
   try {
     state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/analysis-review`, { method: "POST", body: JSON.stringify({ by: "ui", answers }) });
     await loadTasks(true);
@@ -273,8 +275,42 @@ async function submitAnalysisReview() {
   } catch (error) {
     showBanner(error.message);
     btn.disabled = false;
-    btn.textContent = "Continue to approval";
+    btn.textContent = "Continue analysis";
   }
+}
+
+function renderExecutionApproval(detail) {
+  const panel = $("executionApprovalPanel");
+  const approval = detail.execution_approval;
+  if (!approval?.required) {
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+    return;
+  }
+  const artifacts = Array.isArray(approval.artifacts) ? approval.artifacts : [];
+  const missing = Array.isArray(approval.missing_artifacts) ? approval.missing_artifacts : [];
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <div class="execution-approval-head">
+      <div>
+        <h3>Execution approval</h3>
+        <p>${escapeHtml(approval.meaning || "Review the completed plan before running changes.")}</p>
+      </div>
+      <span class="badge status-WAITING_FOR_ALIGNMENT">READY TO RUN</span>
+    </div>
+    <div class="approval-artifact-grid">
+      ${artifacts.map((item) => `
+        <div class="approval-artifact ${item.ready ? "is-ready" : "is-missing"}">
+          <strong>${escapeHtml(item.name)}</strong>
+          <span>${escapeHtml(item.file)}</span>
+          <em>${item.ready ? "Ready" : "Missing"}</em>
+        </div>`).join("")}
+    </div>
+    ${missing.length ? `<div class="dialog-error">Missing approval artifacts: ${escapeHtml(missing.join(", "))}</div>` : ""}
+    <div class="execution-approval-actions">
+      <button id="approveFromPanelBtn" class="primary" type="button" ${detail.actions.approve?.enabled ? "" : "disabled"}>Approve and run</button>
+    </div>`;
+  $("approveFromPanelBtn").addEventListener("click", () => mutate("approve"));
 }
 
 function renderHumanReview(detail) {
@@ -697,8 +733,12 @@ async function mutate(op) {
 }
 
 function openDeleteDialog() {
+  if (!state.selectedTaskId) return;
   $("deleteTaskId").textContent = state.selectedTaskId;
-  $("deleteConfirmInput").value = "";
+  $("deleteError").classList.add("hidden");
+  $("deleteError").textContent = "";
+  $("deleteSubmitBtn").disabled = false;
+  $("deleteSubmitBtn").textContent = "Delete";
   $("deleteDialog").showModal();
 }
 
@@ -763,12 +803,27 @@ function wireEvents() {
   });
   $("deleteForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!state.selectedTaskId) return;
+    const errorBox = $("deleteError");
+    const submitBtn = $("deleteSubmitBtn");
+    errorBox.classList.add("hidden");
+    errorBox.textContent = "";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Deleting...";
     try {
-      await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}`, { method: "DELETE", body: JSON.stringify({ confirm: $("deleteConfirmInput").value }) });
+      await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}`, { method: "DELETE", body: JSON.stringify({ confirm: state.selectedTaskId }) });
       $("deleteDialog").close();
       state.selectedTaskId = null;
       await loadTasks(false);
-    } catch (error) { showBanner(error.message); }
+      showBanner(null);
+    } catch (error) {
+      errorBox.textContent = error.message;
+      errorBox.classList.remove("hidden");
+      showBanner(error.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Delete";
+    }
   });
   $("configForm").addEventListener("submit", async (event) => {
     event.preventDefault();

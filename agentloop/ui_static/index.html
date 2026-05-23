@@ -61,6 +61,7 @@
 
           <div id="overviewTab" class="tab-panel active">
             <section id="analysisReviewPanel" class="analysis-review-panel hidden"></section>
+            <section id="executionApprovalPanel" class="execution-approval-panel hidden"></section>
             <section id="humanReviewPanel" class="human-review-panel hidden"></section>
             <div class="split">
               <section>
@@ -168,21 +169,21 @@
     </dialog>
 
     <dialog id="deleteDialog" class="horizontal-dialog delete-dialog">
-      <form method="dialog" id="deleteForm" class="dialog-form">
+      <form id="deleteForm" class="dialog-form">
         <div class="dialog-cols delete-cols">
           <aside class="delete-aside">
             <div class="delete-icon" aria-hidden="true">!</div>
             <div>
               <h3>Delete task</h3>
-              <p>This cannot be undone. Type the full task id to confirm.</p>
+              <p>This cannot be undone. Confirm that you want to delete this task.</p>
             </div>
           </aside>
           <section class="dialog-col">
+            <div id="deleteError" class="dialog-error hidden"></div>
             <code id="deleteTaskId"></code>
-            <input id="deleteConfirmInput" autocomplete="off" placeholder="Task id" />
             <menu>
               <button type="button" value="cancel" onclick="this.closest('dialog').close()">Cancel</button>
-              <button type="submit" class="danger" value="default">Delete</button>
+              <button id="deleteSubmitBtn" type="submit" class="danger" value="default">Delete</button>
             </menu>
           </section>
         </div>

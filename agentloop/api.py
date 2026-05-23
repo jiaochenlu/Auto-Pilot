@@ -22,8 +22,19 @@ from .tasks import (
     task_dir,
     task_state_path,
 )
-from .workspace import WorkspaceError, agentloop_path, load_config, save_state
-from .workflow import append_analysis_answers, approve_task, cancel_task, run_task, start_task
+from .workspace import WorkspaceError, agentloop_path, load_config, save_state, task_artifact_ref
+from .workflow import (
+    append_analysis_answers,
+    approve_task,
+    cancel_task,
+    draft_acceptance,
+    draft_execution_design,
+    draft_final_analysis,
+    draft_pre_approval_test_plan,
+    load_acceptance_criteria,
+    run_task,
+    start_task,
+)
 
 
 ACTION_STATUSES_FOR_RUN = {"READY_TO_START", "DESIGNING"}
@@ -212,6 +223,26 @@ def build_analysis_review(state: dict[str, Any]) -> dict[str, Any] | None:
         "meaning": "AgentLoop has produced an initial analysis. Review and answer open questions before final acceptance criteria are prepared for approval.",
         "questions": questions,
         "blocking_count": sum(1 for item in questions if isinstance(item, dict) and item.get("blocking") and not item.get("answer")),
+    }
+
+
+def build_execution_approval(state: dict[str, Any], artifacts: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if state.get("status") != "WAITING_FOR_ALIGNMENT":
+        return None
+    artifact_names = {str(item.get("name")) for item in artifacts}
+    required_artifacts = ["analysis.md", "design.md", "acceptance.md", "acceptance.json", "test-plan.md"]
+    missing = [name for name in required_artifacts if name not in artifact_names]
+    return {
+        "required": True,
+        "meaning": "Review the final analysis, implementation design, acceptance criteria, and test plan before execution starts.",
+        "primary_action": "Approve and run",
+        "missing_artifacts": missing,
+        "artifacts": [
+            {"name": "Final analysis", "file": "analysis.md", "ready": "analysis.md" in artifact_names},
+            {"name": "Implementation design", "file": "design.md", "ready": "design.md" in artifact_names},
+            {"name": "Acceptance criteria", "file": "acceptance.md", "ready": "acceptance.md" in artifact_names and "acceptance.json" in artifact_names},
+            {"name": "Test plan", "file": "test-plan.md", "ready": "test-plan.md" in artifact_names},
+        ],
     }
 
 
@@ -489,6 +520,7 @@ def build_task_detail(root: Path, task_id: str) -> dict[str, Any]:
     except WorkspaceError as exc:
         merged = {}
         errors.append(str(exc))
+    artifacts = list_task_artifacts(root, task_id)
     return {
         "state": {
             "task_id": task_id,
@@ -506,9 +538,10 @@ def build_task_detail(root: Path, task_id: str) -> dict[str, Any]:
         },
         "config": {"override": override, "effective": merged},
         "actions": available_actions(state, lock_reason),
-        "artifacts": list_task_artifacts(root, task_id),
+        "artifacts": artifacts,
         "runtime": latest_runtime_summary(root, state),
         "analysis_review": build_analysis_review(state),
+        "execution_approval": build_execution_approval(state, artifacts),
         "human_review": build_human_review(root, task_id, state),
         "errors": errors,
     }
@@ -563,9 +596,25 @@ def submit_analysis_review_api(root: Path, task_id: str, payload: dict[str, Any]
         missing = [item for item in questions if isinstance(item, dict) and item.get("blocking") and not str(item.get("answer") or "").strip()]
         if missing:
             raise WorkspaceError("Required analysis questions must be answered before continuing.")
-        analysis_path = task_dir(root, task_id) / "artifacts" / "analysis.md"
+        artifact_dir = task_dir(root, task_id) / "artifacts"
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        request = str(state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task")
+        analysis_path = artifact_dir / "analysis.md"
+        acceptance_json_path = artifact_dir / "acceptance.json"
+        acceptance_path = artifact_dir / "acceptance.md"
+        design_path = artifact_dir / "design.md"
+        test_plan_path = artifact_dir / "test-plan.md"
+
         if analysis_path.exists():
-            analysis_path.write_text(append_analysis_answers(analysis_path.read_text(encoding="utf-8"), questions), encoding="utf-8")
+            analysis_text = append_analysis_answers(analysis_path.read_text(encoding="utf-8"), questions)
+        else:
+            analysis_text = draft_final_analysis(request, questions)
+        analysis_path.write_text(draft_final_analysis(request, questions) if "## Final Analysis" not in analysis_text else analysis_text, encoding="utf-8")
+
+        state["acceptance_criteria"] = load_acceptance_criteria(acceptance_json_path)
+        acceptance_path.write_text(draft_acceptance(request, state["acceptance_criteria"], task_artifact_ref(task_id, "analysis.md")), encoding="utf-8")
+        design_path.write_text(draft_execution_design(state), encoding="utf-8")
+        test_plan_path.write_text(draft_pre_approval_test_plan(state), encoding="utf-8")
         now = utc_now_iso()
         state["analysis_questions"] = questions
         state.setdefault("analysis_reviews", []).append({"at": now, "by": payload.get("by") or "ui", "answers": answers})
@@ -573,6 +622,8 @@ def submit_analysis_review_api(root: Path, task_id: str, payload: dict[str, Any]
         state["current_phase"] = "alignment"
         state["requires_human_approval"] = True
         state["phases"]["analysis_review"]["status"] = "completed"
+        state["phases"]["design"]["status"] = "ready_for_approval"
+        state["phases"]["test_authoring"]["status"] = "ready_for_approval"
         state["phases"]["alignment"]["status"] = "waiting_for_approval"
         state["updated_at"] = now
         save_task_state(root, task_id, state)
