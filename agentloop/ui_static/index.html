@@ -58,6 +58,7 @@
           <div class="tabs" id="detailTabs">
             <button data-tab="basic" class="active"><span class="tab-name">Basic</span><span class="tab-sub" id="basicTabSub">current phase</span></button>
             <button data-tab="execlog"><span class="tab-name">Execution log</span><span class="tab-sub">iterations &amp; artifacts</span></button>
+            <button data-tab="context"><span class="tab-name">Context</span><span class="tab-sub">sessions &amp; transcripts</span></button>
           </div>
 
           <div id="basicTab" class="tab-panel active" data-phase="">
@@ -90,6 +91,22 @@
             <section class="execlog-artifacts">
               <h3 class="section-head">Artifacts <span class="task-sub">all phases</span></h3>
               <div id="artifactList" class="artifact-list"></div>
+            </section>
+          </div>
+
+          <div id="contextTab" class="tab-panel">
+            <section class="context-sessions">
+              <h3 class="section-head">Warm sessions <span class="task-sub">per role · L1 resume</span></h3>
+              <div id="contextSessions" class="context-sessions-list"></div>
+            </section>
+            <section class="context-timeline">
+              <h3 class="section-head">Context timeline <span class="task-sub">handoffs &amp; transcripts</span></h3>
+              <div class="context-layout">
+                <div id="contextTimeline" class="context-timeline-list"></div>
+                <div id="transcriptViewer" class="transcript-viewer">
+                  <div class="task-sub">Select a turn to view its transcript.</div>
+                </div>
+              </div>
             </section>
           </div>
         </section>

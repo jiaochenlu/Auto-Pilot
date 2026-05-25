@@ -61,6 +61,10 @@ def load_task_state(root: Path, task_id: str) -> dict[str, Any]:
         raise WorkspaceError(f"Invalid task state: {path}: {exc}") from exc
     if not isinstance(data, dict):
         raise WorkspaceError(f"Invalid task state: {path}: expected object")
+    if not isinstance(data.get("context_log"), list):
+        data["context_log"] = []
+    if not isinstance(data.get("role_sessions"), dict):
+        data["role_sessions"] = {}
     return data
 
 

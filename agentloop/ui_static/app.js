@@ -8,6 +8,7 @@ const state = {
   busy: false,
   settings: null,
   pollTimer: null,
+  selectedTranscript: null,
 };
 
 const REFRESH_INTERVAL_MS = 3000;
@@ -338,6 +339,7 @@ function renderDetail() {
   renderArtifacts(detail);
   renderConfig(detail);
   renderRuntime(detail);
+  renderContext(detail);
 }
 
 function renderBasic(detail, phase) {
@@ -1256,6 +1258,116 @@ function renderRuntime(detail) {
   const stdout = agent.stdout || {};
   const stderr = agent.stderr || {};
   content.innerHTML = `<div class="runtime-meta"><span>${escapeHtml(agent.runtime || "runtime")}</span><span>exit ${escapeHtml(agent.exit_code ?? "-")}</span><span>${escapeHtml(agent.duration_ms ?? "-")} ms</span><span>${escapeHtml(agent.command || "manual")}</span></div><h3>stdout</h3><pre class="log-block">${escapeHtml(stdout.content || (stdout.missing ? "Missing stdout log" : ""))}</pre><h3>stderr</h3><pre class="log-block">${escapeHtml(stderr.content || (stderr.missing ? "Missing stderr log" : ""))}</pre>`;
+}
+
+function renderContext(detail) {
+  const ctx = detail.context || {};
+  const sessions = ctx.role_sessions || [];
+  const timeline = ctx.context_log || [];
+  const sessionsEl = $("contextSessions");
+  const timelineEl = $("contextTimeline");
+  const viewerEl = $("transcriptViewer");
+  if (!sessionsEl || !timelineEl || !viewerEl) return;
+
+  if (!sessions.length) {
+    sessionsEl.innerHTML = '<div class="task-sub">No warm sessions yet. Sessions appear once a role completes a turn with a resume-capable runtime.</div>';
+  } else {
+    sessionsEl.innerHTML = sessions
+      .map((s) => {
+        const sid = s.session_id || "(no session_id)";
+        const short = String(sid).slice(0, 8);
+        const turns = s.turns != null ? `${s.turns} turn${s.turns === 1 ? "" : "s"}` : "";
+        return `
+          <div class="context-session">
+            <div class="ctx-role">${escapeHtml(s.role || "?")}</div>
+            <div class="ctx-runtime">${escapeHtml(s.runtime || "-")}</div>
+            <div class="ctx-session-id" title="${escapeHtml(sid)}">${escapeHtml(short)}</div>
+            <div class="task-sub">${escapeHtml(turns)} · ${escapeHtml(s.updated_at || "-")}</div>
+          </div>`;
+      })
+      .join("");
+  }
+
+  if (!timeline.length) {
+    timelineEl.innerHTML = '<div class="task-sub">No context entries yet.</div>';
+  } else {
+    timelineEl.innerHTML = timeline
+      .map((entry, idx) => {
+        const role = entry.role || "?";
+        const turn = entry.turn ?? "?";
+        const key = `${role}-${turn}`;
+        const isSelected = state.selectedTranscript === key;
+        const resumedBadge = entry.resumed ? '<span class="ctx-badge resumed" title="Resumed session">🔁 resume</span>' : "";
+        const handoffBadge = entry.handoff_present === false
+          ? '<span class="ctx-badge muted" title="No handoff (manual runtime)">no handoff</span>'
+          : entry.handoff_ref
+            ? '<span class="ctx-badge ok" title="Handoff written">handoff</span>'
+            : "";
+        const transcriptBadge = entry.transcript_ref ? '<span class="ctx-badge ok" title="Transcript captured">transcript</span>' : "";
+        const sidShort = entry.session_id ? String(entry.session_id).slice(0, 8) : "";
+        return `
+          <button type="button" class="context-row ${isSelected ? "active" : ""}" data-role="${escapeHtml(role)}" data-turn="${escapeHtml(turn)}">
+            <span class="ctx-turn">#${escapeHtml(turn)}</span>
+            <span class="ctx-role">${escapeHtml(role)}</span>
+            <span class="ctx-runtime">${escapeHtml(entry.runtime || "-")}</span>
+            <span class="ctx-badges">${resumedBadge}${handoffBadge}${transcriptBadge}</span>
+            <span class="ctx-session-id task-sub" title="${escapeHtml(entry.session_id || "")}">${escapeHtml(sidShort)}</span>
+            <span class="ctx-at task-sub">${escapeHtml(entry.at || "")}</span>
+          </button>`;
+      })
+      .join("");
+    timelineEl.querySelectorAll(".context-row").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const role = btn.dataset.role;
+        const turn = btn.dataset.turn;
+        loadTranscript(role, turn);
+      });
+    });
+  }
+
+  if (!state.selectedTranscript) {
+    viewerEl.innerHTML = '<div class="task-sub">Select a turn to view its transcript.</div>';
+  }
+}
+
+async function loadTranscript(role, turn) {
+  if (!state.selectedTaskId) return;
+  const key = `${role}-${turn}`;
+  state.selectedTranscript = key;
+  const viewerEl = $("transcriptViewer");
+  if (!viewerEl) return;
+  viewerEl.innerHTML = '<div class="task-sub">Loading transcript…</div>';
+  // refresh active highlight
+  document.querySelectorAll("#contextTimeline .context-row").forEach((row) => {
+    row.classList.toggle("active", row.dataset.role === role && row.dataset.turn === String(turn));
+  });
+  try {
+    const data = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/transcripts/${encodeURIComponent(role)}/${encodeURIComponent(turn)}`);
+    renderTranscript(data);
+  } catch (error) {
+    viewerEl.innerHTML = `<div class="dialog-error">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function renderTranscript(t) {
+  const viewerEl = $("transcriptViewer");
+  if (!viewerEl) return;
+  const meta = [
+    ["role", t.role],
+    ["turn", t.turn],
+    ["runtime", t.runtime],
+    ["exit", t.exit_code],
+    ["duration", t.duration_ms != null ? `${t.duration_ms} ms` : "-"],
+    ["session_id", t.session_id || "-"],
+    ["resumed", t.resumed ? "yes" : "no"],
+    ["written_at", t.written_at || "-"],
+  ];
+  const metaHtml = meta.map(([k, v]) => `<span><strong>${escapeHtml(k)}</strong> ${escapeHtml(String(v ?? "-"))}</span>`).join("");
+  const cmd = t.command ? `<h3>command</h3><pre class="command-block">${escapeHtml(t.command)}</pre>` : "";
+  const prompt = t.prompt ? `<h3>prompt</h3><pre class="log-block">${escapeHtml(t.prompt)}</pre>` : "";
+  const stdout = t.stdout ? `<h3>stdout</h3><pre class="log-block">${escapeHtml(t.stdout)}</pre>` : "";
+  const stderr = t.stderr ? `<h3>stderr</h3><pre class="log-block">${escapeHtml(t.stderr)}</pre>` : "";
+  viewerEl.innerHTML = `<div class="runtime-meta transcript-meta">${metaHtml}</div>${cmd}${prompt}${stdout}${stderr}`;
 }
 
 async function mutate(op) {

@@ -97,6 +97,8 @@ def default_state() -> dict[str, Any]:
             },
         },
         "agents": [],
+        "context_log": [],
+        "role_sessions": {},
         "created_at": now,
         "updated_at": now,
     }

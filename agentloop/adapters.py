@@ -59,6 +59,7 @@ def run_role(
     iteration: int,
     required_artifacts: list[str],
     task_id: str | None = None,
+    session_id: str | None = None,
 ) -> AdapterResult:
     runtime_name, runtime = runtime_for_role(config, role)
     adapter = runtime.get("adapter", "command")
@@ -66,7 +67,17 @@ def run_role(
         return run_manual_role(root, runtime_name, role, iteration, required_artifacts, task_id)
     if adapter == "command":
         exec_cwd = _resolve_exec_cwd(root, task_id)
-        return run_command_role(root, runtime_name, runtime, role, iteration, required_artifacts, task_id, exec_cwd=exec_cwd)
+        return run_command_role(
+            root,
+            runtime_name,
+            runtime,
+            role,
+            iteration,
+            required_artifacts,
+            task_id,
+            exec_cwd=exec_cwd,
+            session_id=session_id,
+        )
     raise WorkspaceError(f"Unsupported adapter for runtime {runtime_name}: {adapter}")
 
 
@@ -121,20 +132,31 @@ def run_command_role(
     required_artifacts: list[str],
     task_id: str | None = None,
     exec_cwd: Path | None = None,
+    session_id: str | None = None,
 ) -> AdapterResult:
+    from .sessions import extract_session_id, runtime_supports_resume
+
     command = runtime.get("command")
     if not command:
         raise WorkspaceError(f"Command runtime {runtime_name} is missing `command`.")
 
     stdout_log, stderr_log = role_log_paths(root, iteration, role, task_id)
     prompt_path = role_prompt_path(root, role)
+    resuming = bool(session_id) and runtime_supports_resume(runtime)
     values = {
         "cwd": str(root),
         "role": role,
         "iteration": str(iteration),
         "prompt_file": str(prompt_path),
+        "session_id": session_id or "",
+        "task_id": task_id or "",
     }
-    args = render_args(list(runtime.get("args") or []), values)
+    base_args = list(runtime.get("args") or [])
+    if resuming:
+        extra_args = list(runtime.get("resume_args") or [])
+    else:
+        extra_args = list(runtime.get("new_session_args") or [])
+    args = render_args([*base_args, *extra_args], values)
     timeout = runtime.get("timeout_seconds")
     stdin_text = None
     stdin_file = runtime.get("stdin_file")
@@ -177,6 +199,11 @@ def run_command_role(
     if missing:
         raise WorkspaceError(f"Role {role} did not produce required artifacts: {', '.join(missing)}")
 
+    new_session_id = extract_session_id(runtime, completed.stdout, completed.stderr)
+    # If resume was attempted and runtime gave us no fresh id, keep the prior id.
+    if resuming and not new_session_id:
+        new_session_id = session_id
+
     return AdapterResult(
         role=role,
         runtime=runtime_name,
@@ -187,4 +214,6 @@ def run_command_role(
         stdout_log=relpath(stdout_log, root),
         stderr_log=relpath(stderr_log, root),
         artifacts=required_artifacts,
+        session_id=new_session_id,
+        resumed=resuming,
     )

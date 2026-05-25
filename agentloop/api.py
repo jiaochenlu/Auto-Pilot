@@ -24,6 +24,7 @@ from .tasks import (
     task_state_path,
 )
 from .workspace import WorkspaceError, agentloop_path, config_path, load_config, save_state, write_json
+from .transcripts import list_transcripts, load_transcript
 from .workflow import (
     approve_task,
     cancel_task,
@@ -595,6 +596,50 @@ def latest_runtime_summary(root: Path, state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_context_view(root: Path, task_id: str, state: dict[str, Any]) -> dict[str, Any]:
+    context_log = state.get("context_log") if isinstance(state.get("context_log"), list) else []
+    role_sessions = state.get("role_sessions") if isinstance(state.get("role_sessions"), dict) else {}
+    entries: list[dict[str, Any]] = []
+    for item in context_log:
+        if not isinstance(item, dict):
+            continue
+        entries.append({
+            "role": item.get("role"),
+            "turn": item.get("turn"),
+            "runtime": item.get("runtime"),
+            "handoff_ref": item.get("handoff_ref"),
+            "handoff_present": item.get("handoff_present"),
+            "transcript_ref": item.get("transcript_ref"),
+            "session_id": item.get("session_id"),
+            "resumed": item.get("resumed"),
+            "at": item.get("at") or item.get("written_at"),
+        })
+    sessions: list[dict[str, Any]] = []
+    for key, value in role_sessions.items():
+        if not isinstance(value, dict):
+            continue
+        sessions.append({
+            "role": value.get("role") or key,
+            "runtime": value.get("runtime"),
+            "session_id": value.get("session_id"),
+            "updated_at": value.get("updated_at"),
+            "turns": value.get("turns"),
+        })
+    transcripts = list_transcripts(root, task_id)
+    return {
+        "context_log": entries,
+        "role_sessions": sessions,
+        "transcripts": transcripts,
+    }
+
+
+def read_transcript(root: Path, task_id: str, role: str, turn: int) -> dict[str, Any]:
+    data = load_transcript(root, task_id, role, turn)
+    if data is None:
+        raise WorkspaceError(f"Transcript not found: {role}-{turn:03d}")
+    return data
+
+
 def build_task_detail(root: Path, task_id: str) -> dict[str, Any]:
     task_state_path(root, task_id)
     errors: list[str] = []
@@ -643,6 +688,7 @@ def build_task_detail(root: Path, task_id: str) -> dict[str, Any]:
         "design_package": build_design_package(artifacts),
         "execution_approval": build_execution_approval(state, artifacts),
         "human_review": build_human_review(root, task_id, state),
+        "context": build_context_view(root, task_id, state),
         "errors": errors,
     }
 

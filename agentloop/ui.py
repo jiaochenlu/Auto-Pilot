@@ -77,6 +77,14 @@ class AgentLoopUIHandler(BaseHTTPRequestHandler):
             if len(parts) == 5 and parts[:2] == ["api", "tasks"] and parts[3] == "artifacts":
                 self._send_json(200, api.read_artifact(self.root, parts[2], parts[4]))
                 return
+            if len(parts) == 6 and parts[:2] == ["api", "tasks"] and parts[3] == "transcripts":
+                role = parts[4]
+                try:
+                    turn = int(parts[5])
+                except ValueError as exc:
+                    raise WorkspaceError(f"Invalid transcript turn: {parts[5]}") from exc
+                self._send_json(200, api.read_transcript(self.root, parts[2], role, turn))
+                return
             self._serve_static(path)
         except Exception as exc:
             self._handle_error(exc)
