@@ -64,6 +64,12 @@
     },
     "integrator": {
       "runtime": "codex"
+    },
+    "framer": {
+      "runtime": "codex"
+    },
+    "investigator": {
+      "runtime": "codex"
     }
   },
   "test_commands": [

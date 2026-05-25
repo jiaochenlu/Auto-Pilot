@@ -46,7 +46,7 @@ function matchesFilter(task) {
   if (state.filter === "all") return true;
   if (state.filter === "active") return !["DONE", "CANCELLED", "CREATED"].includes(status);
   if (state.filter === "waiting") return status.includes("WAITING") || status === "READY_TO_START";
-  if (state.filter === "running") return ["DESIGNING", "IMPLEMENTING_AND_TESTING", "REVIEWING"].includes(status);
+  if (state.filter === "running") return ["INVESTIGATING", "DESIGNING", "IMPLEMENTING_AND_TESTING", "REVIEWING"].includes(status);
   if (state.filter === "done") return ["DONE", "CANCELLED"].includes(status);
   return true;
 }
@@ -146,47 +146,240 @@ function renderEmptyDetail() {
   $("taskIdLabel").textContent = "No task selected";
   $("taskTitle").textContent = "Create or select a task";
   $("taskMeta").textContent = "";
-  ["approveBtn", "cancelBtn", "deleteBtn"].forEach((id) => ($(id).disabled = true));
+  $("lifecycle").innerHTML = "";
+  $("primaryActionBtn").hidden = true;
+  $("cancelBtn").hidden = true;
+  $("deleteBtn").hidden = true;
+  const cta = $("overviewCta");
+  if (cta) { cta.classList.add("hidden"); cta.innerHTML = ""; }
+}
+
+const LIFECYCLE_STEPS = [
+  { key: "framing", label: "Framing", sub: "clarify the problem", tab: "overview", match: ["CREATED", "FRAMING_REVIEW"], roles: [{ key: "framer", label: "Framer", icon: "?" }] },
+  { key: "research", label: "Researching", sub: "investigate & design", tab: "overview", match: ["INVESTIGATING", "DESIGNING"], roles: [{ key: "investigator", label: "Investigator", icon: "I" }, { key: "architect", label: "Architect", icon: "A" }] },
+  { key: "approve", label: "Awaiting approval", sub: "review the plan", tab: "overview", match: ["WAITING_FOR_ALIGNMENT"], roles: [{ key: "human", label: "You", icon: "@" }] },
+  { key: "run", label: "Running", sub: "iterations executing", tab: "runtime", match: ["READY_TO_START", "RUNNING", "EXECUTING", "IMPLEMENTING_AND_TESTING", "REVIEWING", "WAITING_FOR_HUMAN"], roles: [{ key: "implementer", label: "Implementer", icon: "⚙" }, { key: "tester", label: "Tester", icon: "✓" }, { key: "reviewer", label: "Reviewer", icon: "👁" }] },
+  { key: "done", label: "Done", sub: "task complete", tab: "artifacts", match: ["DONE", "CANCELLED", "FAILED"], roles: [{ key: "integrator", label: "Integrator", icon: "★" }] },
+];
+
+function lifecycleIndex(status) {
+  const idx = LIFECYCLE_STEPS.findIndex((step) => step.match.includes(String(status || "").toUpperCase()));
+  return idx === -1 ? 0 : idx;
+}
+
+function currentPhase(status) {
+  const s = String(status || "").toUpperCase();
+  if (["FRAMING", "FRAMING_REVIEW", "CREATED"].includes(s)) return "framing";
+  if (["INVESTIGATING", "DESIGNING"].includes(s)) return "research";
+  if (s === "WAITING_FOR_ALIGNMENT") return "approval";
+  if (["IMPLEMENTING_AND_TESTING", "REVIEWING", "WAITING_FOR_HUMAN", "READY_TO_START"].includes(s)) return "running";
+  if (["DONE", "INTEGRATING"].includes(s)) return "done";
+  if (s === "CANCELLED") return "done";
+  return "framing";
+}
+
+const PHASE_LABELS = { framing: "Framing", research: "Researching", approval: "Awaiting approval", running: "Running", done: "Done" };
+const PHASE_ARTIFACTS = {
+  framing: [],
+  research: ["dossier.md", "proposal.md", "acceptance.md", "test-plan.md"],
+  approval: ["dossier.md", "proposal.md", "acceptance.md", "test-plan.md"],
+  running: ["final-report.md"],
+  done: [],
+};
+
+function renderLifecycle(task) {
+  const root = $("lifecycle");
+  root.innerHTML = "";
+  const cancelled = String(task.status || "").toUpperCase() === "CANCELLED";
+  // For cancelled tasks, derive position from the pre-cancel status so prior phases still look completed
+  // and the cancelled phase is marked red. Steps after stay gray.
+  const current = cancelled
+    ? lifecycleIndex(task.cancelled_from || "FRAMING_REVIEW")
+    : lifecycleIndex(task.status);
+  LIFECYCLE_STEPS.forEach((step, idx) => {
+    const li = document.createElement("li");
+    const state = idx < current ? "done" : idx === current ? "current" : "pending";
+    li.className = `lc-step lc-${state}${cancelled && idx === current ? " lc-cancelled" : ""}`;
+    const rolesHtml = (step.roles || []).map((r) => `
+      <span class="lc-role lc-role-${escapeHtml(r.key)}" title="${escapeHtml(r.label)}">
+        <span class="lc-role-icon">${escapeHtml(r.icon)}</span>
+        <span class="lc-role-label">${escapeHtml(r.label)}</span>
+      </span>`).join("");
+    li.innerHTML = `
+      <button type="button" class="lc-btn" data-tab="${step.tab}" data-state="${state}" ${state === "pending" ? "disabled" : ""} title="${escapeHtml(state === "pending" ? "Not started yet" : step.sub)}">
+        <span class="lc-dot">${idx < current ? "✓" : idx + 1}</span>
+        <span class="lc-text">
+          <span class="lc-label">${escapeHtml(step.label)}</span>
+          <span class="lc-sub">${escapeHtml(step.sub)}</span>
+          ${rolesHtml ? `<span class="lc-roles">${rolesHtml}</span>` : ""}
+        </span>
+      </button>`;
+    root.appendChild(li);
+  });
+  root.onclick = (event) => {
+    const btn = event.target.closest(".lc-btn");
+    if (!btn || btn.disabled || btn.dataset.state === "pending") return;
+    const tab = btn.dataset.tab;
+    [...$("detailTabs").querySelectorAll("button")].forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+    [...document.querySelectorAll(".tab-panel")].forEach((panel) => panel.classList.toggle("active", panel.id === `${tab}Tab`));
+  };
+}
+
+function configurePrimaryAction(detail) {
+  const task = detail.state;
+  const actions = detail.actions || {};
+  const status = String(task.status || "").toUpperCase();
+  const primary = $("primaryActionBtn");
+  const cancel = $("cancelBtn");
+  const deleteBtn = $("deleteBtn");
+
+  let primaryConfig = null;
+  if (status === "WAITING_FOR_ALIGNMENT" && actions.approve?.enabled) {
+    primaryConfig = { label: "Approve plan & run", handler: () => approveAndRun(), title: "" };
+  } else if (status === "READY_TO_START" && actions.run?.enabled) {
+    primaryConfig = { label: "Run", handler: () => mutate("run"), title: "" };
+  } else if (["RUNNING", "EXECUTING", "IMPLEMENTING_AND_TESTING", "REVIEWING"].includes(status)) {
+    primaryConfig = { label: `Running · iter ${task.iteration ?? "-"}/${task.max_iterations ?? "-"}`, handler: null, title: "Task in progress", disabled: true };
+  } else if (status === "FRAMING_REVIEW") {
+    if (actions.start_research?.enabled) {
+      primaryConfig = { label: "Start research →", handler: () => startResearch(), title: "" };
+    } else if (actions.submit_framing?.enabled) {
+      primaryConfig = { label: "Submit answers", handler: () => submitFramingAnswers(), title: "Answer the open questions to continue" };
+    }
+  } else if (["INVESTIGATING", "DESIGNING"].includes(status)) {
+    primaryConfig = { label: "Researching…", handler: null, title: "Investigator and Architect are running", disabled: true };
+  } else if (status === "CREATED" || status === "FRAMING") {
+    primaryConfig = { label: "Framing…", handler: null, title: "Framer is drafting the problem statement", disabled: true };
+  } else if (status === "WAITING_FOR_HUMAN") {
+    primaryConfig = { label: "Resume", handler: () => {
+      const panel = $("humanReviewPanel");
+      if (panel && !panel.classList.contains("hidden")) {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, title: "Review the blocker, then resume" };
+  } else if (status === "DONE") {
+    primaryConfig = { label: "View report", handler: () => {
+      [...$("detailTabs").querySelectorAll("button")].forEach((b) => b.classList.toggle("active", b.dataset.tab === "artifacts"));
+      [...document.querySelectorAll(".tab-panel")].forEach((p) => p.classList.toggle("active", p.id === "artifactsTab"));
+    }, title: "Open the final report" };
+  }
+
+  if (primaryConfig) {
+    primary.hidden = false;
+    primary.textContent = primaryConfig.label;
+    primary.disabled = !!primaryConfig.disabled || state.busy;
+    primary.title = primaryConfig.title || "";
+    primary.onclick = primaryConfig.handler;
+  } else {
+    primary.hidden = true;
+    primary.onclick = null;
+  }
+
+  cancel.hidden = !actions.cancel?.enabled && status !== "RUNNING";
+  cancel.disabled = !actions.cancel?.enabled || state.busy;
+  cancel.title = actions.cancel?.reason || "";
+  cancel.onclick = () => mutate("cancel");
+
+  setAction("deleteBtn", actions.delete, () => openDeleteDialog());
+  deleteBtn.hidden = !actions.delete?.enabled;
+}
+
+function closeMoreMenu() { /* no-op kept for callsite safety */ }
+
+function renderOverviewCta(detail) {
+  const cta = $("overviewCta");
+  if (!cta) return;
+  const status = String(detail.state.status || "").toUpperCase();
+  const approveEnabled = detail.actions?.approve?.enabled;
+  if (status === "WAITING_FOR_ALIGNMENT" && approveEnabled) {
+    cta.classList.remove("hidden");
+    cta.innerHTML = `
+      <div class="overview-cta-text">
+        <strong>Plan ready for review.</strong>
+        <span>Read the goal, phases, and acceptance above, then approve to start running.</span>
+      </div>
+      <button type="button" class="primary" id="overviewApproveBtn">Approve &amp; run →</button>`;
+    $("overviewApproveBtn").onclick = () => approveAndRun();
+    $("overviewApproveBtn").disabled = state.busy;
+  } else if (status === "READY_TO_START" && detail.actions?.run?.enabled) {
+    cta.classList.remove("hidden");
+    cta.innerHTML = `
+      <div class="overview-cta-text">
+        <strong>Approved.</strong>
+        <span>Start the first iteration when ready.</span>
+      </div>
+      <button type="button" class="primary" id="overviewRunBtn">Run →</button>`;
+    $("overviewRunBtn").onclick = () => mutate("run");
+    $("overviewRunBtn").disabled = state.busy;
+  } else {
+    cta.classList.add("hidden");
+    cta.innerHTML = "";
+  }
 }
 
 function renderDetail() {
   const detail = state.detail;
   const task = detail.state;
+  const isCancelled = String(task.status || "").toUpperCase() === "CANCELLED";
+  const phase = isCancelled
+    ? currentPhase(task.cancelled_from || task.status)
+    : currentPhase(task.status);
   $("taskIdLabel").textContent = task.task_id;
   $("taskTitle").textContent = task.title || task.task_id;
   $("taskMeta").innerHTML = `<span class="${statusClass(task.status)}">${escapeHtml(task.status)}</span> ${escapeHtml(task.current_phase || "-")} · ${task.iteration ?? "-"}/${task.max_iterations ?? "-"} · updated ${escapeHtml(task.updated_at || "-")}`;
-  setAction("approveBtn", detail.actions.approve, () => mutate("approve"));
-  $("approveBtn").textContent = "Approve and run";
-  setAction("cancelBtn", detail.actions.cancel, () => mutate("cancel"));
-  setAction("deleteBtn", detail.actions.delete, openDeleteDialog);
-  renderOverview(detail);
+  const basicSub = $("basicTabSub");
+  if (basicSub) basicSub.textContent = PHASE_LABELS[phase] || "current phase";
+  const basicPanel = $("basicTab");
+  if (basicPanel) basicPanel.dataset.phase = phase;
+  renderLifecycle(task);
+  configurePrimaryAction(detail);
+  renderBasic(detail, phase);
+  renderOverviewCta(detail);
   renderArtifacts(detail);
   renderConfig(detail);
   renderRuntime(detail);
 }
 
-function setAction(id, action, handler) {
-  const button = $(id);
-  button.disabled = !action?.enabled || state.busy;
-  button.title = action?.reason || "";
-  button.onclick = handler;
-}
-
-function renderOverview(detail) {
+function renderBasic(detail, phase) {
   const task = detail.state;
-  renderAnalysisReview(detail);
+  const isCancelled = String(task.status || "").toUpperCase() === "CANCELLED";
+  // gate sub-panels: each render*() already toggles its own hidden class based on detail
+  // but we additionally force-hide ones that don't belong to current phase
+  const gate = (id, allowed) => {
+    const el = $(id);
+    if (!el) return;
+    if (!allowed) el.classList.add("hidden");
+  };
+  // Run sub-renderers first
+  renderFramingReview(detail);
+  renderResearchProgress(detail);
   renderExecutionApproval(detail);
   renderHumanReview(detail);
-  $("goalText").textContent = task.goal?.raw_request || task.title || "";
-  const phaseList = $("phaseList");
-  phaseList.innerHTML = "";
-  Object.entries(task.phases || {}).forEach(([name, phase]) => {
-    const item = document.createElement("div");
-    item.className = "phase-item";
-    item.innerHTML = `<strong>${escapeHtml(name)}</strong><span class="badge">${escapeHtml(phase?.status || "pending")}</span>`;
-    phaseList.appendChild(item);
-  });
+  renderGoal(task);
+  // Then phase-gate (interactive panels hide entirely for cancelled tasks)
+  gate("framingReviewPanel", !isCancelled && phase === "framing");
+  gate("researchProgressPanel", !isCancelled && phase === "research");
+  gate("executionApprovalPanel", !isCancelled && phase === "approval");
+  gate("humanReviewPanel", !isCancelled && phase === "running");
+  // Goal & acceptance visibility
+  const goalSec = $("goalSection");
+  const accSec = $("acceptanceSection");
+  if (goalSec) goalSec.classList.toggle("hidden", phase === "done");
+  if (accSec) accSec.classList.toggle("hidden", phase === "framing" || phase === "done");
+  // Acceptance content
+  renderAcceptance(task);
+  // Phase-specific artifact preview (for cancelled tasks in framing phase, surface framing.md
+  // since the interactive panel is hidden; other phases already list artifacts via PHASE_ARTIFACTS)
+  const wantedOverride = isCancelled && phase === "framing" ? ["framing.md"] : null;
+  renderPhaseArtifacts(detail, phase, wantedOverride);
+  // Done placeholder
+  const empty = $("basicEmpty");
+  if (empty) empty.classList.toggle("hidden", phase !== "done");
+}
+
+function renderAcceptance(task) {
   const list = $("acceptanceList");
+  if (!list) return;
   list.innerHTML = "";
   const items = task.acceptance_criteria || [];
   const passed = items.filter((ac) => String(ac.status || "").toLowerCase() === "passed").length;
@@ -222,61 +415,304 @@ function renderOverview(detail) {
   }
 }
 
-function renderAnalysisReview(detail) {
-  const panel = $("analysisReviewPanel");
-  const review = detail.analysis_review;
+function renderPhaseArtifacts(detail, phase, wantedOverride) {
+  const section = $("phaseArtifactSection");
+  const body = $("phaseArtifactBody");
+  const heading = $("phaseArtifactHeading");
+  if (!section || !body) return;
+  const wanted = wantedOverride || PHASE_ARTIFACTS[phase] || [];
+  const editable = phase === "approval" && !wantedOverride;
+  const all = detail.artifacts || [];
+  const byName = new Map(all.map((a) => [String(a.name || "").toLowerCase(), a]));
+  // For approval, prefer .edited.* if present
+  const pick = (base) => {
+    if (editable) {
+      const edited = byName.get(base.replace(/\.([a-z]+)$/i, ".edited.$1").toLowerCase());
+      if (edited) return { artifact: edited, isEdited: true };
+    }
+    const orig = byName.get(base.toLowerCase());
+    return orig ? { artifact: orig, isEdited: false } : null;
+  };
+  const items = wanted.map(pick).filter(Boolean);
+  if (!items.length) {
+    section.classList.add("hidden");
+    body.innerHTML = "";
+    return;
+  }
+  section.classList.remove("hidden");
+  if (heading) {
+    heading.textContent = phase === "approval" ? "Design package — editable" : phase === "research" ? "Research outputs" : phase === "framing" ? "Framing" : "Outputs";
+  }
+  body.innerHTML = "";
+  for (const { artifact, isEdited } of items) {
+    const node = document.createElement("section");
+    node.className = "phase-artifact-card" + (editable ? " is-editable" : "");
+    const content = artifact.preview?.content || "";
+    const truncated = artifact.preview?.truncated;
+    const headHtml = `<div class="phase-artifact-head"><strong>${escapeHtml(artifact.name)}</strong>${isEdited ? '<span class="badge badge-edited">edited</span>' : ""}<span class="task-sub">${artifact.size} bytes${truncated ? ` · truncated` : ""}</span></div>`;
+    if (editable && !truncated) {
+      node.innerHTML = `${headHtml}
+        <textarea class="phase-artifact-editor" data-original-name="${escapeHtml(artifact.name.replace(/\.edited\.([a-z]+)$/i, ".$1"))}" rows="14">${escapeHtml(content)}</textarea>
+        <div class="phase-artifact-actions">
+          <button type="button" class="phase-artifact-save primary" data-base="${escapeHtml(artifact.name.replace(/\.edited\.([a-z]+)$/i, ".$1"))}">Save edits</button>
+          ${isEdited ? `<button type="button" class="phase-artifact-revert" data-base="${escapeHtml(artifact.name.replace(/\.edited\.([a-z]+)$/i, ".$1"))}">Revert to original</button>` : ""}
+          <span class="phase-artifact-save-status task-sub"></span>
+        </div>`;
+    } else {
+      node.innerHTML = `${headHtml}<div class="markdown-body">${renderMarkdown(content)}</div>${truncated ? '<div class="task-sub">Preview truncated — open full file from Execution log.</div>' : ""}`;
+    }
+    body.appendChild(node);
+  }
+  // Wire edit handlers
+  body.querySelectorAll(".phase-artifact-save").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const base = btn.dataset.base;
+      const textarea = btn.closest(".phase-artifact-card").querySelector(".phase-artifact-editor");
+      const statusEl = btn.parentElement.querySelector(".phase-artifact-save-status");
+      if (statusEl) statusEl.textContent = "Saving…";
+      try {
+        await apiFetch(`/api/tasks/${encodeURIComponent(detail.state.task_id)}/edit-artifact`, {
+          method: "POST",
+          body: JSON.stringify({ name: base, content: textarea.value }),
+        });
+        if (statusEl) statusEl.textContent = "Saved.";
+        loadDetail(detail.state.task_id).catch(() => {});
+      } catch (err) {
+        if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+  });
+  body.querySelectorAll(".phase-artifact-revert").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const base = btn.dataset.base;
+      if (!confirm(`Discard your edits to ${base}?`)) return;
+      try {
+        await apiFetch(`/api/tasks/${encodeURIComponent(detail.state.task_id)}/edit-artifact`, {
+          method: "POST",
+          body: JSON.stringify({ name: base, content: null }),
+        });
+        loadDetail(detail.state.task_id).catch(() => {});
+      } catch (err) {
+        showBanner(err.message);
+      }
+    });
+  });
+}
+
+
+function setAction(id, action, handler) {
+  const button = $(id);
+  button.disabled = !action?.enabled || state.busy;
+  button.title = action?.reason || "";
+  button.onclick = handler;
+}
+
+function renderGoal(task) {
+  const el = $("goalText");
+  if (!el) return;
+  const framing = task.framing && typeof task.framing === "object" ? task.framing : {};
+  const statement = String(framing.problem_statement || "").trim();
+  const nonGoals = Array.isArray(framing.non_goals) ? framing.non_goals.filter((x) => String(x || "").trim()) : [];
+  const assumptions = Array.isArray(framing.assumptions) ? framing.assumptions.filter((x) => String(x || "").trim()) : [];
+  const raw = String(task.goal?.raw_request || task.title || "").trim();
+  if (!statement) {
+    el.classList.add("copy-block");
+    el.classList.remove("goal-structured");
+    el.innerHTML = "";
+    el.textContent = raw || "Framer hasn't drafted a problem statement yet.";
+    return;
+  }
+  el.classList.remove("copy-block");
+  el.classList.add("goal-structured");
+  const parts = [
+    `<div class="goal-section"><div class="goal-label">Problem statement</div><p>${escapeHtml(statement)}</p></div>`,
+  ];
+  if (nonGoals.length) {
+    parts.push(`<div class="goal-section"><div class="goal-label">Non-goals</div><ul>${nonGoals.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`);
+  }
+  if (assumptions.length) {
+    parts.push(`<div class="goal-section"><div class="goal-label">Assumptions</div><ul>${assumptions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`);
+  }
+  if (raw && raw !== statement) {
+    parts.push(`<details class="goal-raw"><summary>Original request</summary><pre>${escapeHtml(raw)}</pre></details>`);
+  }
+  el.innerHTML = parts.join("");
+}
+
+function renderFramingReview(detail) {
+  const panel = $("framingReviewPanel");
+  const review = detail.framing_review;
   if (!review?.required) {
     panel.classList.add("hidden");
     panel.innerHTML = "";
+    panel.dataset.signature = "";
+    return;
+  }
+  if (review.running) {
+    panel.classList.remove("hidden");
+    const runningSig = `running:${review.error || ""}`;
+    if (panel.dataset.signature === runningSig) return;
+    panel.dataset.signature = runningSig;
+    const errBlock = review.error
+      ? `<div class="dialog-error">Framer failed: ${escapeHtml(String(review.error))}</div>`
+      : "";
+    panel.innerHTML = `
+      <div class="framing-review-head">
+        <div>
+          <h3>Framing</h3>
+          <p>Framer is drafting open questions. This page will update automatically when it's ready.</p>
+        </div>
+        <span class="badge status-FRAMING_REVIEW">FRAMING…</span>
+      </div>
+      <div class="framing-loading"><span class="spinner" aria-hidden="true"></span> Working…</div>
+      ${errBlock}`;
     return;
   }
   const questions = Array.isArray(review.questions) ? review.questions : [];
+  const blocking = review.blocking_count || 0;
+  const ready = !!review.ready_for_research;
+  const badge = ready ? "READY FOR RESEARCH" : (blocking ? `${blocking} BLOCKING` : "NEEDS REVIEW");
+  const badgeClass = ready ? "status-READY_TO_START" : "status-FRAMING_REVIEW";
+  const signature = `review:${ready ? 1 : 0}:${blocking}:${questions.map((q) => `${q.id}|${q.question}|${q.blocking ? 1 : 0}|${q.answer || ""}`).join("§")}`;
   panel.classList.remove("hidden");
+  if (panel.dataset.signature === signature) {
+    // Same content — keep existing DOM so the user's in-progress typing is preserved.
+    return;
+  }
+  panel.dataset.signature = signature;
   panel.innerHTML = `
-    <div class="analysis-review-head">
+    <div class="framing-review-head">
       <div>
-        <h3>Analysis review</h3>
-        <p>${escapeHtml(review.meaning || "Review the initial analysis before approval.")}</p>
+        <h3>Framing</h3>
+        <p>${escapeHtml(review.meaning || "Review the problem framing. Answer blocking questions, then start research.")}</p>
       </div>
-      <span class="badge status-WAITING_FOR_ANALYSIS_REVIEW">NEEDS ANSWERS</span>
+      <span class="badge ${badgeClass}">${escapeHtml(badge)}</span>
     </div>
     <div class="question-list">
-      ${questions.length ? questions.map(renderAnalysisQuestion).join("") : '<div class="task-sub">No open questions. Continue analysis to prepare the approval package.</div>'}
+      ${questions.length ? questions.map(renderFramingQuestion).join("") : '<div class="task-sub">No open questions. Click "Start research" to continue.</div>'}
     </div>
-    <div class="analysis-review-actions">
-      <button id="submitAnalysisReviewBtn" class="primary" type="button">Continue analysis</button>
+    <div class="framing-review-actions">
+      <button id="submitFramingBtn" class="secondary" type="button">Submit answers</button>
+      <button id="startResearchBtn" class="primary" type="button" ${ready ? "" : "disabled"} title="${ready ? "" : "Answer the required questions first"}">Start research →</button>
     </div>`;
-  $("submitAnalysisReviewBtn").addEventListener("click", submitAnalysisReview);
+  $("submitFramingBtn").addEventListener("click", submitFramingAnswers);
+  $("startResearchBtn").addEventListener("click", startResearch);
+  panel.querySelectorAll("textarea[data-question-id]").forEach((ta) => {
+    ta.addEventListener("input", () => refreshFramingReadiness(questions));
+  });
 }
 
-function renderAnalysisQuestion(question) {
+const PLACEHOLDER_ANSWERS = new Set(["", "unanswered", "n/a", "na", "tbd", "none"]);
+
+function refreshFramingReadiness(questions) {
+  const panel = $("framingReviewPanel");
+  if (!panel) return;
+  const answers = new Map();
+  for (const ta of panel.querySelectorAll("textarea[data-question-id]")) {
+    answers.set(ta.dataset.questionId, ta.value.trim().toLowerCase());
+    if (ta.value.trim()) ta.classList.remove("invalid");
+  }
+  let blocking = 0;
+  for (const q of questions) {
+    if (!q || !q.blocking) continue;
+    const v = answers.get(String(q.id || "")) ?? "";
+    if (PLACEHOLDER_ANSWERS.has(v)) blocking += 1;
+  }
+  const ready = blocking === 0;
+  const badgeEl = panel.querySelector(".framing-review-head .badge");
+  if (badgeEl) {
+    badgeEl.textContent = ready ? "READY FOR RESEARCH" : `${blocking} BLOCKING`;
+    badgeEl.className = `badge ${ready ? "status-READY_TO_START" : "status-FRAMING_REVIEW"}`;
+  }
+}
+
+function renderFramingQuestion(question) {
   const required = question.blocking ? "required" : "optional";
+  const raw = String(question.answer || "").trim();
+  const answer = raw.toLowerCase() === "unanswered" ? "" : raw;
   return `<label class="question-item">
     <span class="question-top"><strong>${escapeHtml(question.id || "Q")}</strong><em>${escapeHtml(required)}</em></span>
     <span>${escapeHtml(question.question || "Open question")}</span>
     ${question.reason ? `<small>${escapeHtml(question.reason)}</small>` : ""}
-    <textarea data-question-id="${escapeHtml(question.id || "")}" rows="3" placeholder="Answer or leave blank for AgentLoop assumptions">${escapeHtml(question.answer || "")}</textarea>
+    <textarea data-question-id="${escapeHtml(question.id || "")}" rows="2" placeholder="${question.blocking ? "Required answer" : "Optional — leave blank to use Framer assumptions"}">${escapeHtml(answer)}</textarea>
   </label>`;
 }
 
-async function submitAnalysisReview() {
+async function submitFramingAnswers() {
   if (!state.selectedTaskId) return;
-  const answers = {};
-  for (const input of $("analysisReviewPanel").querySelectorAll("textarea[data-question-id]")) {
-    answers[input.dataset.questionId] = input.value.trim();
+  const panel = $("framingReviewPanel");
+  const textareas = Array.from(panel.querySelectorAll("textarea[data-question-id]"));
+  const questionsById = new Map();
+  const review = state.detail?.framing_review;
+  for (const q of (review?.questions || [])) {
+    if (q && q.id) questionsById.set(String(q.id), q);
   }
-  const btn = $("submitAnalysisReviewBtn");
-  btn.disabled = true;
-  btn.textContent = "Continuing analysis...";
+  const missing = [];
+  const answers = {};
+  for (const input of textareas) {
+    const id = input.dataset.questionId;
+    const value = input.value.trim();
+    answers[id] = value;
+    const q = questionsById.get(id);
+    const blocking = q ? !!q.blocking : false;
+    input.classList.remove("invalid");
+    if (blocking && !value) missing.push(input);
+  }
+  if (missing.length) {
+    for (const input of missing) input.classList.add("invalid");
+    missing[0].focus();
+    showBanner(`Please answer ${missing.length} required question${missing.length === 1 ? "" : "s"} before submitting.`);
+    return;
+  }
+  const btn = $("submitFramingBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Re-framing…"; }
+  showBanner("Re-framing problem with your answers…");
   try {
-    state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/analysis-review`, { method: "POST", body: JSON.stringify({ by: "ui", answers }) });
+    state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/submit-framing`, { method: "POST", body: JSON.stringify({ by: "ui", answers }) });
     await loadTasks(true);
     showBanner(null);
   } catch (error) {
     showBanner(error.message);
-    btn.disabled = false;
-    btn.textContent = "Continue analysis";
+    if (btn) { btn.disabled = false; btn.textContent = "Submit answers"; }
   }
+}
+
+async function startResearch() {
+  if (!state.selectedTaskId) return;
+  state.busy = true;
+  renderDetail();
+  showBanner("Starting research…");
+  try {
+    state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/start-research`, { method: "POST", body: JSON.stringify({ by: "ui" }) });
+    await loadTasks(true);
+    showBanner(null);
+  } catch (error) {
+    showBanner(error.message);
+  } finally {
+    state.busy = false;
+    if (state.detail) renderDetail();
+  }
+}
+
+function renderResearchProgress(detail) {
+  const panel = $("researchProgressPanel");
+  if (!panel) return;
+  const status = String(detail.state.status || "").toUpperCase();
+  if (!["INVESTIGATING", "DESIGNING"].includes(status)) {
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+    return;
+  }
+  const stage = status === "INVESTIGATING" ? "Investigating current state" : "Drafting proposal, acceptance & test plan";
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <div class="research-progress-head">
+      <div>
+        <h3>Researching</h3>
+        <p>${escapeHtml(stage)}</p>
+      </div>
+      <span class="badge status-${escapeHtml(status)}">${escapeHtml(status)}</span>
+    </div>`;
 }
 
 function renderExecutionApproval(detail) {
@@ -287,30 +723,33 @@ function renderExecutionApproval(detail) {
     panel.innerHTML = "";
     return;
   }
-  const artifacts = Array.isArray(approval.artifacts) ? approval.artifacts : [];
+  const pkg = Array.isArray(approval.design_package) ? approval.design_package : [];
   const missing = Array.isArray(approval.missing_artifacts) ? approval.missing_artifacts : [];
   panel.classList.remove("hidden");
   panel.innerHTML = `
     <div class="execution-approval-head">
       <div>
-        <h3>Execution approval</h3>
-        <p>${escapeHtml(approval.meaning || "Review the completed plan before running changes.")}</p>
+        <h3>Awaiting approval</h3>
+        <p>${escapeHtml(approval.meaning || "Review the design package below, then approve to start the implementation loop.")}</p>
       </div>
       <span class="badge status-WAITING_FOR_ALIGNMENT">READY TO RUN</span>
     </div>
-    <div class="approval-artifact-grid">
-      ${artifacts.map((item) => `
-        <div class="approval-artifact ${item.ready ? "is-ready" : "is-missing"}">
-          <strong>${escapeHtml(item.name)}</strong>
-          <span>${escapeHtml(item.file)}</span>
-          <em>${item.ready ? "Ready" : "Missing"}</em>
+    <div class="design-package-cards">
+      ${pkg.map((item) => `
+        <div class="design-package-card ${item.ready ? "is-ready" : "is-missing"}">
+          <div class="dpc-head">
+            <strong>${escapeHtml(item.name)}</strong>
+            <em>${item.ready ? "Ready" : "Missing"}</em>
+          </div>
+          <p>${escapeHtml(item.description || "")}</p>
+          <code>${escapeHtml(item.file)}</code>
         </div>`).join("")}
     </div>
     ${missing.length ? `<div class="dialog-error">Missing approval artifacts: ${escapeHtml(missing.join(", "))}</div>` : ""}
     <div class="execution-approval-actions">
       <button id="approveFromPanelBtn" class="primary" type="button" ${detail.actions.approve?.enabled ? "" : "disabled"}>Approve and run</button>
     </div>`;
-  $("approveFromPanelBtn").addEventListener("click", () => mutate("approve"));
+  $("approveFromPanelBtn").addEventListener("click", () => approveAndRun());
 }
 
 function renderHumanReview(detail) {
@@ -389,6 +828,18 @@ async function resumeHumanReview() {
   }
 }
 
+function artifactPhase(name) {
+  const n = String(name || "").toLowerCase();
+  if (n.startsWith("framing.")) return "Framing";
+  if (n === "dossier.md") return "Research";
+  if (n === "proposal.md" || n.startsWith("acceptance.") || n === "test-plan.md") return "Design";
+  if (/^review-.*\.json$/i.test(name)) return "Reviews";
+  if (n === "final-report.md") return "Final";
+  return "Other";
+}
+
+const ARTIFACT_PHASE_ORDER = ["Framing", "Research", "Design", "Reviews", "Final", "Other"];
+
 function renderArtifacts(detail) {
   const list = $("artifactList");
   list.innerHTML = "";
@@ -397,19 +848,36 @@ function renderArtifacts(detail) {
     list.innerHTML = '<div class="task-sub">No markdown artifacts yet.</div>';
     return;
   }
+  const groups = new Map();
   for (const artifact of mdArtifacts) {
-    const node = document.createElement("section");
-    node.className = "artifact-item";
-    const truncated = artifact.preview?.truncated ? ` · truncated ${artifact.preview.bytes_returned}/${artifact.preview.bytes_total} bytes` : "";
+    const phase = artifactPhase(artifact.name);
+    if (!groups.has(phase)) groups.set(phase, []);
+    groups.get(phase).push(artifact);
+  }
+  for (const phase of ARTIFACT_PHASE_ORDER) {
+    const items = groups.get(phase);
+    if (!items?.length) continue;
+    const group = document.createElement("section");
+    group.className = "artifact-group";
     const head = document.createElement("div");
-    head.className = "artifact-head";
-    head.innerHTML = `<strong>${escapeHtml(artifact.name)}</strong><span class="task-sub">${artifact.size} bytes${truncated}</span>`;
-    const body = document.createElement("div");
-    body.className = "markdown-body";
-    body.innerHTML = renderMarkdown(artifact.preview?.content || "");
-    node.appendChild(head);
-    node.appendChild(body);
-    list.appendChild(node);
+    head.className = "artifact-group-head";
+    head.innerHTML = `<h3>${escapeHtml(phase)}</h3><span class="task-sub">${items.length} file${items.length === 1 ? "" : "s"}</span>`;
+    group.appendChild(head);
+    for (const artifact of items) {
+      const node = document.createElement("section");
+      node.className = "artifact-item";
+      const truncated = artifact.preview?.truncated ? ` · truncated ${artifact.preview.bytes_returned}/${artifact.preview.bytes_total} bytes` : "";
+      const itemHead = document.createElement("div");
+      itemHead.className = "artifact-head";
+      itemHead.innerHTML = `<strong>${escapeHtml(artifact.name)}</strong><span class="task-sub">${artifact.size} bytes${truncated}</span>`;
+      const body = document.createElement("div");
+      body.className = "markdown-body";
+      body.innerHTML = renderMarkdown(artifact.preview?.content || "");
+      node.appendChild(itemHead);
+      node.appendChild(body);
+      group.appendChild(node);
+    }
+    list.appendChild(group);
   }
 }
 
@@ -498,6 +966,28 @@ function renderConfig(detail) {
   const list = $("commandsList");
   list.innerHTML = "";
   commands.forEach((command) => addCommandRow(command));
+  renderConfigRoleRuntimes(detail);
+}
+
+function renderConfigRoleRuntimes(detail) {
+  const container = $("configRoleRuntimes");
+  if (!container) return;
+  const effective = detail.config.effective || {};
+  const roles = effective.roles && typeof effective.roles === "object" ? effective.roles : {};
+  const defaultRuntime = effective.default_runtime || "manual";
+  const entries = Object.entries(roles);
+  if (!entries.length) {
+    container.innerHTML = '<div class="task-sub">No role runtimes configured.</div>';
+    return;
+  }
+  container.innerHTML = entries.map(([role, cfg]) => {
+    const runtime = (cfg && cfg.runtime) || defaultRuntime;
+    const usesDefault = !(cfg && cfg.runtime);
+    return `<label class="role-runtime-row">
+      <span><strong>${escapeHtml(role)}</strong><small>${usesDefault ? "global default" : "role override"}</small></span>
+      <code>${escapeHtml(runtime)}</code>
+    </label>`;
+  }).join("");
 }
 
 function runtimeOptionsHtml(selected) {
@@ -582,11 +1072,63 @@ function renderSettingsRuntime(settings) {
   }).join("") : '<div class="task-sub">No runtimes configured.</div>';
 
   const roles = runtime.role_defaults || [];
-  $("roleDefaults").innerHTML = roles.map((role) => `
-    <div class="role-runtime-row">
+  const container = $("roleDefaults");
+  const saveBtn = $("roleDefaultsSaveBtn");
+  const statusEl = $("roleDefaultsStatus");
+  container.innerHTML = roles.map((role) => `
+    <label class="role-runtime-row">
       <span><strong>${escapeHtml(role.role)}</strong><small>${role.uses_global_default ? "global default" : "role default"}</small></span>
-      <code>${escapeHtml(role.runtime)}</code>
-    </div>`).join("");
+      <select data-role="${escapeHtml(role.role)}" data-original="${escapeHtml(role.runtime)}">${runtimeOptionsHtml(role.runtime)}</select>
+    </label>`).join("");
+  statusEl.classList.add("hidden");
+  statusEl.textContent = "";
+  saveBtn.disabled = true;
+  const updateDirty = () => {
+    const dirty = Array.from(container.querySelectorAll("select[data-role]")).some(
+      (s) => s.value !== s.dataset.original,
+    );
+    saveBtn.disabled = !dirty;
+    if (dirty) {
+      statusEl.classList.remove("hidden");
+      statusEl.textContent = "Unsaved changes";
+      statusEl.classList.remove("saved");
+    } else {
+      statusEl.classList.add("hidden");
+    }
+  };
+  for (const select of container.querySelectorAll("select[data-role]")) {
+    select.addEventListener("change", updateDirty);
+  }
+}
+
+async function saveRoleDefaults() {
+  const container = $("roleDefaults");
+  const saveBtn = $("roleDefaultsSaveBtn");
+  const statusEl = $("roleDefaultsStatus");
+  const role_runtimes = {};
+  for (const select of container.querySelectorAll("select[data-role]")) {
+    if (select.value !== select.dataset.original) {
+      role_runtimes[select.dataset.role] = select.value;
+    }
+  }
+  if (!Object.keys(role_runtimes).length) return;
+  saveBtn.disabled = true;
+  statusEl.classList.remove("hidden");
+  statusEl.textContent = "Saving…";
+  statusEl.classList.remove("saved");
+  try {
+    state.settings = await apiFetch("/api/settings", { method: "PATCH", body: JSON.stringify({ role_runtimes }) });
+    renderSettingsRuntime(state.settings);
+    statusEl.classList.remove("hidden");
+    statusEl.classList.add("saved");
+    statusEl.textContent = "Saved";
+    setTimeout(() => statusEl.classList.add("hidden"), 1500);
+  } catch (error) {
+    statusEl.classList.remove("hidden");
+    statusEl.classList.remove("saved");
+    statusEl.textContent = error.message;
+    saveBtn.disabled = false;
+  }
 }
 
 function runtimeEffectiveStatus(item) {
@@ -660,13 +1202,13 @@ function renderRuntime(detail) {
     state.iterationIndex = latest != null ? latest : byIter[byIter.length - 1].iteration;
   }
 
-  byIter.forEach((it) => {
+  byIter.forEach((it, idx) => {
     const chip = document.createElement("button");
     chip.className = `iter-chip ${it.iteration === state.iterationIndex ? "active" : ""}${it.iteration === latest ? " is-latest" : ""}`;
     const failBadge = it.tests_failed ? `<span class="iter-chip-fail">${it.tests_failed}</span>` : "";
     const passBadge = it.tests_passed ? `<span class="iter-chip-pass">${it.tests_passed}</span>` : "";
     chip.innerHTML = `
-      <span class="iter-chip-num">#${it.iteration}</span>
+      <span class="iter-chip-num">Iteration ${idx + 1}</span>
       <span class="iter-chip-meta">${it.agent_count} agent${it.agent_count === 1 ? "" : "s"} · ${it.test_count} test${it.test_count === 1 ? "" : "s"}</span>
       ${passBadge}${failBadge}`;
     chip.addEventListener("click", () => {
@@ -678,12 +1220,13 @@ function renderRuntime(detail) {
   });
 
   const current = byIter.find((it) => it.iteration === state.iterationIndex) || byIter[byIter.length - 1];
+  const currentDisplayNum = (byIter.findIndex((it) => it.iteration === current.iteration) + 1) || 1;
   const entries = [
     ...(current.agents || []).map((agent) => ({ type: "agent", label: agent.role || "agent", data: agent })),
     ...(current.tests || []).map((test) => ({ type: "test", label: test.name, data: test })),
   ];
   if (!entries.length) {
-    content.innerHTML = `<div class="task-sub">Iteration #${current.iteration} has no agent or test output.</div>`;
+    content.innerHTML = `<div class="task-sub">Iteration ${currentDisplayNum} has no agent or test output.</div>`;
     return;
   }
   if (state.runtimeIndex >= entries.length) state.runtimeIndex = 0;
@@ -693,7 +1236,7 @@ function renderRuntime(detail) {
     const isTest = entry.type === "test";
     const exit = isTest ? entry.data.exit_code : entry.data.exit_code;
     const dot = exit === 0 ? "ok" : (typeof exit === "number" ? "fail" : "muted");
-    button.innerHTML = `<span class="dot dot-${dot}"></span><span class="rt-label">${escapeHtml(entry.label)}</span><span class="rt-kind">${entry.type}</span>`;
+    button.innerHTML = `<span class="dot dot-${dot}"></span><span class="rt-label">${escapeHtml(entry.label)}</span><span class="rt-iter">Iteration ${currentDisplayNum}</span><span class="rt-kind">${entry.type}</span>`;
     button.className = index === state.runtimeIndex ? "active" : "";
     button.addEventListener("click", () => { state.runtimeIndex = index; renderRuntime(detail); });
     tabs.appendChild(button);
@@ -732,6 +1275,28 @@ async function mutate(op) {
   }
 }
 
+async function approveAndRun() {
+  if (!state.selectedTaskId) return;
+  const taskId = state.selectedTaskId;
+  state.busy = true;
+  renderDetail();
+  showBanner("Approving...");
+  try {
+    state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/approve`, { method: "POST", body: JSON.stringify({ by: "ui" }) });
+    if (state.detail?.actions?.run?.enabled) {
+      showBanner("Starting run...");
+      state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/run`, { method: "POST", body: JSON.stringify({ by: "ui" }) });
+    }
+    await loadTasks(true);
+    showBanner(null);
+  } catch (error) {
+    showBanner(error.message);
+  } finally {
+    state.busy = false;
+    if (state.detail) renderDetail();
+  }
+}
+
 function openDeleteDialog() {
   if (!state.selectedTaskId) return;
   $("deleteTaskId").textContent = state.selectedTaskId;
@@ -745,6 +1310,11 @@ function openDeleteDialog() {
 function wireEvents() {
   $("refreshBtn").addEventListener("click", () => loadTasks(true).catch((error) => showBanner(error.message)));
   $("settingsBtn").addEventListener("click", openSettingsDialog);
+  $("roleDefaultsSaveBtn").addEventListener("click", saveRoleDefaults);
+  $("taskSettingsBtn").addEventListener("click", () => {
+    const dlg = $("taskSettingsDialog");
+    if (dlg && typeof dlg.showModal === "function") dlg.showModal();
+  });
   $("searchInput").addEventListener("input", renderTaskList);
   $("newTaskBtn").addEventListener("click", openCreateDialog);
   $("addCommandBtn").addEventListener("click", () => addCommandRow(""));
@@ -755,14 +1325,16 @@ function wireEvents() {
     renderTaskList();
   });
   $("detailTabs").addEventListener("click", (event) => {
-    if (event.target.tagName !== "BUTTON") return;
-    const tab = event.target.dataset.tab;
+    const btn = event.target.closest("button[data-tab]");
+    if (!btn) return;
+    const tab = btn.dataset.tab;
     [...$("detailTabs").querySelectorAll("button")].forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
     [...document.querySelectorAll(".tab-panel")].forEach((panel) => panel.classList.toggle("active", panel.id === `${tab}Tab`));
   });
   $("createForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const request = $("requestInput").value.trim();
+    const codePath = $("codePathInput").value.trim();
     const errorBox = $("createError");
     const submitBtn = $("createSubmitBtn");
     errorBox.classList.add("hidden");
@@ -773,12 +1345,20 @@ function wireEvents() {
       $("requestInput").focus();
       return;
     }
+    if (!codePath) {
+      errorBox.textContent = "Code path is required.";
+      errorBox.classList.remove("hidden");
+      $("codePathInput").focus();
+      return;
+    }
     submitBtn.disabled = true;
     submitBtn.textContent = "Creating...";
     try {
-      const detail = await apiFetch("/api/tasks", { method: "POST", body: JSON.stringify({ request, role_runtimes: selectedRoleRuntimes() }) });
+      const maxIter = Number($("createMaxIterations").value) || 7;
+      const detail = await apiFetch("/api/tasks", { method: "POST", body: JSON.stringify({ request, code_path: codePath, role_runtimes: selectedRoleRuntimes(), max_iterations: maxIter }) });
       $("createDialog").close();
       $("requestInput").value = "";
+      $("codePathInput").value = "";
       state.selectedTaskId = detail.state.task_id;
       state.detail = detail;
       renderDetail();
@@ -829,7 +1409,7 @@ function wireEvents() {
     event.preventDefault();
     const commands = [...$("commandsList").querySelectorAll("input")].map((input) => input.value.trim()).filter(Boolean);
     try {
-      state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/config`, { method: "PATCH", body: JSON.stringify({ max_iterations: Number($("maxIterationsInput").value), test_commands: commands }) });
+      state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/config`, { method: "PATCH", body: JSON.stringify({ test_commands: commands }) });
       renderDetail();
       showBanner(null);
     } catch (error) { showBanner(error.message); }

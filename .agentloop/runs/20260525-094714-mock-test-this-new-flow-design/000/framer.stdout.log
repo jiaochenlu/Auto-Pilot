@@ -1,0 +1,6 @@
+Created the framing artifacts and stopped before research:
+
+- [.agentloop/tasks/20260525-094714-mock-test-this-new-flow-design/artifacts/framing.md](C:/Users/chenlujiao/OneDrive%20-%20Microsoft/Documents/AutoPilot/.agentloop/tasks/20260525-094714-mock-test-this-new-flow-design/artifacts/framing.md)
+- [.agentloop/tasks/20260525-094714-mock-test-this-new-flow-design/artifacts/framing.json](C:/Users/chenlujiao/OneDrive%20-%20Microsoft/Documents/AutoPilot/.agentloop/tasks/20260525-094714-mock-test-this-new-flow-design/artifacts/framing.json)
+
+Validated that `framing.json` parses, both open-question `answer` fields are `""`, and `ready_for_research` is `false` because blocking questions remain unanswered.

@@ -10,7 +10,7 @@ from typing import Any
 from .workspace import WorkspaceError, config_path, load_config, write_json
 
 
-VALID_ROLES = {"analyst", "architect", "implementer", "tester", "reviewer", "integrator"}
+VALID_ROLES = {"framer", "investigator", "architect", "implementer", "tester", "reviewer", "integrator"}
 
 RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
     "codex": {

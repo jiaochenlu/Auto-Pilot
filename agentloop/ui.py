@@ -93,8 +93,11 @@ class AgentLoopUIHandler(BaseHTTPRequestHandler):
                 if op == "approve":
                     self._send_json(200, api.approve_task_api(self.root, task_id, payload))
                     return
-                if op == "analysis-review":
-                    self._send_json(200, api.submit_analysis_review_api(self.root, task_id, payload))
+                if op == "submit-framing":
+                    self._send_json(200, api.submit_framing_answers_api(self.root, task_id, payload))
+                    return
+                if op == "start-research":
+                    self._send_json(200, api.start_research_api(self.root, task_id, payload))
                     return
                 if op == "cancel":
                     self._send_json(200, api.cancel_task_api(self.root, task_id, payload))
@@ -105,6 +108,9 @@ class AgentLoopUIHandler(BaseHTTPRequestHandler):
                 if op == "resume":
                     self._send_json(200, api.resume_task_api(self.root, task_id, payload))
                     return
+                if op == "edit-artifact":
+                    self._send_json(200, api.edit_artifact_api(self.root, task_id, payload))
+                    return
             self._send_json(404, {"error": {"code": "not_found", "message": "Endpoint not found."}})
         except Exception as exc:
             self._handle_error(exc)
@@ -114,6 +120,9 @@ class AgentLoopUIHandler(BaseHTTPRequestHandler):
             parts = [unquote(part) for part in urlparse(self.path).path.split("/") if part]
             if len(parts) == 4 and parts[:2] == ["api", "tasks"] and parts[3] == "config":
                 self._send_json(200, api.patch_task_config(self.root, parts[2], self._read_json()))
+                return
+            if parts == ["api", "settings"]:
+                self._send_json(200, api.patch_settings(self.root, self._read_json()))
                 return
             self._send_json(404, {"error": {"code": "not_found", "message": "Endpoint not found."}})
         except Exception as exc:

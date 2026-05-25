@@ -29,7 +29,8 @@ def default_config() -> dict[str, Any]:
             }
         },
         "roles": {
-            "analyst": {"runtime": "manual"},
+            "framer": {"runtime": "manual"},
+            "investigator": {"runtime": "manual"},
             "architect": {"runtime": "manual"},
             "implementer": {"runtime": "manual"},
             "tester": {"runtime": "manual"},
@@ -60,22 +61,26 @@ def default_state() -> dict[str, Any]:
         },
         "acceptance_criteria": [],
         "phases": {
-            "analysis": {
+            "framing": {
                 "status": "pending",
-                "artifact": ".agentloop/artifacts/analysis.md",
+                "artifact": ".agentloop/artifacts/framing.md",
             },
-            "analysis_review": {
+            "framing_review": {
                 "status": "pending",
-                "artifact": ".agentloop/artifacts/analysis.md",
+                "artifact": ".agentloop/artifacts/framing.md",
+            },
+            "investigation": {
+                "status": "pending",
+                "artifact": ".agentloop/artifacts/dossier.md",
+            },
+            "proposal": {
+                "status": "pending",
+                "artifact": ".agentloop/artifacts/proposal.md",
             },
             "alignment": {
                 "status": "pending",
                 "approved_by": None,
                 "approved_at": None,
-            },
-            "design": {
-                "status": "pending",
-                "artifact": ".agentloop/artifacts/design.md",
             },
             "test_authoring": {
                 "status": "pending",
@@ -100,19 +105,23 @@ def default_state() -> dict[str, Any]:
 def next_action(state: dict[str, Any]) -> str:
     status = state.get("status")
     phases = state.get("phases", {}) if isinstance(state.get("phases"), dict) else {}
-    analysis_ref = phases.get("analysis", {}).get("artifact", ".agentloop/artifacts/analysis.md")
-    acceptance_ref = phases.get("alignment", {}).get("artifact", ".agentloop/artifacts/acceptance.md")
+    framing_ref = phases.get("framing", {}).get("artifact", ".agentloop/artifacts/framing.md")
+    acceptance_ref = ".agentloop/artifacts/acceptance.md"
     final_ref = ".agentloop/artifacts/final-report.md"
     task_id = state.get("task_id")
     if isinstance(task_id, str) and task_id:
         final_ref = f".agentloop/tasks/{task_id}/artifacts/final-report.md"
     if status == "CREATED":
-        return "Run `agentloop start \"<task>\"` to create analysis and acceptance artifacts."
+        return "Run `agentloop start \"<task>\"` to draft the framing and open questions."
+    if status == "FRAMING_REVIEW":
+        return f"Answer the open questions in `{framing_ref}`, then click \"Start research\"."
+    if status in {"INVESTIGATING", "DESIGNING"}:
+        return "Research in progress — wait for the dossier, proposal, acceptance, and test plan."
     if status == "WAITING_FOR_ALIGNMENT":
-        return f"Review `{analysis_ref}` and `{acceptance_ref}`, then run `agentloop approve`."
+        return f"Review the design package and acceptance (`{acceptance_ref}`), then run `agentloop approve`."
     if status == "READY_TO_START":
-        return "Run `agentloop run` to start the design/implementation/testing/review loop."
-    if status in {"DESIGNING", "IMPLEMENTING_AND_TESTING", "REVIEWING"}:
+        return "Run `agentloop run` to start the implementation/testing/review loop."
+    if status in {"IMPLEMENTING_AND_TESTING", "REVIEWING"}:
         return "Run `agentloop run` or wait for the active phase to finish."
     if status == "WAITING_FOR_HUMAN":
         return "Review the latest artifact or review report, then run the appropriate resume command."

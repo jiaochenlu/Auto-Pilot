@@ -40,76 +40,89 @@
         <section class="detail-panel">
           <div id="banner" class="banner hidden"></div>
           <header class="detail-header">
-            <div>
+            <div class="detail-header-info">
               <div class="eyebrow" id="taskIdLabel">No task selected</div>
               <h2 id="taskTitle">Select a task</h2>
               <div class="meta" id="taskMeta"></div>
             </div>
-            <div class="actions">
-              <button id="approveBtn">Approve</button>
-              <button id="cancelBtn">Cancel</button>
-              <button id="deleteBtn" class="danger">Delete</button>
+            <div class="actions" id="actionBar">
+              <button id="primaryActionBtn" class="primary" hidden></button>
+              <button id="cancelBtn" hidden>Cancel</button>
+              <button id="deleteBtn" class="danger" hidden>Delete</button>
+              <button id="taskSettingsBtn" title="Task settings">Settings</button>
             </div>
           </header>
 
+          <ol id="lifecycle" class="lifecycle" aria-label="Task lifecycle"></ol>
+
           <div class="tabs" id="detailTabs">
-            <button data-tab="overview" class="active">Overview</button>
-            <button data-tab="artifacts">Artifacts</button>
-            <button data-tab="config">Config</button>
-            <button data-tab="runtime">Runtime</button>
+            <button data-tab="basic" class="active"><span class="tab-name">Basic</span><span class="tab-sub" id="basicTabSub">current phase</span></button>
+            <button data-tab="execlog"><span class="tab-name">Execution log</span><span class="tab-sub">iterations &amp; artifacts</span></button>
           </div>
 
-          <div id="overviewTab" class="tab-panel active">
-            <section id="analysisReviewPanel" class="analysis-review-panel hidden"></section>
+          <div id="basicTab" class="tab-panel active" data-phase="">
+            <section id="goalSection">
+              <h3>Goal</h3>
+              <pre id="goalText" class="copy-block goal-text"></pre>
+            </section>
+            <section id="framingReviewPanel" class="framing-review-panel hidden"></section>
+            <section id="researchProgressPanel" class="research-progress-panel hidden"></section>
             <section id="executionApprovalPanel" class="execution-approval-panel hidden"></section>
             <section id="humanReviewPanel" class="human-review-panel hidden"></section>
-            <div class="split">
-              <section>
-                <h3>Goal</h3>
-                <pre id="goalText" class="copy-block"></pre>
-              </section>
-              <section>
-                <h3>Phases</h3>
-                <div id="phaseList" class="phase-list"></div>
-              </section>
-            </div>
-            <section>
+            <section id="acceptanceSection">
               <h3 class="section-head">Acceptance <span id="acceptanceCount" class="section-count"></span></h3>
               <div id="acceptanceList" class="acceptance-list"></div>
             </section>
+            <section id="phaseArtifactSection" class="phase-artifact-section hidden">
+              <h3 class="section-head"><span id="phaseArtifactHeading">Artifacts</span></h3>
+              <div id="phaseArtifactBody" class="phase-artifact-body"></div>
+            </section>
+            <div id="overviewCta" class="overview-cta hidden"></div>
+            <div id="basicEmpty" class="task-sub hidden">Task complete. See Execution log for the full history.</div>
           </div>
 
-          <div id="artifactsTab" class="tab-panel">
-            <div id="artifactList" class="artifact-list"></div>
-          </div>
-
-          <div id="configTab" class="tab-panel">
-            <form id="configForm" class="config-form">
-              <label>
-                <span>Max iterations</span>
-                <input id="maxIterationsInput" type="number" min="1" />
-              </label>
-              <div>
-                <div class="field-row">
-                  <span>Test commands</span>
-                  <button type="button" id="addCommandBtn">Add</button>
-                </div>
-                <div id="commandsList" class="commands-list"></div>
-              </div>
-              <button class="primary" type="submit">Save config</button>
-            </form>
-          </div>
-
-          <div id="runtimeTab" class="tab-panel">
+          <div id="execlogTab" class="tab-panel">
             <div id="iterationBar" class="iteration-bar"></div>
             <div class="runtime-layout">
               <div id="runtimeTabs" class="runtime-tabs"></div>
               <div id="runtimeContent" class="runtime-content"></div>
             </div>
+            <section class="execlog-artifacts">
+              <h3 class="section-head">Artifacts <span class="task-sub">all phases</span></h3>
+              <div id="artifactList" class="artifact-list"></div>
+            </section>
           </div>
         </section>
       </main>
     </div>
+
+    <dialog id="taskSettingsDialog">
+      <form id="configForm" class="dialog-form config-form">
+        <div class="dialog-title-row">
+          <h3>Task settings</h3>
+          <button type="button" class="icon-button" title="Close" onclick="this.closest('dialog').close()">×</button>
+        </div>
+        <label>
+          <span>Max iterations <small class="task-sub">set at task creation</small></span>
+          <input id="maxIterationsInput" type="number" min="1" readonly />
+        </label>
+        <div>
+          <div class="field-row">
+            <span>Test commands</span>
+            <button type="button" id="addCommandBtn">Add</button>
+          </div>
+          <div id="commandsList" class="commands-list"></div>
+        </div>
+        <div>
+          <div class="field-row"><span>Role runtimes</span><small class="task-sub">read-only · edit defaults in Settings</small></div>
+          <div id="configRoleRuntimes" class="role-runtime-list readonly"></div>
+        </div>
+        <menu>
+          <button type="button" value="cancel" onclick="this.closest('dialog').close()">Cancel</button>
+          <button class="primary" type="submit">Save</button>
+        </menu>
+      </form>
+    </dialog>
 
     <dialog id="createDialog" class="wide-dialog horizontal-dialog">
       <form id="createForm" class="dialog-form">
@@ -122,6 +135,11 @@
           <section class="dialog-col">
             <label class="dialog-field-label" for="requestInput">Describe the task</label>
             <textarea id="requestInput" rows="10" placeholder="What should the agent do?"></textarea>
+            <label class="dialog-field-label" for="codePathInput" style="margin-top:12px;">
+              <span>Code path</span>
+              <span class="task-sub">absolute path to a file or folder</span>
+            </label>
+            <input id="codePathInput" type="text" placeholder="C:/path/to/repo or /path/to/file.py" />
           </section>
           <section class="dialog-col">
             <div class="dialog-field-label">
@@ -129,6 +147,10 @@
               <span class="task-sub">applies to this task</span>
             </div>
             <div id="createRuntimeList" class="role-runtime-list"></div>
+            <label class="dialog-field-label" for="createMaxIterations" style="margin-top:12px;">
+              <span>Max iterations</span>
+            </label>
+            <input id="createMaxIterations" type="number" min="1" value="7" />
           </section>
         </div>
         <menu>
@@ -160,7 +182,11 @@
               </div>
               <div class="settings-section">
                 <h3>Default role runtimes</h3>
-                <div id="roleDefaults" class="role-runtime-list readonly"></div>
+                <div id="roleDefaults" class="role-runtime-list"></div>
+                <div class="role-defaults-footer">
+                  <div id="roleDefaultsStatus" class="role-defaults-status hidden"></div>
+                  <button type="button" id="roleDefaultsSaveBtn" class="btn-save" disabled>Save</button>
+                </div>
               </div>
             </section>
           </div>

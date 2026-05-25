@@ -1,6 +1,10 @@
 {
+  "max_iterations": 7,
   "roles": {
-    "analyst": {
+    "framer": {
+      "runtime": "codex"
+    },
+    "investigator": {
       "runtime": "codex"
     },
     "architect": {

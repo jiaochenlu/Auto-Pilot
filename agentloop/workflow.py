@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -28,134 +30,288 @@ def slugify(value: str) -> str:
     return slug[:48] or "task"
 
 
+_CJK_RANGES = (
+    (0x3040, 0x30FF),   # Japanese kana
+    (0x3400, 0x4DBF),   # CJK Extension A
+    (0x4E00, 0x9FFF),   # CJK Unified Ideographs (covers Chinese + most Kanji)
+    (0xAC00, 0xD7AF),   # Hangul
+    (0xF900, 0xFAFF),   # CJK Compatibility Ideographs
+)
+
+
+def detect_language(text: str) -> str:
+    if not text:
+        return "en"
+    for ch in text:
+        code = ord(ch)
+        for lo, hi in _CJK_RANGES:
+            if lo <= code <= hi:
+                if 0xAC00 <= code <= 0xD7AF:
+                    return "ko"
+                if 0x3040 <= code <= 0x30FF:
+                    return "ja"
+                return "zh"
+    return "en"
+
+
+_LANGUAGE_DISPLAY_NAMES = {
+    "zh": "Chinese (中文)",
+    "ja": "Japanese (日本語)",
+    "ko": "Korean (한국어)",
+    "en": "English",
+}
+
+
+def language_directive(state: dict[str, Any]) -> str:
+    lang = (state.get("goal", {}) or {}).get("language") or "en"
+    if lang == "en":
+        return ""
+    display = _LANGUAGE_DISPLAY_NAMES.get(lang, lang)
+    return (
+        f"User's working language: **{display}**. "
+        "Write all human-facing prose (analysis, design rationale, question text, summaries, "
+        "acceptance criterion descriptions, review comments) in that language. "
+        "Keep code, file paths, identifiers, JSON keys, structured field names, status enums, "
+        "and shell commands in English.\n\n"
+    )
+
+
+def _normalize_code_path(raw: str) -> tuple[Path, str]:
+    candidate = Path(str(raw).strip().strip('"').strip("'")).expanduser()
+    if not candidate.is_absolute():
+        candidate = candidate.resolve()
+    else:
+        candidate = candidate.resolve()
+    if not candidate.exists():
+        raise WorkspaceError(f"Code path does not exist: {candidate}")
+    display = str(candidate).replace("\\", "/")
+    return candidate, display
+
+
+def code_path_directive(state: dict[str, Any]) -> str:
+    goal = state.get("goal", {}) or {}
+    raw = (goal.get("code_path") or "").strip()
+    if not raw:
+        return ""
+    kind = (goal.get("code_path_kind") or "").strip() or "path"
+    if kind == "file":
+        path_obj = Path(raw)
+        parent = str(path_obj.parent).replace("\\", "/") or "/"
+        return (
+            f"Task code path: `{raw}` (single file). "
+            f"Treat its parent directory `{parent}` as the working directory. "
+            "Focus analysis on this file and its immediate neighbors; expand scope only when the task requires it.\n\n"
+        )
+    return (
+        f"Task code path: `{raw}` (directory). "
+        "Treat it as the working directory and limit analysis to files under it unless the task explicitly requires looking elsewhere. "
+        "All file paths cited in your output must be relative to this directory.\n\n"
+    )
+
+
+def effective_cwd_for_task(root: Path, state: dict[str, Any]) -> Path:
+    goal = state.get("goal", {}) or {}
+    raw = (goal.get("code_path") or "").strip()
+    if not raw:
+        return root
+    path_obj = Path(raw)
+    if not path_obj.exists():
+        return root
+    if path_obj.is_file():
+        return path_obj.parent
+    return path_obj
+
+
 def create_task_id(raw_request: str) -> str:
     compact_time = utc_now_iso().replace("-", "").replace(":", "").split("+")[0].replace("T", "-")
     return f"{compact_time}-{slugify(raw_request)}"
 
 
-def draft_analysis(raw_request: str) -> str:
-    fragments = requirement_fragments(raw_request)
-    requirement_lines = "\n".join(f"- {fragment}" for fragment in fragments)
-    return f"""# Task Analysis
-
-## Raw Request
-
-{raw_request}
-
-## Current Understanding
-
-The requester wants this specific outcome delivered:
-
-{requirement_lines}
-
-## Assumptions
-
-- The implementation should stay inside the current workspace.
-- The result should satisfy the task-specific acceptance criteria in `acceptance.md`.
-- Execution should not start until the requester approves this analysis and the acceptance criteria.
-
-## Risks
-
-- The request may need more detail about exact files, visual style, or verification commands.
-- Some acceptance criteria may need manual review if no automated test can verify them.
-- If the requester disagrees with these criteria, they should revise the task before approval.
-
-## Open Questions
-
-- None. The current request is specific enough to proceed with conservative assumptions.
-"""
+def requirement_fragments(raw_request: str) -> list[str]:
+    normalized = re.sub(r"[\r\n]+", " ", raw_request.strip())
+    parts = re.split(r"[;；。.!?？]+|要求[:：]", normalized)
+    fragments: list[str] = []
+    for part in parts:
+        fragment = part.strip(" ，,、")
+        if len(fragment) >= 4 and fragment not in fragments:
+            fragments.append(fragment)
+    return fragments or [raw_request.strip()]
 
 
-def draft_analysis_questions(raw_request: str) -> list[dict[str, Any]]:
+# ---------------------------------------------------------------------------
+# Framing helpers
+# ---------------------------------------------------------------------------
+
+
+def _initial_open_questions(raw_request: str, prior: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    if prior:
+        # Carry forward unanswered + blocking questions; reuse answers.
+        return prior
     lower = raw_request.lower()
     questions: list[dict[str, Any]] = []
-    if any(token in lower for token in ["performance", "slow", "too slow", "性能", "太慢"]):
+    if any(token in lower for token in ["performance", "slow", "too slow", "性能", "太慢", "latency", "timeout"]):
         questions.append(
             {
                 "id": "Q-1",
-                "question": "Is there a specific performance target, or should AgentLoop define a conservative benchmark from the current code and input size?",
-                "blocking": False,
-                "reason": "A target improves precision, but the agent can choose a reasonable regression benchmark if unanswered.",
-                "answer": None,
+                "question": "Is there a specific performance target (latency, throughput, percentile), or should AgentLoop define a conservative baseline?",
+                "blocking": True,
+                "reason": "A measurable target is needed before research can pick a baseline to beat.",
+                "answer": "",
             }
         )
     if not re.search(r"[\w./\\-]+\.(py|js|ts|tsx|jsx|json|md|html|css)\b", raw_request):
         questions.append(
             {
-                "id": "Q-2",
-                "question": "Which files or area of the codebase should AgentLoop inspect first?",
+                "id": "Q-FILES",
+                "question": "Which files, modules, or subsystem should AgentLoop investigate first?",
                 "blocking": True,
-                "reason": "The request does not name a concrete file or subsystem, so implementation scope may be ambiguous.",
-                "answer": None,
+                "reason": "Investigation scope is ambiguous without a concrete starting point.",
+                "answer": "",
             }
         )
+    questions.append(
+        {
+            "id": "Q-OUTCOME",
+            "question": "What does success look like from the requester's perspective? Any non-goals to keep out of scope?",
+            "blocking": False,
+            "reason": "Clarifies acceptance signals and prevents scope creep.",
+            "answer": "",
+        }
+    )
     return questions
 
 
-def append_analysis_answers(analysis: str, questions: list[dict[str, Any]]) -> str:
-    if not questions:
-        return analysis
-    lines = [analysis.rstrip(), "", "## User Answers", ""]
+_PLACEHOLDER_ANSWERS = {"", "unanswered", "n/a", "na", "tbd", "none"}
+
+
+def _ready_for_research(questions: list[dict[str, Any]]) -> bool:
     for item in questions:
-        answer = str(item.get("answer") or "").strip() or "No answer provided; proceed with documented assumptions."
-        lines.append(f"- {item.get('id')}: {item.get('question')}")
-        lines.append(f"  Answer: {answer}")
-    return "\n".join(lines) + "\n"
+        if not isinstance(item, dict):
+            continue
+        answer = str(item.get("answer") or "").strip().lower()
+        if item.get("blocking") and answer in _PLACEHOLDER_ANSWERS:
+            return False
+    return True
 
 
-def draft_final_analysis(raw_request: str, questions: list[dict[str, Any]]) -> str:
-    base = draft_analysis(raw_request).rstrip()
-    answered = append_analysis_answers(base, questions).rstrip() if questions else base
-    return f"""{answered}
+def draft_framing_json(raw_request: str, questions: list[dict[str, Any]]) -> dict[str, Any]:
+    fragments = requirement_fragments(raw_request)
+    assumptions = ["Implementation stays inside the current workspace."]
+    if not _ready_for_research(questions):
+        assumptions.append("Blocking questions remain; do not begin research until they are answered.")
+    return {
+        "problem_statement": fragments[0] if fragments else raw_request.strip(),
+        "non_goals": [],
+        "assumptions": assumptions,
+        "open_questions": questions,
+        "ready_for_research": _ready_for_research(questions),
+    }
 
-## Final Analysis
 
-AgentLoop has no remaining blocking open questions for this task. Execution can proceed after requester approval of the implementation design, acceptance criteria, and test plan.
+def draft_framing(raw_request: str, framing_json: dict[str, Any]) -> str:
+    fragments = requirement_fragments(raw_request)
+    bullets = "\n".join(f"- {fragment}" for fragment in fragments)
+    open_lines = []
+    for item in framing_json.get("open_questions", []):
+        if not isinstance(item, dict):
+            continue
+        marker = "blocking" if item.get("blocking") else "optional"
+        answer = str(item.get("answer") or "").strip()
+        answer_line = f"\n  Answer: {answer}" if answer else ""
+        open_lines.append(
+            f"- {item.get('id')} ({marker}): {item.get('question')}\n  Reason: {item.get('reason', '')}" + answer_line
+        )
+    open_block = "\n".join(open_lines) or "- None."
+    assumption_block = "\n".join(f"- {a}" for a in framing_json.get("assumptions", [])) or "- None."
+    non_goal_block = "\n".join(f"- {a}" for a in framing_json.get("non_goals", [])) or "- None recorded."
+    ready_line = "Ready for research." if framing_json.get("ready_for_research") else "Blocking questions remain. Answer them to unlock research."
+    return f"""# Problem Framing
 
-## Verification Plan
+## Raw Request
 
-- Use task-specific automated tests when the request changes code, fixes a bug, or addresses performance.
-- Record exact commands, exit codes, and evidence in the task artifacts before reviewer approval.
-- Do not mark the task done unless required acceptance criteria have passing evidence or a documented human-review decision.
+{raw_request}
+
+## Problem Statement
+
+{framing_json.get("problem_statement", "")}
+
+## What the requester is asking for
+
+{bullets}
+
+## Non-Goals
+
+{non_goal_block}
+
+## Assumptions
+
+{assumption_block}
+
+## Open Questions
+
+{open_block}
+
+## Status
+
+{ready_line}
 """
 
 
-def draft_execution_design(state: dict[str, Any]) -> str:
+# ---------------------------------------------------------------------------
+# Investigator + Architect helpers
+# ---------------------------------------------------------------------------
+
+
+def draft_dossier(state: dict[str, Any]) -> str:
     request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
-    criteria = state.get("acceptance_criteria") or []
-    criteria_lines = "\n".join(f"- {item.get('id')}: {item.get('description')}" for item in criteria) or "- No acceptance criteria recorded."
-    return f"""# Implementation Design
+    framing = state.get("framing") or {}
+    statement = framing.get("problem_statement") or request
+    return f"""# Investigation Dossier
 
-## Task
+## Problem
 
-{request}
+{statement}
 
-## Scope
+## Current-state archive
 
-- Inspect the files and subsystems directly implied by the request.
-- Keep edits limited to the requested behavior and its focused tests.
-- Preserve existing public behavior unless an acceptance criterion explicitly changes it.
+- Investigator should list the relevant files (file:line) and summarize today's behavior.
+- For performance work, record baseline measurements, repro commands, and contributing call sites.
 
-## Acceptance Targets
+## Affected modules
 
-{criteria_lines}
+- To be filled in by the investigator with concrete file references.
 
-## Execution Approach
+## Open risks discovered during investigation
 
-1. Tester authors focused regression or validation tests before implementation when the task changes code behavior.
-2. Implementer makes the smallest scoped change that satisfies the accepted criteria.
-3. Tester runs focused checks and records evidence.
-4. Reviewer verifies acceptance criteria, test evidence, and scope before completion.
-
-## Risks
-
-- Missing or weak tests can hide regressions.
-- Performance tasks need measurable evidence instead of subjective speed claims.
-- If implementation reveals new ambiguity, AgentLoop should pause for Human Review instead of widening scope silently.
+- None recorded yet.
 """
 
 
-def draft_pre_approval_test_plan(state: dict[str, Any]) -> str:
+def draft_proposal(state: dict[str, Any]) -> str:
+    request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
+    framing = state.get("framing") or {}
+    statement = framing.get("problem_statement") or request
+    return f"""# Solution Proposal
+
+## Problem
+
+{statement}
+
+## Recommended Approach
+
+- Architect should describe the chosen approach and why it satisfies the framing.
+
+## Alternatives Considered
+
+- Architect should list the alternatives evaluated and the reason each was rejected.
+
+## Risks & Open Trade-offs
+
+- To be filled in by the architect.
+"""
+
+
+def draft_test_plan_from_proposal(state: dict[str, Any]) -> str:
     request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
     criteria = state.get("acceptance_criteria") or []
     automated = [item for item in criteria if str(item.get("verification") or "").lower() in {"automated_test", "unit_test", "test"}]
@@ -170,8 +326,8 @@ def draft_pre_approval_test_plan(state: dict[str, Any]) -> str:
 
 ## Pre-Implementation Test Authoring
 
-- Before implementation, tester should create or update focused tests that capture the requested behavior.
-- For bug, regression, performance, slow, or timeout tasks, the test plan must include a regression or performance signal before reviewer approval.
+- Tester creates or updates focused regression tests for the approved task before implementation.
+- For bug, regression, performance, slow, or timeout tasks, the plan must include a regression or performance signal before reviewer approval.
 
 ## Required Evidence
 
@@ -184,18 +340,7 @@ def draft_pre_approval_test_plan(state: dict[str, Any]) -> str:
 """
 
 
-def requirement_fragments(raw_request: str) -> list[str]:
-    normalized = re.sub(r"[\r\n]+", " ", raw_request.strip())
-    parts = re.split(r"[;；。.!?？]+|要求[:：]", normalized)
-    fragments: list[str] = []
-    for part in parts:
-        fragment = part.strip(" ，,、")
-        if len(fragment) >= 4 and fragment not in fragments:
-            fragments.append(fragment)
-    return fragments or [raw_request.strip()]
-
-
-def draft_custom_acceptance_items(raw_request: str, analysis_ref: str, acceptance_ref: str) -> list[dict[str, Any]]:
+def draft_acceptance_items(raw_request: str, acceptance_ref: str) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for index, fragment in enumerate(requirement_fragments(raw_request), start=1):
         lower = fragment.lower()
@@ -211,6 +356,7 @@ def draft_custom_acceptance_items(raw_request: str, analysis_ref: str, acceptanc
             "slow",
             "too slow",
             "timeout",
+            "latency",
             "单元测试",
             "测试",
             "缺陷",
@@ -231,17 +377,46 @@ def draft_custom_acceptance_items(raw_request: str, analysis_ref: str, acceptanc
                 "evidence": acceptance_ref if verification == "functional_review" else "configured test command output",
             }
         )
-    items.append(
-        {
-            "id": f"AC-{len(items) + 1}",
-            "description": "Requester reviews and approves the task-specific analysis and acceptance criteria before execution starts.",
-            "verification": "human_review",
-            "required": True,
-            "status": "pending",
-            "evidence": analysis_ref,
-        }
-    )
     return items
+
+
+def draft_acceptance(raw_request: str, criteria: list[dict[str, Any]], framing_ref: str) -> str:
+    rows = "\n".join(
+        "| {id} | {required} | {verification} | {description} | {status} | {evidence} |".format(
+            id=item.get("id"),
+            required="yes" if item.get("required", True) else "no",
+            verification=item.get("verification", "review"),
+            description=str(item.get("description", "")).replace("|", "\\|"),
+            status=item.get("status", "pending"),
+            evidence=item.get("evidence", ""),
+        )
+        for item in criteria
+    )
+    return f"""# Acceptance Criteria
+
+## Task
+
+{raw_request}
+
+## Draft Criteria
+
+| ID | Required | Verification | Criterion | Status | Evidence |
+| --- | --- | --- | --- | --- | --- |
+{rows}
+
+## Approval Instruction
+
+Review this file together with `{framing_ref}`, the dossier, and the proposal. If the scope is correct, run:
+
+```powershell
+python -m agentloop approve
+```
+"""
+
+
+# ---------------------------------------------------------------------------
+# Prompt preparation
+# ---------------------------------------------------------------------------
 
 
 def task_id_or_error(state: dict[str, Any]) -> str:
@@ -263,27 +438,78 @@ def write_role_prompt(root: Path, role: str, content: str) -> None:
     write_text(agentloop_path(root) / "prompts" / f"{role}.md", content)
 
 
-def prepare_analyst_prompt(root: Path, state: dict[str, Any]) -> None:
+def prepare_framer_prompt(root: Path, state: dict[str, Any]) -> None:
     request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
-    analysis_ref = artifact_ref(state, "analysis.md")
-    acceptance_ref = artifact_ref(state, "acceptance.md")
-    acceptance_json_ref = artifact_ref(state, "acceptance.json")
+    framing_ref = artifact_ref(state, "framing.md")
+    framing_json_ref = artifact_ref(state, "framing.json")
+    prior_qa = state.get("framing_questions") or []
+    prior_block = "\n".join(
+        f"- {item.get('id')}: {item.get('question')} (answer: {str(item.get('answer') or '').strip() or 'unanswered'})"
+        for item in prior_qa
+        if isinstance(item, dict)
+    ) or "- (none yet)"
     write_role_prompt(
         root,
-        "analyst",
-        "# Analyst Prompt\n\n"
+        "framer",
+        "# Framer Prompt\n\n"
+        f"{language_directive(state)}"
+        f"{code_path_directive(state)}"
         f"Task request:\n{request}\n\n"
-        "Analyze this specific task. Do not use generic AgentLoop acceptance criteria unless they are directly required by the task.\n\n"
+        "Frame the problem so research and implementation can later proceed without ambiguity. Do NOT propose a solution yet.\n\n"
+        f"Prior Q&A:\n{prior_block}\n\n"
         "Required outputs:\n"
-        f"- Write task-specific analysis to `{analysis_ref}`. Include goal, non-goals, assumptions, risks, and open questions.\n"
-        "- Include a `Verification Plan` section in the analysis. For bug, regression, performance, or code-change tasks, name the focused tests or test files that should prove the fix.\n"
-        f"- Write human-readable task-specific acceptance criteria to `{acceptance_ref}`.\n"
-        f"- Write structured acceptance criteria JSON to `{acceptance_json_ref}`.\n\n"
-        "The JSON must be an object with `acceptance_criteria`, an array of objects containing: "
-        "id, description, verification, required, status, evidence. Use status `pending`.\n"
-        "For bug, regression, performance, slow, timeout, or code-change tasks, include at least one required "
-        "criterion with verification `automated_test`; its evidence should name the expected regression test file or command.\n"
-        "Stop after producing these files; execution starts only after requester approval.\n",
+        f"- Write a human-readable framing to `{framing_ref}` (problem statement, non-goals, assumptions, open questions).\n"
+        f"- Write structured framing JSON to `{framing_json_ref}` with the schema "
+        "{problem_statement, non_goals[], assumptions[], open_questions[{id,question,blocking,reason,answer}], ready_for_research}.\n"
+        "- Leave `answer` as an empty string (\"\") when the requester has not answered. Do NOT write placeholder text like \"unanswered\", \"n/a\", or \"tbd\".\n"
+        "- Set `ready_for_research` to true only when no blocking question is unanswered.\n"
+        "- Stop after producing these two files; research starts only after the requester clicks \"Start research\".\n",
+    )
+
+
+def prepare_investigator_prompt(root: Path, state: dict[str, Any]) -> None:
+    request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
+    framing_ref = artifact_ref(state, "framing.md")
+    dossier_ref = artifact_ref(state, "dossier.md")
+    write_role_prompt(
+        root,
+        "investigator",
+        "# Investigator Prompt\n\n"
+        f"{language_directive(state)}"
+        f"{code_path_directive(state)}"
+        f"Task request:\n{request}\n\n"
+        f"Framing input: `{framing_ref}` (treat as approved by the requester).\n\n"
+        "Investigate the current state of the relevant code, configuration, and behavior. Do NOT propose changes yet.\n\n"
+        "Required outputs:\n"
+        f"- Write the dossier to `{dossier_ref}` with: (1) current-state archive (file:line citations), "
+        "(2) baseline data or reproduction, (3) affected modules, (4) any open risks you discovered.\n"
+        "- Only describe what exists today; leave the recommendation to the architect.\n",
+    )
+
+
+def prepare_architect_design_prompt(root: Path, state: dict[str, Any]) -> None:
+    request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
+    framing_ref = artifact_ref(state, "framing.md")
+    dossier_ref = artifact_ref(state, "dossier.md")
+    proposal_ref = artifact_ref(state, "proposal.md")
+    acceptance_ref = artifact_ref(state, "acceptance.md")
+    acceptance_json_ref = artifact_ref(state, "acceptance.json")
+    test_plan_ref = artifact_ref(state, "test-plan.md")
+    write_role_prompt(
+        root,
+        "architect",
+        "# Architect Prompt (pre-approval)\n\n"
+        f"{language_directive(state)}"
+        f"{code_path_directive(state)}"
+        f"Task request:\n{request}\n\n"
+        f"Inputs: `{framing_ref}`, `{dossier_ref}`.\n\n"
+        "Required outputs:\n"
+        f"- `{proposal_ref}` — recommended approach, alternatives considered, risks.\n"
+        f"- `{acceptance_ref}` — human-readable acceptance criteria.\n"
+        f"- `{acceptance_json_ref}` — structured `{{acceptance_criteria: [{{id, description, verification, required, status, evidence}}]}}`.\n"
+        f"- `{test_plan_ref}` — pre-implementation test plan with required evidence and reviewer gate.\n\n"
+        "For bug, regression, performance, slow, timeout, or code-change tasks, include at least one required criterion with verification `automated_test`.\n"
+        "Stop after producing these files; execution starts only after the requester approves.\n",
     )
 
 
@@ -296,16 +522,22 @@ def prepare_role_prompt(
     mode: str | None = None,
 ) -> None:
     request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
-    design_ref = artifact_ref(state, "design.md")
-    test_plan_ref = artifact_ref(state, "test-plan.md")
+    has_snapshot = bool((state.get("runtime_input") or {}).get("files"))
+    proposal_name = "proposal.approved.md" if has_snapshot else "proposal.md"
+    test_plan_name = "test-plan.approved.md" if has_snapshot else "test-plan.md"
+    proposal_ref = artifact_ref(state, proposal_name)
+    test_plan_ref = artifact_ref(state, test_plan_name)
     final_ref = artifact_ref(state, "final-report.md")
     review_ref = artifact_ref(state, review_name or f"review-{iteration:03d}.json")
     artifact_dir_ref = task_artifact_ref(task_id_or_error(state), "")
 
     common = (
+        f"{language_directive(state)}"
+        f"{code_path_directive(state)}"
         f"Task: {request}\n"
         f"Iteration: {iteration}\n"
         f"Task artifact directory: `{artifact_dir_ref}`\n"
+        f"Approved proposal: `{proposal_ref}`\n"
         "Use paths exactly as written. Do not write task artifacts to `.agentloop/artifacts/`.\n"
     )
     tester_instruction = (
@@ -313,7 +545,7 @@ def prepare_role_prompt(
     )
     if mode == "pre_implementation":
         tester_instruction = (
-            f"Before implementation, create or update focused regression tests for the approved task and write the plan at `{test_plan_ref}`.\n"
+            f"Before implementation, create or update focused regression tests for the approved task and update the plan at `{test_plan_ref}`.\n"
             "The tests should fail against the current buggy or slow behavior when feasible, and pass after the implementation fix.\n"
             "Include exact test files, commands, expected signals, and measurable acceptance thresholds when the task implies performance.\n"
             "Do not implement the production fix in this tester step.\n"
@@ -325,15 +557,10 @@ def prepare_role_prompt(
         )
 
     prompts = {
-        "architect": (
-            "# Architect Prompt\n\n"
-            f"{common}\n"
-            f"Produce the design document at `{design_ref}`.\n"
-        ),
         "implementer": (
             "# Implementer Prompt\n\n"
             f"{common}\n"
-            "Implement the approved task in the workspace. Keep changes scoped to the request.\n"
+            "Implement the approved task in the workspace. Keep changes scoped to the proposal.\n"
         ),
         "tester": (
             "# Tester Prompt\n\n"
@@ -362,100 +589,9 @@ def prepare_role_prompt(
         write_role_prompt(root, role, prompts[role])
 
 
-def draft_acceptance(raw_request: str, criteria: list[dict[str, Any]], analysis_ref: str) -> str:
-    rows = "\n".join(
-        "| {id} | {required} | {verification} | {description} | {status} | {evidence} |".format(
-            id=item.get("id"),
-            required="yes" if item.get("required", True) else "no",
-            verification=item.get("verification", "review"),
-            description=str(item.get("description", "")).replace("|", "\\|"),
-            status=item.get("status", "pending"),
-            evidence=item.get("evidence", ""),
-        )
-        for item in criteria
-    )
-    return f"""# Acceptance Criteria
-
-## Task
-
-{raw_request}
-
-## Draft Criteria
-
-| ID | Required | Verification | Criterion | Status | Evidence |
-| --- | --- | --- | --- | --- | --- |
-{rows}
-
-## Approval Instruction
-
-Review this file and `{analysis_ref}`. If the scope is correct, run:
-
-```powershell
-python -m agentloop approve
-```
-"""
-
-
-def draft_design(state: dict[str, Any], iteration: int) -> str:
-    request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
-    artifact_dir_ref = task_artifact_ref(task_id_or_error(state), "")
-    return f"""# Design
-
-## Task
-
-{request}
-
-## Iteration
-
-{iteration}
-
-## Approach
-
-AgentLoop will keep orchestration logic local and agent-agnostic. The workflow engine owns task state, artifacts, review gate decisions, and bounded iteration. Coding agents are replaceable runtimes connected through prompt files, artifacts, logs, and structured JSON outputs.
-
-## Runtime Boundary
-
-- Core workflow code must not import or depend on Codex, Claude Code, Copilot, or any other specific coding agent.
-- Runtime configuration selects which external agent handles each role.
-- The `manual` runtime remains valid for environments where an agent cannot be invoked directly.
-
-## Files And Ownership
-
-- `agentloop/workflow.py`: workflow state transitions.
-- `agentloop/quality.py`: review JSON parsing and gate decisions.
-- `agentloop/runner.py`: local command execution for tests.
-- `{artifact_dir_ref}`: durable workflow artifacts for this task.
-
-## Test Strategy
-
-- Unit tests cover CLI state transitions and artifact generation.
-- Configured test commands are run during `agentloop run` when present.
-- Review JSON records test evidence and acceptance results.
-"""
-
-
-def draft_test_plan(state: dict[str, Any], test_results: list[dict[str, Any]]) -> str:
-    commands = test_results or []
-    command_lines = "\n".join(
-        f"- `{item['command']}` -> exit {item['exit_code']} ({item['log']})" for item in commands
-    ) or "- No test commands configured."
-    return f"""# Test Plan
-
-## Scope
-
-Validate the AgentLoop local workflow through state files, artifacts, and command behavior.
-
-## Checks
-
-- `agentloop start` creates analysis and acceptance artifacts.
-- `agentloop approve` moves the task to `READY_TO_START`.
-- `agentloop run` creates design, test-plan, review, and final-report artifacts.
-- Review JSON can be parsed and evaluated by the quality gate.
-
-## Test Command Results
-
-{command_lines}
-"""
+# ---------------------------------------------------------------------------
+# Manual fallbacks
+# ---------------------------------------------------------------------------
 
 
 def manual_review(state: dict[str, Any], test_results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -463,7 +599,7 @@ def manual_review(state: dict[str, Any], test_results: list[dict[str, Any]]) -> 
     acceptance_results = []
     for criterion in state.get("acceptance_criteria", []):
         status = criterion.get("status")
-        if criterion.get("id") in {"AC-1", "AC-2", "AC-3", "AC-4"} and not test_failure:
+        if not test_failure and status == "pending":
             status = "passed"
         acceptance_results.append(
             {
@@ -494,12 +630,29 @@ def manual_review(state: dict[str, Any], test_results: list[dict[str, Any]]) -> 
 
     return {
         "decision": "APPROVED",
-        "summary": "Manual runtime generated required Phase 3 artifacts and no configured tests failed.",
+        "summary": "Manual runtime generated required artifacts and no configured tests failed.",
         "open_medium_high_count": 0,
         "comments": [],
         "acceptance_results": acceptance_results,
         "test_results": test_results,
     }
+
+
+def draft_test_plan_with_results(state: dict[str, Any], test_results: list[dict[str, Any]]) -> str:
+    commands = test_results or []
+    command_lines = "\n".join(
+        f"- `{item['command']}` -> exit {item['exit_code']} ({item['log']})" for item in commands
+    ) or "- No test commands configured."
+    return f"""# Test Plan
+
+## Scope
+
+Validate the approved proposal through configured commands and focused regression tests.
+
+## Test Command Results
+
+{command_lines}
+"""
 
 
 def draft_final_report(state: dict[str, Any], review: dict[str, Any]) -> str:
@@ -520,15 +673,12 @@ def draft_final_report(state: dict[str, Any], review: dict[str, Any]) -> str:
 
 ## Artifacts
 
-- `{artifact_ref(state, "analysis.md")}`
+- `{artifact_ref(state, "framing.md")}`
+- `{artifact_ref(state, "dossier.md")}`
+- `{artifact_ref(state, "proposal.md")}`
 - `{artifact_ref(state, "acceptance.md")}`
-- `{artifact_ref(state, "design.md")}`
 - `{artifact_ref(state, "test-plan.md")}`
 - `{review_artifact}`
-
-## Residual Risk
-
-- The MVP still uses the manual runtime; real coding agent adapters are configured in later phases.
 """
 
 
@@ -570,18 +720,102 @@ def load_acceptance_criteria(path: Path) -> list[dict[str, Any]]:
     return normalized
 
 
+# ---------------------------------------------------------------------------
+# Public workflow entry points
+# ---------------------------------------------------------------------------
+
+
+def _run_framer(root: Path, state: dict[str, Any], config: dict[str, Any], task_id: str) -> None:
+    framing_ref = task_artifact_ref(task_id, "framing.md")
+    framing_json_ref = task_artifact_ref(task_id, "framing.json")
+    prepare_framer_prompt(root, state)
+    if role_uses_manual(config, "framer"):
+        framing_path = task_artifact_path(root, task_id, "framing.md")
+        framing_json_path = task_artifact_path(root, task_id, "framing.json")
+        framing_path.parent.mkdir(parents=True, exist_ok=True)
+        framing_json = draft_framing_json(
+            state.get("goal", {}).get("raw_request") or "",
+            state.get("framing_questions") or [],
+        )
+        framing_path.write_text(
+            draft_framing(state.get("goal", {}).get("raw_request") or "", framing_json),
+            encoding="utf-8",
+        )
+        framing_json_path.write_text(json.dumps(framing_json, indent=2) + "\n", encoding="utf-8")
+    record_agent_result(
+        state,
+        run_role(root, config, "framer", 0, [framing_ref, framing_json_ref], task_id=task_id),
+    )
+
+
+def _finalize_framing_state(root: Path, state: dict[str, Any], task_id: str) -> None:
+    framing_json = _load_framing_json(root, task_id)
+    if framing_json.get("open_questions"):
+        state["framing_questions"] = framing_json["open_questions"]
+    state["framing"] = framing_json
+    state["status"] = "FRAMING_REVIEW"
+    state["current_phase"] = "framing_review"
+    state["framing_running"] = False
+    state["framing_error"] = None
+    state["updated_at"] = utc_now_iso()
+
+
+def _run_framer_in_background(root: Path, task_id: str) -> None:
+    from .tasks import effective_config, load_task_state, save_task_state
+
+    try:
+        state = load_task_state(root, task_id)
+        config = effective_config(root, task_id)
+        _run_framer(root, state, config, task_id)
+        _finalize_framing_state(root, state, task_id)
+        save_task_state(root, task_id, state)
+    except Exception as exc:  # pragma: no cover - reported through state
+        try:
+            state = load_task_state(root, task_id)
+            state["framing_running"] = False
+            state["framing_error"] = f"{exc.__class__.__name__}: {exc}"
+            state["updated_at"] = utc_now_iso()
+            save_task_state(root, task_id, state)
+        except Exception:
+            traceback.print_exc()
+
+
+def _spawn_framer_thread(root: Path, task_id: str) -> None:
+    thread = threading.Thread(
+        target=_run_framer_in_background,
+        args=(root, task_id),
+        name=f"framer-{task_id}",
+        daemon=True,
+    )
+    thread.start()
+
+
+def _load_framing_json(root: Path, task_id: str) -> dict[str, Any]:
+    path = task_artifact_path(root, task_id, "framing.json")
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise WorkspaceError(f"Invalid framing.json: {exc}") from exc
+    return data if isinstance(data, dict) else {}
+
+
 def start_task(
     root: Path,
     raw_request: str,
     config_override: dict[str, Any] | None = None,
-    require_analysis_review: bool = False,
-    run_analyst: bool = True,
+    code_path: str | None = None,
 ) -> dict[str, Any]:
-    from .tasks import effective_config, save_task_config, set_current_task_id
+    from .tasks import save_task_config, set_current_task_id
 
     request = raw_request.strip()
     if not request:
         raise WorkspaceError("Task request cannot be empty.")
+    if not code_path or not str(code_path).strip():
+        raise WorkspaceError("Code path is required.")
+    resolved_path, display_path = _normalize_code_path(code_path)
+    code_path_kind = "file" if resolved_path.is_file() else "directory"
 
     task_id = create_task_id(request)
     now = utc_now_iso()
@@ -589,53 +823,157 @@ def start_task(
     state["task_id"] = task_id
     if config_override:
         save_task_config(root, task_id, config_override)
-    config = effective_config(root, task_id)
-    analysis_ref = task_artifact_ref(task_id, "analysis.md")
-    acceptance_ref = task_artifact_ref(task_id, "acceptance.md")
-    acceptance_json_ref = task_artifact_ref(task_id, "acceptance.json")
+    framing_ref = task_artifact_ref(task_id, "framing.md")
     state["title"] = request[:80]
-    state["status"] = "WAITING_FOR_ANALYSIS_REVIEW" if require_analysis_review else "WAITING_FOR_ALIGNMENT"
-    state["current_phase"] = "analysis_review" if require_analysis_review else "alignment"
+    state["status"] = "FRAMING"
+    state["current_phase"] = "framing"
+    state["framing_running"] = True
+    state["framing_error"] = None
     state["iteration"] = 0
     state["requires_human_approval"] = True
     state["goal"] = {
         "raw_request": request,
+        "language": detect_language(request),
+        "code_path": display_path,
+        "code_path_kind": code_path_kind,
         "problem": None,
         "desired_outcome": None,
         "non_goals": [],
     }
     state["acceptance_criteria"] = []
-    state["phases"]["analysis"]["status"] = "completed"
-    state["phases"]["analysis"]["artifact"] = analysis_ref
-    state.setdefault("phases", {}).setdefault("analysis_review", {"status": "pending"})
-    state["phases"]["analysis_review"]["status"] = "waiting_for_review" if require_analysis_review else "completed"
-    state["phases"]["analysis_review"]["artifact"] = analysis_ref
-    state["phases"]["alignment"]["status"] = "pending" if require_analysis_review else "waiting_for_approval"
-    state["phases"]["alignment"]["artifact"] = acceptance_ref
-    state["phases"]["design"]["artifact"] = task_artifact_ref(task_id, "design.md")
-    state.setdefault("phases", {}).setdefault("test_authoring", {"status": "pending"})
+    state["framing_questions"] = _initial_open_questions(request, None)
+    state["phases"]["framing"]["status"] = "completed"
+    state["phases"]["framing"]["artifact"] = framing_ref
+    state["phases"]["framing_review"]["status"] = "waiting_for_review"
+    state["phases"]["framing_review"]["artifact"] = framing_ref
+    state["phases"]["investigation"]["artifact"] = task_artifact_ref(task_id, "dossier.md")
+    state["phases"]["proposal"]["artifact"] = task_artifact_ref(task_id, "proposal.md")
     state["phases"]["test_authoring"]["artifact"] = task_artifact_ref(task_id, "test-plan.md")
     state["phases"]["testing"]["artifact"] = task_artifact_ref(task_id, "test-plan.md")
-    state["analysis_questions"] = draft_analysis_questions(request) if require_analysis_review else []
     state["agents"] = []
     state["updated_at"] = now
 
-    task_artifact_path(root, task_id, "analysis.md").parent.mkdir(parents=True, exist_ok=True)
-    prepare_analyst_prompt(root, state)
-    manual_criteria = draft_custom_acceptance_items(request, analysis_ref, acceptance_ref)
-    if not run_analyst or role_uses_manual(config, "analyst"):
-        write_text(task_artifact_path(root, task_id, "analysis.md"), draft_analysis(request))
-        write_text(task_artifact_path(root, task_id, "acceptance.json"), json.dumps({"acceptance_criteria": manual_criteria}, indent=2) + "\n")
-        write_text(task_artifact_path(root, task_id, "acceptance.md"), draft_acceptance(request, manual_criteria, analysis_ref))
-    if run_analyst:
-        record_agent_result(
-            state,
-            run_role(root, config, "analyst", 0, [analysis_ref, acceptance_ref, acceptance_json_ref], task_id=task_id),
-        )
-    state["acceptance_criteria"] = load_acceptance_criteria(task_artifact_path(root, task_id, "acceptance.json"))
-    # Make this task the current one (updates legacy pointer + per-task file).
+    task_artifact_path(root, task_id, "framing.md").parent.mkdir(parents=True, exist_ok=True)
     set_current_task_id(root, task_id)
     save_state(root, state)
+    _spawn_framer_thread(root, task_id)
+    return state
+
+
+def submit_framing_answers(
+    root: Path,
+    task_id: str,
+    answers: dict[str, str],
+    by: str = "ui",
+) -> dict[str, Any]:
+    from .tasks import load_task_state, save_task_state
+
+    state = load_task_state(root, task_id)
+    if state.get("status") != "FRAMING_REVIEW":
+        raise WorkspaceError(f"Cannot submit framing answers while status is {state.get('status')}.")
+    questions = state.get("framing_questions") if isinstance(state.get("framing_questions"), list) else []
+    for item in questions:
+        if not isinstance(item, dict):
+            continue
+        qid = str(item.get("id") or "")
+        if qid in answers:
+            item["answer"] = str(answers[qid]).strip()
+    state["framing_questions"] = questions
+    state.setdefault("framing_reviews", []).append(
+        {"at": utc_now_iso(), "by": by, "answers": answers}
+    )
+
+    state["status"] = "FRAMING"
+    state["current_phase"] = "framing"
+    state["framing_running"] = True
+    state["framing_error"] = None
+    state["updated_at"] = utc_now_iso()
+    save_task_state(root, task_id, state)
+    _spawn_framer_thread(root, task_id)
+    return state
+
+
+def start_research(root: Path, task_id: str) -> dict[str, Any]:
+    from .tasks import effective_config, load_task_state, save_task_state
+
+    state = load_task_state(root, task_id)
+    if state.get("status") != "FRAMING_REVIEW":
+        raise WorkspaceError(f"Cannot start research while status is {state.get('status')}.")
+    questions = state.get("framing_questions") if isinstance(state.get("framing_questions"), list) else []
+    if not _ready_for_research(questions):
+        raise WorkspaceError("Required framing questions must be answered before starting research.")
+
+    config = effective_config(root, task_id)
+    now = utc_now_iso()
+    state["status"] = "INVESTIGATING"
+    state["current_phase"] = "investigation"
+    state["phases"]["framing_review"]["status"] = "completed"
+    state["phases"]["investigation"]["status"] = "in_progress"
+    state["updated_at"] = now
+    save_task_state(root, task_id, state)
+
+    # Investigator
+    dossier_ref = task_artifact_ref(task_id, "dossier.md")
+    prepare_investigator_prompt(root, state)
+    if role_uses_manual(config, "investigator"):
+        path = task_artifact_path(root, task_id, "dossier.md")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(draft_dossier(state), encoding="utf-8")
+    record_agent_result(
+        state,
+        run_role(root, config, "investigator", 0, [dossier_ref], task_id=task_id),
+    )
+    state["phases"]["investigation"]["status"] = "completed"
+    state["status"] = "DESIGNING"
+    state["current_phase"] = "proposal"
+    state["phases"]["proposal"]["status"] = "in_progress"
+    state["updated_at"] = utc_now_iso()
+    save_task_state(root, task_id, state)
+
+    # Architect (pre-approval design pass)
+    framing_ref = task_artifact_ref(task_id, "framing.md")
+    proposal_ref = task_artifact_ref(task_id, "proposal.md")
+    acceptance_ref = task_artifact_ref(task_id, "acceptance.md")
+    acceptance_json_ref = task_artifact_ref(task_id, "acceptance.json")
+    test_plan_ref = task_artifact_ref(task_id, "test-plan.md")
+    prepare_architect_design_prompt(root, state)
+    if role_uses_manual(config, "architect"):
+        request = state.get("goal", {}).get("raw_request") or state.get("title") or ""
+        manual_criteria = draft_acceptance_items(request, acceptance_ref)
+        task_artifact_path(root, task_id, "proposal.md").write_text(draft_proposal(state), encoding="utf-8")
+        task_artifact_path(root, task_id, "acceptance.json").write_text(
+            json.dumps({"acceptance_criteria": manual_criteria}, indent=2) + "\n", encoding="utf-8"
+        )
+        task_artifact_path(root, task_id, "acceptance.md").write_text(
+            draft_acceptance(request, manual_criteria, framing_ref), encoding="utf-8"
+        )
+        # Stash criteria into state so the test-plan draft has them.
+        state["acceptance_criteria"] = manual_criteria
+        task_artifact_path(root, task_id, "test-plan.md").write_text(
+            draft_test_plan_from_proposal(state), encoding="utf-8"
+        )
+    record_agent_result(
+        state,
+        run_role(
+            root,
+            config,
+            "architect",
+            0,
+            [proposal_ref, acceptance_ref, acceptance_json_ref, test_plan_ref],
+            task_id=task_id,
+        ),
+    )
+    state["acceptance_criteria"] = load_acceptance_criteria(
+        task_artifact_path(root, task_id, "acceptance.json")
+    )
+    state["phases"]["proposal"]["status"] = "completed"
+    state["phases"]["test_authoring"]["status"] = "ready_for_approval"
+    state["phases"]["alignment"]["status"] = "waiting_for_approval"
+    state["status"] = "WAITING_FOR_ALIGNMENT"
+    state["current_phase"] = "alignment"
+    state["requires_human_approval"] = True
+    state["updated_at"] = utc_now_iso()
+    save_task_state(root, task_id, state)
     return state
 
 
@@ -662,18 +1000,49 @@ def approve_task(root: Path, approved_by: str = "requester", task_id: str | None
     state["phases"]["alignment"]["approved_by"] = approved_by
     state["phases"]["alignment"]["approved_at"] = now
     state["updated_at"] = now
+    state["runtime_input"] = _snapshot_runtime_input(root, tid)
     save_task_state(root, tid, state)
     return state
+
+
+def _snapshot_runtime_input(root: Path, task_id: str) -> dict[str, Any]:
+    """Capture the approval-time content (edited if present, else original) of
+    design-package artifacts into a dict, so the implementer/tester loop reads
+    from this snapshot rather than re-reading files mid-run. Also writes
+    `*.approved.<ext>` copies for runtimes that need file paths."""
+    artifacts_dir = root / ".agentloop" / "tasks" / task_id / "artifacts"
+    snapshot: dict[str, Any] = {"captured_at": utc_now_iso(), "files": {}}
+    bases = ["proposal.md", "acceptance.md", "acceptance.json", "test-plan.md", "dossier.md"]
+    for base in bases:
+        stem, dot, ext = base.rpartition(".")
+        edited = artifacts_dir / (f"{stem}.edited.{ext}" if dot else f"{base}.edited")
+        original = artifacts_dir / base
+        chosen = edited if edited.exists() else original
+        if not chosen.exists():
+            continue
+        try:
+            text = chosen.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        approved = artifacts_dir / (f"{stem}.approved.{ext}" if dot else f"{base}.approved")
+        approved.write_text(text, encoding="utf-8")
+        snapshot["files"][base] = {
+            "content": text,
+            "source": "edited" if chosen is edited else "original",
+            "path": chosen.resolve().relative_to(root.resolve()).as_posix(),
+            "approved_path": approved.resolve().relative_to(root.resolve()).as_posix(),
+        }
+    return snapshot
+
+
 
 
 def cancel_task(root: Path, cancelled_by: str = "requester", task_id: str | None = None) -> dict[str, Any]:
     from .tasks import load_task_state, resolve_task_id, save_task_state
 
-    tid: str
     try:
         tid = resolve_task_id(root, task_id)
     except WorkspaceError:
-        # Backwards-compatible behavior: when no task at all, fall through to legacy load.
         legacy = load_state(root)
         status = legacy.get("status")
         if status in {"CREATED", "DONE", "CANCELLED"}:
@@ -686,6 +1055,7 @@ def cancel_task(root: Path, cancelled_by: str = "requester", task_id: str | None
         raise WorkspaceError(f"Cannot cancel while status is {status}.")
 
     now = utc_now_iso()
+    state["cancelled_from"] = status
     state["status"] = "CANCELLED"
     state["current_phase"] = "cancelled"
     state["requires_human_approval"] = False
@@ -703,7 +1073,7 @@ def run_one_iteration(root: Path, task_id: str | None = None) -> dict[str, Any]:
     state = load_task_state(root, tid)
     config = effective_config(root, tid)
     status = state.get("status")
-    if status not in {"READY_TO_START", "DESIGNING"}:
+    if status not in {"READY_TO_START", "IMPLEMENTING_AND_TESTING"}:
         raise WorkspaceError(f"Cannot run while status is {status}.")
 
     iteration = int(state.get("iteration") or 0) + 1
@@ -716,27 +1086,8 @@ def run_one_iteration(root: Path, task_id: str | None = None) -> dict[str, Any]:
         return state
 
     state["iteration"] = iteration
-    state["status"] = "DESIGNING"
-    state["current_phase"] = "design"
-    state["phases"]["design"]["status"] = "in_progress"
-    state["updated_at"] = utc_now_iso()
-    save_task_state(root, tid, state)
-
-    design_ref = artifact_ref(state, "design.md")
-    prepare_role_prompt(root, state, "architect", iteration)
-    if role_uses_manual(config, "architect"):
-        write_text(artifact_file(root, state, "design.md"), draft_design(state, iteration))
-    record_agent_result(
-        state,
-        run_role(root, config, "architect", iteration, [design_ref], task_id=tid),
-    )
-    state["phases"]["design"]["status"] = "completed"
     state["status"] = "IMPLEMENTING_AND_TESTING"
     state["current_phase"] = "test_authoring"
-    state.setdefault("phases", {}).setdefault(
-        "test_authoring",
-        {"status": "pending", "artifact": artifact_ref(state, "test-plan.md")},
-    )
     state["phases"]["test_authoring"]["status"] = "in_progress"
     state["updated_at"] = utc_now_iso()
     save_task_state(root, tid, state)
@@ -764,7 +1115,7 @@ def run_one_iteration(root: Path, task_id: str | None = None) -> dict[str, Any]:
     test_results = run_test_commands(root, list(config.get("test_commands") or []), iteration, task_id=tid)
     prepare_role_prompt(root, state, "tester", iteration, mode="post_implementation")
     if role_uses_manual(config, "tester"):
-        write_text(artifact_file(root, state, "test-plan.md"), draft_test_plan(state, test_results))
+        write_text(artifact_file(root, state, "test-plan.md"), draft_test_plan_with_results(state, test_results))
     record_agent_result(
         state,
         run_role(root, config, "tester", iteration, [test_plan_ref], task_id=tid),
@@ -818,8 +1169,8 @@ def run_one_iteration(root: Path, task_id: str | None = None) -> dict[str, Any]:
             state["status"] = "BLOCKED"
             state["current_phase"] = "blocked"
         else:
-            state["status"] = "DESIGNING"
-            state["current_phase"] = "design"
+            state["status"] = "IMPLEMENTING_AND_TESTING"
+            state["current_phase"] = "test_authoring"
     state["updated_at"] = utc_now_iso()
     save_task_state(root, tid, state)
     return state
@@ -830,13 +1181,13 @@ def run_task(root: Path, task_id: str | None = None) -> dict[str, Any]:
 
     tid = resolve_task_id(root, task_id)
     state = load_task_state(root, tid)
-    if state.get("status") not in {"READY_TO_START", "DESIGNING"}:
+    if state.get("status") not in {"READY_TO_START", "IMPLEMENTING_AND_TESTING"}:
         raise WorkspaceError(f"Cannot run while status is {state.get('status')}.")
 
-    while state.get("status") in {"READY_TO_START", "DESIGNING"}:
+    while state.get("status") in {"READY_TO_START", "IMPLEMENTING_AND_TESTING"}:
         previous_iteration = int(state.get("iteration") or 0)
         state = run_one_iteration(root, tid)
-        if state.get("status") != "DESIGNING":
+        if state.get("status") != "IMPLEMENTING_AND_TESTING":
             break
         if int(state.get("iteration") or 0) <= previous_iteration:
             raise WorkspaceError("Iteration did not advance; refusing to continue automatic loop.")

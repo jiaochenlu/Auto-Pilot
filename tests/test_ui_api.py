@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -9,11 +10,29 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from agentloop.api import approve_task_api, build_settings, build_task_detail, build_task_list, create_task, delete_task, patch_task_config, resume_task_api, submit_analysis_review_api
+from agentloop.api import (
+    approve_task_api,
+    build_settings,
+    build_task_detail,
+    build_task_list,
+    create_task,
+    delete_task,
+    patch_task_config,
+    resume_task_api,
+    start_research_api,
+    submit_framing_answers_api,
+)
 from agentloop.tasks import load_task_state, save_task_state, set_current_task_id
 from agentloop.ui import AgentLoopUIHandler
 from agentloop.workspace import init_workspace
 from agentloop.workflow import approve_task, start_task
+
+
+def _answer_blocking_and_start_research(root: Path, task_id: str, initial_state: dict) -> dict:
+    """Helper: answer all blocking framing questions then run start_research."""
+    answers = {q["id"]: f"answer for {q['id']}" for q in initial_state.get("framing_questions", []) if q.get("blocking")}
+    submit_framing_answers_api(root, task_id, {"by": "ui", "answers": answers})
+    return start_research_api(root, task_id, {"by": "ui"})
 
 
 class UIApiTests(unittest.TestCase):
@@ -31,7 +50,7 @@ class UIApiTests(unittest.TestCase):
             data = build_task_list(root)
             rows = {row["task_id"]: row for row in data["tasks"]}
             self.assertTrue(rows[good_id]["current"])
-            self.assertEqual(rows[good_id]["status"], "WAITING_FOR_ALIGNMENT")
+            self.assertEqual(rows[good_id]["status"], "FRAMING_REVIEW")
             self.assertEqual(rows["bad-task"]["status"], "UNKNOWN")
             self.assertIn("Invalid task state", rows["bad-task"]["error"])
 
@@ -41,20 +60,25 @@ class UIApiTests(unittest.TestCase):
             init_workspace(root)
             detail = create_task(root, {"request": "ship a UI"})
             task_id = detail["state"]["task_id"]
-            self.assertEqual(detail["state"]["status"], "WAITING_FOR_ANALYSIS_REVIEW")
-            self.assertTrue(detail["analysis_review"]["required"])
+            self.assertEqual(detail["state"]["status"], "FRAMING_REVIEW")
+            self.assertTrue(detail["framing_review"]["required"])
             artifact_dir = root / ".agentloop" / "tasks" / task_id / "artifacts"
-            self.assertTrue((artifact_dir / "analysis.md").exists())
+            self.assertTrue((artifact_dir / "framing.md").exists())
+            self.assertTrue((artifact_dir / "framing.json").exists())
+
+            answers = {q["id"]: f"answer {q['id']}" for q in detail["framing_review"]["questions"] if q.get("blocking")}
+            reviewed = submit_framing_answers_api(root, task_id, {"by": "ui", "answers": answers})
+            self.assertEqual(reviewed["state"]["status"], "FRAMING_REVIEW")
+            self.assertTrue(reviewed["framing_review"].get("ready_for_research"))
+            self.assertTrue(reviewed["actions"]["start_research"]["enabled"])
+
+            researched = start_research_api(root, task_id, {"by": "ui"})
+            self.assertEqual(researched["state"]["status"], "WAITING_FOR_ALIGNMENT")
+            self.assertTrue(researched["execution_approval"]["required"])
+            self.assertTrue((artifact_dir / "dossier.md").exists())
+            self.assertTrue((artifact_dir / "proposal.md").exists())
             self.assertTrue((artifact_dir / "acceptance.md").exists())
             self.assertTrue((artifact_dir / "acceptance.json").exists())
-
-            reviewed = submit_analysis_review_api(root, task_id, {"by": "ui", "answers": {"Q-2": "UI files."}})
-            self.assertEqual(reviewed["state"]["status"], "WAITING_FOR_ALIGNMENT")
-            self.assertTrue(reviewed["execution_approval"]["required"])
-            analysis = (artifact_dir / "analysis.md").read_text(encoding="utf-8")
-            self.assertIn("User Answers", analysis)
-            self.assertIn("Final Analysis", analysis)
-            self.assertTrue((artifact_dir / "design.md").exists())
             self.assertTrue((artifact_dir / "test-plan.md").exists())
 
     def test_create_task_accepts_role_runtime_overrides(self) -> None:
@@ -65,15 +89,16 @@ class UIApiTests(unittest.TestCase):
                 root,
                 {
                     "request": "ship a UI",
-                    "role_runtimes": {"analyst": "manual", "tester": "manual"},
+                    "role_runtimes": {"framer": "manual", "architect": "manual", "tester": "manual"},
                 },
             )
             task_id = detail["state"]["task_id"]
             config = json.loads((root / ".agentloop" / "tasks" / task_id / "config.json").read_text(encoding="utf-8"))
-            self.assertEqual(config["roles"]["analyst"]["runtime"], "manual")
+            self.assertEqual(config["roles"]["framer"]["runtime"], "manual")
+            self.assertEqual(config["roles"]["architect"]["runtime"], "manual")
             self.assertEqual(config["roles"]["tester"]["runtime"], "manual")
 
-    def test_create_task_does_not_run_selected_analyst_runtime_before_review(self) -> None:
+    def test_create_task_does_not_run_selected_investigator_before_research(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             init_workspace(root)
@@ -87,14 +112,18 @@ class UIApiTests(unittest.TestCase):
             }
             config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 
-            detail = create_task(root, {"request": "ship a UI", "role_runtimes": {"analyst": "fail-fast"}})
+            detail = create_task(root, {"request": "ship a UI", "role_runtimes": {"investigator": "fail-fast"}})
 
-            self.assertEqual(detail["state"]["status"], "WAITING_FOR_ANALYSIS_REVIEW")
+            self.assertEqual(detail["state"]["status"], "FRAMING_REVIEW")
             task_id = detail["state"]["task_id"]
-            self.assertEqual(load_task_state(root, task_id)["agents"], [])
+            agents = load_task_state(root, task_id)["agents"]
+            agent_roles = [a["role"] for a in agents]
+            self.assertNotIn("investigator", agent_roles)
+            self.assertNotIn("architect", agent_roles)
             artifact_dir = root / ".agentloop" / "tasks" / task_id / "artifacts"
-            self.assertTrue((artifact_dir / "analysis.md").exists())
-            self.assertTrue((artifact_dir / "acceptance.json").exists())
+            self.assertTrue((artifact_dir / "framing.md").exists())
+            self.assertTrue((artifact_dir / "framing.json").exists())
+            self.assertFalse((artifact_dir / "dossier.md").exists())
 
     def test_settings_include_usage_runtimes_and_role_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -113,7 +142,8 @@ class UIApiTests(unittest.TestCase):
             self.assertIn("codex", runtime_names)
             self.assertIn(runtimes["codex"]["status"], {"active", "configured_missing", "detected_not_injected", "not_injected"})
             role_defaults = {item["role"]: item["runtime"] for item in settings["runtime"]["role_defaults"]}
-            self.assertEqual(role_defaults["analyst"], "manual")
+            self.assertEqual(role_defaults["framer"], "manual")
+            self.assertEqual(role_defaults["architect"], "manual")
             self.assertEqual(role_defaults["tester"], "manual")
 
     def test_detail_includes_artifacts_runtime_and_test_logs(self) -> None:
@@ -240,10 +270,17 @@ class UIApiTests(unittest.TestCase):
             self.assertEqual(detail["config"]["override"]["max_iterations"], 3)
             config = json.loads((root / ".agentloop" / "tasks" / task_id / "config.json").read_text(encoding="utf-8"))
             self.assertEqual(config["test_commands"], ["python -V"])
+            readonly = root / ".agentloop" / "tasks" / task_id / "artifacts" / "readonly.txt"
+            readonly.write_text("locked by attributes", encoding="utf-8")
+            readonly.chmod(0o400)
 
-            result = delete_task(root, task_id, {"confirm": task_id})
-            self.assertTrue(result["deleted"])
-            self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
+            try:
+                result = delete_task(root, task_id, {"confirm": task_id})
+                self.assertTrue(result["deleted"])
+                self.assertFalse((root / ".agentloop" / "tasks" / task_id).exists())
+            finally:
+                if readonly.exists():
+                    readonly.chmod(0o700)
 
     def test_actions_reflect_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -251,9 +288,16 @@ class UIApiTests(unittest.TestCase):
             init_workspace(root)
             state = start_task(root, "approval task")
             task_id = state["task_id"]
-            waiting = build_task_detail(root, task_id)
-            self.assertTrue(waiting["actions"]["approve"]["enabled"])
-            self.assertFalse(waiting["actions"]["run"]["enabled"])
+            framing_detail = build_task_detail(root, task_id)
+            self.assertEqual(framing_detail["state"]["status"], "FRAMING_REVIEW")
+            self.assertTrue(framing_detail["actions"]["submit_framing"]["enabled"])
+            self.assertFalse(framing_detail["actions"]["approve"]["enabled"])
+            self.assertFalse(framing_detail["actions"]["run"]["enabled"])
+
+            researched = _answer_blocking_and_start_research(root, task_id, state)
+            self.assertEqual(researched["state"]["status"], "WAITING_FOR_ALIGNMENT")
+            self.assertTrue(researched["actions"]["approve"]["enabled"])
+            self.assertFalse(researched["actions"]["run"]["enabled"])
 
             approved = approve_task_api(root, task_id, {"by": "ui"})
             self.assertFalse(approved["actions"]["approve"]["enabled"])
@@ -297,7 +341,7 @@ class UIApiTests(unittest.TestCase):
             self.assertEqual(detail["human_review"]["review"]["test_results"][0]["exit_code"], 2)
 
             resumed = resume_task_api(root, task_id, {"by": "ui", "note": "Credentials configured."})
-            self.assertEqual(resumed["state"]["status"], "DESIGNING")
+            self.assertEqual(resumed["state"]["status"], "IMPLEMENTING_AND_TESTING")
             resumed_state = load_task_state(root, task_id)
             self.assertEqual(resumed_state["human_reviews"][0]["note"], "Credentials configured.")
             self.assertFalse(resumed_state["requires_human_approval"])
@@ -344,17 +388,32 @@ class UIApiTests(unittest.TestCase):
                 self.assertEqual(status, 201)
                 self.assertIsInstance(detail, dict)
                 task_id = detail["state"]["task_id"]
-                self.assertEqual(detail["state"]["status"], "WAITING_FOR_ANALYSIS_REVIEW")
-                self.assertTrue(detail["analysis_review"]["required"])
+                self.assertEqual(detail["state"]["status"], "FRAMING_REVIEW")
+                self.assertTrue(detail["framing_review"]["required"])
 
+                blocking_answers = {
+                    q["id"]: f"answer {q['id']}"
+                    for q in detail["framing_review"]["questions"]
+                    if q.get("blocking")
+                }
                 status, reviewed, _ = request(
-                    f"/api/tasks/{task_id}/analysis-review",
+                    f"/api/tasks/{task_id}/submit-framing",
                     "POST",
-                    {"by": "ui", "answers": {"Q-2": "UI task management files."}},
+                    {"by": "ui", "answers": blocking_answers},
                 )
                 self.assertEqual(status, 200)
                 self.assertIsInstance(reviewed, dict)
-                self.assertEqual(reviewed["state"]["status"], "WAITING_FOR_ALIGNMENT")
+                self.assertEqual(reviewed["state"]["status"], "FRAMING_REVIEW")
+                self.assertTrue(reviewed["framing_review"].get("ready_for_research"))
+
+                status, researched, _ = request(
+                    f"/api/tasks/{task_id}/start-research",
+                    "POST",
+                    {"by": "ui"},
+                )
+                self.assertEqual(status, 200)
+                self.assertIsInstance(researched, dict)
+                self.assertEqual(researched["state"]["status"], "WAITING_FOR_ALIGNMENT")
 
                 status, task_list, _ = request("/api/tasks")
                 self.assertEqual(status, 200)

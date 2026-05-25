@@ -65,8 +65,22 @@ def run_role(
     if adapter == "manual":
         return run_manual_role(root, runtime_name, role, iteration, required_artifacts, task_id)
     if adapter == "command":
-        return run_command_role(root, runtime_name, runtime, role, iteration, required_artifacts, task_id)
+        exec_cwd = _resolve_exec_cwd(root, task_id)
+        return run_command_role(root, runtime_name, runtime, role, iteration, required_artifacts, task_id, exec_cwd=exec_cwd)
     raise WorkspaceError(f"Unsupported adapter for runtime {runtime_name}: {adapter}")
+
+
+def _resolve_exec_cwd(root: Path, task_id: str | None) -> Path:
+    if not task_id:
+        return root
+    try:
+        from .tasks import load_task_state
+        from .workflow import effective_cwd_for_task
+
+        state = load_task_state(root, task_id)
+        return effective_cwd_for_task(root, state)
+    except Exception:
+        return root
 
 
 def run_manual_role(
@@ -106,6 +120,7 @@ def run_command_role(
     iteration: int,
     required_artifacts: list[str],
     task_id: str | None = None,
+    exec_cwd: Path | None = None,
 ) -> AdapterResult:
     command = runtime.get("command")
     if not command:
@@ -133,10 +148,11 @@ def run_command_role(
     env = os.environ.copy()
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("PYTHONUTF8", "1")
+    cwd = exec_cwd if exec_cwd is not None else root
     try:
         completed = subprocess.run(
             [command, *args],
-            cwd=root,
+            cwd=cwd,
             env=env,
             input=stdin_text,
             text=True,
