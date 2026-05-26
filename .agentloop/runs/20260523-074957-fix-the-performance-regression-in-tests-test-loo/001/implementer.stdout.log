@@ -1,3 +1,0 @@
-Fixed the O(N²) regression in `tests/test_loop/duplicate_transactions.py:4` by replacing the nested scan with a single pass that builds a key→count dict, then filters in input order. This calls `_duplicate_key` exactly once per transaction (well within the test's `N*3` budget) and preserves order.
-
-Note: I attempted to run `pytest tests/test_loop/test_duplicate_transactions.py` but it required approval — please run it to confirm.
