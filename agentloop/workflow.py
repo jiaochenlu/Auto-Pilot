@@ -14,6 +14,7 @@ from .handoff import (
     append_context_log,
     collect_upstream_handoffs,
     handoff_output_contract,
+    handoff_output_contract_brief,
     handoff_path,
     handoff_ref,
     next_turn_for_role,
@@ -23,7 +24,7 @@ from .handoff import (
 from .models import default_state, utc_now_iso
 from .quality import evaluate_gate, load_review
 from .runner import run_test_commands
-from .sessions import get_role_session, update_role_session
+from .sessions import generate_session_id, get_role_session, runtime_supports_resume, update_role_session
 from .transcripts import write_transcript
 from .workspace import (
     WorkspaceError,
@@ -274,11 +275,11 @@ def draft_framing(raw_request: str, framing_json: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def draft_dossier(state: dict[str, Any]) -> str:
+def draft_research(state: dict[str, Any]) -> str:
     request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
     framing = state.get("framing") or {}
     statement = framing.get("problem_statement") or request
-    return f"""# Investigation Dossier
+    return f"""# Research
 
 ## Problem
 
@@ -418,7 +419,7 @@ def draft_acceptance(raw_request: str, criteria: list[dict[str, Any]], framing_r
 
 ## Approval Instruction
 
-Review this file together with `{framing_ref}`, the dossier, and the proposal. If the scope is correct, run:
+Review this file together with `{framing_ref}`, the research, and the proposal. If the scope is correct, run:
 
 ```powershell
 python -m agentloop approve
@@ -475,18 +476,13 @@ def prepare_framer_prompt(root: Path, state: dict[str, Any], mode: str = "initia
         ) or "- (no new answers)"
         body = (
             f"# Framer Prompt (resume turn {turn})\n\n"
-            f"{language_directive(state)}"
-            "The requester has answered the open questions you raised last turn. "
-            "Your prior context (raw request, framing draft, code path) is already in this session — "
-            "do NOT restate it.\n\n"
-            "## New answers from the requester\n"
+            "The requester answered your open questions. Prior context is in this session — do NOT restate it.\n\n"
+            "## New answers\n"
             f"{answer_lines}\n\n"
-            "## What to do this turn\n"
-            f"- Update `{framing_ref}` in place to incorporate these answers.\n"
-            f"- Update `{framing_json_ref}` so each answered question carries its `answer`, "
-            "and `ready_for_research` reflects whether any blocking question remains unanswered.\n"
-            "- Do not re-emit the entire framing — patch the assumptions/open questions that the answers change.\n\n"
-            f"{handoff_output_contract(task_id, 'framer', turn)}"
+            "## What to do\n"
+            f"- Patch `{framing_ref}` in place (only the assumptions/open questions affected).\n"
+            f"- Update `{framing_json_ref}`: fill `answer` for each answered question; set `ready_for_research` based on remaining blockers.\n\n"
+            f"{handoff_output_contract_brief(task_id, 'framer', turn)}"
         )
     else:
         body = (
@@ -512,22 +508,20 @@ def prepare_framer_prompt(root: Path, state: dict[str, Any], mode: str = "initia
 def prepare_investigator_prompt(root: Path, state: dict[str, Any], mode: str = "initial") -> None:
     request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
     framing_ref = artifact_ref(state, "framing.md")
-    dossier_ref = artifact_ref(state, "dossier.md")
+    research_ref = artifact_ref(state, "research.md")
     task_id = task_id_or_error(state)
     turn = next_turn_for_role(state, "investigator")
     upstream_block = render_upstream_handoff_block(collect_upstream_handoffs(root, state, "investigator"))
     if mode == "resume_incremental":
         body = (
             f"# Investigator Prompt (resume turn {turn})\n\n"
-            f"{language_directive(state)}"
-            "You already investigated this task in a prior turn. Your prior context is still in this "
-            "session — do NOT restate it.\n\n"
+            "Your prior research context is in this session — do NOT restate it.\n\n"
             "## What changed\n"
             f"{upstream_block}"
-            "## What to do this turn\n"
-            f"- Re-check whether the dossier at `{dossier_ref}` still reflects current code state and the latest framing.\n"
+            "## What to do\n"
+            f"- Re-check whether `{research_ref}` still reflects current code state and the latest framing.\n"
             "- Patch only the sections affected by upstream changes; leave the rest as-is.\n\n"
-            f"{handoff_output_contract(task_id, 'investigator', turn)}"
+            f"{handoff_output_contract_brief(task_id, 'investigator', turn)}"
         )
     else:
         body = (
@@ -539,7 +533,7 @@ def prepare_investigator_prompt(root: Path, state: dict[str, Any], mode: str = "
             f"Framing input: `{framing_ref}` (treat as approved by the requester).\n\n"
             "Investigate the current state of the relevant code, configuration, and behavior. Do NOT propose changes yet.\n\n"
             "Required outputs:\n"
-            f"- Write the dossier to `{dossier_ref}` with: (1) current-state archive (file:line citations), "
+            f"- Write the research to `{research_ref}` with: (1) current-state archive (file:line citations), "
             "(2) baseline data or reproduction, (3) affected modules, (4) any open risks you discovered.\n"
             "- Only describe what exists today; leave the recommendation to the architect.\n\n"
             f"{handoff_output_contract(task_id, 'investigator', turn)}"
@@ -550,7 +544,7 @@ def prepare_investigator_prompt(root: Path, state: dict[str, Any], mode: str = "
 def prepare_architect_design_prompt(root: Path, state: dict[str, Any], mode: str = "initial") -> None:
     request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
     framing_ref = artifact_ref(state, "framing.md")
-    dossier_ref = artifact_ref(state, "dossier.md")
+    research_ref = artifact_ref(state, "research.md")
     proposal_ref = artifact_ref(state, "proposal.md")
     acceptance_ref = artifact_ref(state, "acceptance.md")
     acceptance_json_ref = artifact_ref(state, "acceptance.json")
@@ -561,14 +555,13 @@ def prepare_architect_design_prompt(root: Path, state: dict[str, Any], mode: str
     if mode == "resume_incremental":
         body = (
             f"# Architect Prompt (resume turn {turn})\n\n"
-            f"{language_directive(state)}"
-            "Your prior design context is still in this session — do NOT restate it.\n\n"
+            "Your prior design context is in this session — do NOT restate it.\n\n"
             "## What changed\n"
             f"{upstream_block}"
-            "## What to do this turn\n"
+            "## What to do\n"
             f"- Patch `{proposal_ref}`, `{acceptance_ref}`, `{acceptance_json_ref}`, `{test_plan_ref}` "
             "to reflect the upstream delta. Edit in place; do not re-emit unchanged sections.\n\n"
-            f"{handoff_output_contract(task_id, 'architect', turn)}"
+            f"{handoff_output_contract_brief(task_id, 'architect', turn)}"
         )
     else:
         body = (
@@ -577,7 +570,7 @@ def prepare_architect_design_prompt(root: Path, state: dict[str, Any], mode: str
             f"{code_path_directive(state)}"
             f"{upstream_block}"
             f"Task request:\n{request}\n\n"
-            f"Inputs: `{framing_ref}`, `{dossier_ref}`.\n\n"
+            f"Inputs: `{framing_ref}`, `{research_ref}`.\n\n"
             "Required outputs:\n"
             f"- `{proposal_ref}` — recommended approach, alternatives considered, risks.\n"
             f"- `{acceptance_ref}` — human-readable acceptance criteria.\n"
@@ -615,8 +608,7 @@ def prepare_role_prompt(
     if session_mode == "resume_incremental":
         delta_intro = (
             f"# {role.title()} Prompt (resume turn {turn}, iteration {iteration})\n\n"
-            f"{language_directive(state)}"
-            "Your prior context for this task is still in this session — do NOT restate it.\n\n"
+            "Your prior context is in this session — do NOT restate it.\n\n"
             "## What changed since your last turn\n"
             f"{upstream_block}"
             f"Task artifact directory: `{artifact_dir_ref}`\n"
@@ -624,31 +616,30 @@ def prepare_role_prompt(
         role_delta = {
             "implementer": (
                 f"{delta_intro}\n"
-                "## What to do this turn\n"
+                "## What to do\n"
                 "- Apply only the additional changes implied by the upstream delta above.\n"
                 "- Preserve work from prior turns; do not re-implement what is already in place.\n\n"
-                f"{handoff_output_contract(task_id, 'implementer', turn)}"
+                f"{handoff_output_contract_brief(task_id, 'implementer', turn)}"
             ),
             "tester": (
                 f"{delta_intro}\n"
-                "## What to do this turn\n"
+                "## What to do\n"
                 f"- Update `{test_plan_ref}` to reflect new evidence or new tests required by the upstream delta.\n"
                 "- Re-run only the tests whose inputs changed; record updated commands, exit codes, and timing.\n\n"
-                f"{handoff_output_contract(task_id, 'tester', turn)}"
+                f"{handoff_output_contract_brief(task_id, 'tester', turn)}"
             ),
             "reviewer": (
                 f"{delta_intro}\n"
-                "## What to do this turn\n"
-                f"- Re-review against acceptance criteria and write strict JSON to `{review_ref}`.\n"
-                "- Focus on the delta: which previously-open comments are now resolved, what new issues appear.\n"
-                "- Keep the same JSON schema (decision, summary, open_medium_high_count, comments, acceptance_results, test_results).\n\n"
-                f"{handoff_output_contract(task_id, 'reviewer', turn)}"
+                "## What to do\n"
+                f"- Re-review against acceptance criteria and write strict JSON to `{review_ref}` (same schema as turn 1).\n"
+                "- Focus on the delta: which previously-open comments are now resolved, what new issues appear.\n\n"
+                f"{handoff_output_contract_brief(task_id, 'reviewer', turn)}"
             ),
             "integrator": (
                 f"{delta_intro}\n"
-                "## What to do this turn\n"
+                "## What to do\n"
                 f"- Update `{final_ref}` if the upstream delta changed outcomes; otherwise confirm prior report still holds.\n\n"
-                f"{handoff_output_contract(task_id, 'integrator', turn)}"
+                f"{handoff_output_contract_brief(task_id, 'integrator', turn)}"
             ),
         }
         if role in role_delta:
@@ -803,7 +794,7 @@ def draft_final_report(state: dict[str, Any], review: dict[str, Any]) -> str:
 ## Artifacts
 
 - `{artifact_ref(state, "framing.md")}`
-- `{artifact_ref(state, "dossier.md")}`
+- `{artifact_ref(state, "research.md")}`
 - `{artifact_ref(state, "proposal.md")}`
 - `{artifact_ref(state, "acceptance.md")}`
 - `{artifact_ref(state, "test-plan.md")}`
@@ -850,8 +841,24 @@ def _run_role_with_session(
     *,
     task_id: str | None = None,
 ) -> dict[str, Any]:
-    runtime_name, _ = runtime_for_role(config, role)
+    runtime_name, runtime_cfg = runtime_for_role(config, role)
     sess = get_role_session(state, role, runtime_name)
+    supports_resume = runtime_supports_resume(runtime_cfg)
+    if sess and sess.get("session_id"):
+        session_id = sess["session_id"]
+        resume = True
+    elif supports_resume and not runtime_cfg.get("session_id_regex"):
+        # Runtime accepts a caller-supplied session id (e.g. Claude Code's
+        # `--session-id <uuid>`). Pre-generate one so the very first turn already
+        # owns a stable id we can resume against — no need to scrape stdout.
+        session_id = generate_session_id()
+        resume = False
+        update_role_session(state, role, session_id=session_id, runtime_name=runtime_name)
+    else:
+        # Runtime mints its own session id (e.g. Codex). Run cold, then extract
+        # the id from stdout via `session_id_regex` and persist it.
+        session_id = None
+        resume = False
     result = run_role(
         root,
         config,
@@ -859,7 +866,8 @@ def _run_role_with_session(
         iteration,
         required_artifacts,
         task_id=task_id,
-        session_id=sess.get("session_id") if sess else None,
+        session_id=session_id,
+        resume=resume,
     )
     new_sid = result.get("session_id")
     if new_sid:
@@ -1086,7 +1094,7 @@ def start_task(
     state["phases"]["framing"]["artifact"] = framing_ref
     state["phases"]["framing_review"]["status"] = "waiting_for_review"
     state["phases"]["framing_review"]["artifact"] = framing_ref
-    state["phases"]["investigation"]["artifact"] = task_artifact_ref(task_id, "dossier.md")
+    state["phases"]["investigation"]["artifact"] = task_artifact_ref(task_id, "research.md")
     state["phases"]["proposal"]["artifact"] = task_artifact_ref(task_id, "proposal.md")
     state["phases"]["test_authoring"]["artifact"] = task_artifact_ref(task_id, "test-plan.md")
     state["phases"]["testing"]["artifact"] = task_artifact_ref(task_id, "test-plan.md")
@@ -1153,17 +1161,17 @@ def start_research(root: Path, task_id: str) -> dict[str, Any]:
     save_task_state(root, task_id, state)
 
     # Investigator
-    dossier_ref = task_artifact_ref(task_id, "dossier.md")
+    research_ref = task_artifact_ref(task_id, "research.md")
     prepare_investigator_prompt(root, state, mode=prompt_mode_for_role(state, config, "investigator"))
     if role_uses_manual(config, "investigator"):
-        path = task_artifact_path(root, task_id, "dossier.md")
+        path = task_artifact_path(root, task_id, "research.md")
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(draft_dossier(state), encoding="utf-8")
+        path.write_text(draft_research(state), encoding="utf-8")
     record_agent_result(
         state,
-        _run_role_with_session(root, state, config, "investigator", 0, [dossier_ref], task_id=task_id),
+        _run_role_with_session(root, state, config, "investigator", 0, [research_ref], task_id=task_id),
     )
-    _post_role_handoff(root, state, config, "investigator", fallback_summary="Investigator produced dossier.md.")
+    _post_role_handoff(root, state, config, "investigator", fallback_summary="Investigator produced research.md.")
     state["phases"]["investigation"]["status"] = "completed"
     state["status"] = "DESIGNING"
     state["current_phase"] = "proposal"
@@ -1255,7 +1263,7 @@ def _snapshot_runtime_input(root: Path, task_id: str) -> dict[str, Any]:
     `*.approved.<ext>` copies for runtimes that need file paths."""
     artifacts_dir = root / ".agentloop" / "tasks" / task_id / "artifacts"
     snapshot: dict[str, Any] = {"captured_at": utc_now_iso(), "files": {}}
-    bases = ["proposal.md", "acceptance.md", "acceptance.json", "test-plan.md", "dossier.md"]
+    bases = ["proposal.md", "acceptance.md", "acceptance.json", "test-plan.md", "research.md"]
     for base in bases:
         stem, dot, ext = base.rpartition(".")
         edited = artifacts_dir / (f"{stem}.edited.{ext}" if dot else f"{base}.edited")

@@ -13,6 +13,7 @@ after every run.
 from __future__ import annotations
 
 import re
+import uuid
 from typing import Any
 
 from .models import utc_now_iso
@@ -68,6 +69,10 @@ def invalidate_role_session(state: dict[str, Any], role: str, reason: str | None
 
 def runtime_supports_resume(runtime_cfg: dict[str, Any]) -> bool:
     return bool(runtime_cfg.get("supports_resume"))
+
+
+def generate_session_id() -> str:
+    return str(uuid.uuid4())
 
 
 def extract_session_id(runtime_cfg: dict[str, Any], stdout: str, stderr: str) -> str | None:

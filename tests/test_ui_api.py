@@ -75,7 +75,7 @@ class UIApiTests(unittest.TestCase):
             researched = start_research_api(root, task_id, {"by": "ui"})
             self.assertEqual(researched["state"]["status"], "WAITING_FOR_ALIGNMENT")
             self.assertTrue(researched["execution_approval"]["required"])
-            self.assertTrue((artifact_dir / "dossier.md").exists())
+            self.assertTrue((artifact_dir / "research.md").exists())
             self.assertTrue((artifact_dir / "proposal.md").exists())
             self.assertTrue((artifact_dir / "acceptance.md").exists())
             self.assertTrue((artifact_dir / "acceptance.json").exists())
@@ -123,7 +123,7 @@ class UIApiTests(unittest.TestCase):
             artifact_dir = root / ".agentloop" / "tasks" / task_id / "artifacts"
             self.assertTrue((artifact_dir / "framing.md").exists())
             self.assertTrue((artifact_dir / "framing.json").exists())
-            self.assertFalse((artifact_dir / "dossier.md").exists())
+            self.assertFalse((artifact_dir / "research.md").exists())
 
     def test_settings_include_usage_runtimes_and_role_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

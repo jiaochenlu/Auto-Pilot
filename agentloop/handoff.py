@@ -135,6 +135,15 @@ def render_upstream_handoff_block(handoffs: list[dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def handoff_output_contract_brief(task_id: str, role: str, turn: int) -> str:
+    """Short reminder for resume turns where the full schema is already in session context."""
+    ref = handoff_ref(task_id, role, turn)
+    return (
+        "## Handoff contract\n\n"
+        f"Write the handoff JSON to `{ref}` using the same schema as turn 1.\n"
+    )
+
+
 def handoff_output_contract(task_id: str, role: str, turn: int) -> str:
     """Prompt fragment instructing the role to produce its handoff JSON."""
     ref = handoff_ref(task_id, role, turn)

@@ -62,38 +62,82 @@ def first_existing(paths: list[str | Path]) -> str | None:
     return None
 
 
+def _npm_global_dirs() -> list[Path]:
+    """Common locations where `npm -g` installs binaries across platforms."""
+    dirs: list[Path] = []
+    home = Path.home()
+    if os.name == "nt":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            dirs.append(Path(appdata) / "npm")
+    else:
+        # macOS (Homebrew + system) and Linux conventions
+        dirs.extend([
+            home / ".npm-global" / "bin",
+            home / ".local" / "bin",
+            Path("/usr/local/bin"),
+            Path("/opt/homebrew/bin"),
+            Path("/usr/bin"),
+        ])
+    return dirs
+
+
+def _npm_global_lib_dirs() -> list[Path]:
+    """Common roots for `npm -g` `node_modules/` package payloads."""
+    dirs: list[Path] = []
+    home = Path.home()
+    if os.name == "nt":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            dirs.append(Path(appdata) / "npm" / "node_modules")
+    else:
+        dirs.extend([
+            home / ".npm-global" / "lib" / "node_modules",
+            Path("/usr/local/lib/node_modules"),
+            Path("/opt/homebrew/lib/node_modules"),
+            Path("/usr/lib/node_modules"),
+        ])
+    return dirs
+
+
 def detect_claude_command() -> str | None:
     found = shutil.which("claude") or shutil.which("claude.exe") or shutil.which("claude.cmd")
     if found:
         return found
-    appdata = os.environ.get("APPDATA")
-    if not appdata:
-        return None
-    return first_existing(
-        [
-            Path(appdata) / "npm" / "claude.cmd",
-            Path(appdata) / "npm" / "claude.exe",
-            Path(appdata) / "npm" / "node_modules" / "@anthropic-ai" / "claude-code" / "bin" / "claude.exe",
-        ]
-    )
+    candidates: list[str | Path] = []
+    for bin_dir in _npm_global_dirs():
+        candidates.extend([
+            bin_dir / "claude",
+            bin_dir / "claude.cmd",
+            bin_dir / "claude.exe",
+        ])
+    for lib_dir in _npm_global_lib_dirs():
+        pkg_bin = lib_dir / "@anthropic-ai" / "claude-code" / "bin"
+        candidates.extend([pkg_bin / "claude", pkg_bin / "claude.exe"])
+    return first_existing(candidates)
 
 
 def detect_codex_command() -> str | None:
     found = shutil.which("codex") or shutil.which("codex.exe") or shutil.which("codex.cmd")
     if found:
         return found
-    appdata = os.environ.get("APPDATA")
-    if not appdata:
-        return None
-    npm = Path(appdata) / "npm"
-    direct = first_existing([npm / "codex.cmd", npm / "codex.exe"])
+    candidates: list[str | Path] = []
+    for bin_dir in _npm_global_dirs():
+        candidates.extend([
+            bin_dir / "codex",
+            bin_dir / "codex.cmd",
+            bin_dir / "codex.exe",
+        ])
+    direct = first_existing(candidates)
     if direct:
         return direct
-    vendor_root = npm / "node_modules" / "@openai" / "codex"
-    if not vendor_root.exists():
-        return None
-    for candidate in vendor_root.rglob("codex.exe"):
-        return str(candidate)
+    for lib_dir in _npm_global_lib_dirs():
+        vendor_root = lib_dir / "@openai" / "codex"
+        if not vendor_root.exists():
+            continue
+        for name in ("codex", "codex.exe"):
+            for candidate in vendor_root.rglob(name):
+                return str(candidate)
     return None
 
 

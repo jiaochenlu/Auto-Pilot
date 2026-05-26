@@ -9,6 +9,9 @@ const state = {
   settings: null,
   pollTimer: null,
   selectedTranscript: null,
+  approvalSelection: {},
+  researchSelection: {},
+  viewPhase: {},
 };
 
 const REFRESH_INTERVAL_MS = 3000;
@@ -156,11 +159,11 @@ function renderEmptyDetail() {
 }
 
 const LIFECYCLE_STEPS = [
-  { key: "framing", label: "Framing", sub: "clarify the problem", tab: "overview", match: ["CREATED", "FRAMING_REVIEW"], roles: [{ key: "framer", label: "Framer", icon: "?" }] },
-  { key: "research", label: "Researching", sub: "investigate & design", tab: "overview", match: ["INVESTIGATING", "DESIGNING"], roles: [{ key: "investigator", label: "Investigator", icon: "I" }, { key: "architect", label: "Architect", icon: "A" }] },
-  { key: "approve", label: "Awaiting approval", sub: "review the plan", tab: "overview", match: ["WAITING_FOR_ALIGNMENT"], roles: [{ key: "human", label: "You", icon: "@" }] },
-  { key: "run", label: "Running", sub: "iterations executing", tab: "runtime", match: ["READY_TO_START", "RUNNING", "EXECUTING", "IMPLEMENTING_AND_TESTING", "REVIEWING", "WAITING_FOR_HUMAN"], roles: [{ key: "implementer", label: "Implementer", icon: "⚙" }, { key: "tester", label: "Tester", icon: "✓" }, { key: "reviewer", label: "Reviewer", icon: "👁" }] },
-  { key: "done", label: "Done", sub: "task complete", tab: "artifacts", match: ["DONE", "CANCELLED", "FAILED"], roles: [{ key: "integrator", label: "Integrator", icon: "★" }] },
+  { key: "framing", label: "Framing", sub: "clarify the problem", tab: "basic", match: ["CREATED", "FRAMING_REVIEW"], roles: [{ key: "framer", label: "Framer", icon: "?" }] },
+  { key: "research", label: "Researching", sub: "investigate & design", tab: "basic", match: ["INVESTIGATING", "DESIGNING"], roles: [{ key: "investigator", label: "Investigator", icon: "I" }, { key: "architect", label: "Architect", icon: "A" }] },
+  { key: "approve", label: "Awaiting approval", sub: "review the plan", tab: "basic", match: ["WAITING_FOR_ALIGNMENT"], roles: [{ key: "human", label: "You", icon: "@" }] },
+  { key: "run", label: "Running", sub: "iterations executing", tab: "execlog", match: ["READY_TO_START", "RUNNING", "EXECUTING", "IMPLEMENTING_AND_TESTING", "REVIEWING", "WAITING_FOR_HUMAN"], roles: [{ key: "implementer", label: "Implementer", icon: "⚙" }, { key: "tester", label: "Tester", icon: "✓" }, { key: "reviewer", label: "Reviewer", icon: "👁" }] },
+  { key: "done", label: "Done", sub: "task complete", tab: "basic", match: ["DONE", "CANCELLED", "FAILED"], roles: [{ key: "integrator", label: "Integrator", icon: "★" }] },
 ];
 
 function lifecycleIndex(status) {
@@ -181,14 +184,34 @@ function currentPhase(status) {
 
 const PHASE_LABELS = { framing: "Framing", research: "Researching", approval: "Awaiting approval", running: "Running", done: "Done" };
 const PHASE_ARTIFACTS = {
-  framing: [],
-  research: ["dossier.md", "proposal.md", "acceptance.md", "test-plan.md"],
-  approval: ["dossier.md", "proposal.md", "acceptance.md", "test-plan.md"],
+  framing: ["framing.md"],
+  research: ["research.md", "proposal.md", "acceptance.md", "test-plan.md"],
+  approval: ["research.md", "proposal.md", "acceptance.md", "test-plan.md"],
   running: ["final-report.md"],
-  done: [],
+  done: ["final-report.md"],
 };
 
-function renderLifecycle(task) {
+// Map between lifecycle step keys and renderBasic phase identifiers.
+const STEP_TO_PHASE = { framing: "framing", research: "research", approve: "approval", run: "running", done: "done" };
+const PHASE_TO_STEP = { framing: "framing", research: "research", approval: "approve", running: "run", done: "done" };
+
+function reachedPhases(task) {
+  const cancelled = String(task.status || "").toUpperCase() === "CANCELLED";
+  const currentIdx = cancelled
+    ? lifecycleIndex(task.cancelled_from || task.status)
+    : lifecycleIndex(task.status);
+  return LIFECYCLE_STEPS.slice(0, currentIdx + 1).map((s) => STEP_TO_PHASE[s.key]);
+}
+
+function resolveViewPhase(task) {
+  const reached = reachedPhases(task);
+  if (!reached.length) return "framing";
+  const stored = state.viewPhase[task.task_id];
+  if (stored && reached.includes(stored)) return stored;
+  return reached[reached.length - 1];
+}
+
+function renderLifecycle(task, viewedPhase) {
   const root = $("lifecycle");
   root.innerHTML = "";
   const cancelled = String(task.status || "").toUpperCase() === "CANCELLED";
@@ -197,22 +220,40 @@ function renderLifecycle(task) {
   const current = cancelled
     ? lifecycleIndex(task.cancelled_from || "FRAMING_REVIEW")
     : lifecycleIndex(task.status);
+  const viewedStepKey = viewedPhase ? PHASE_TO_STEP[viewedPhase] : null;
+  // A phase is "actively running" when an agent is working and the UI is not blocking
+  // on a human prompt. These statuses keep the current lifecycle dot pulsing.
+  const ACTIVE_STATUSES = new Set([
+    "CREATED", "FRAMING",
+    "INVESTIGATING", "DESIGNING",
+    "READY_TO_START", "RUNNING", "EXECUTING", "IMPLEMENTING_AND_TESTING", "REVIEWING",
+    "INTEGRATING",
+  ]);
+  const isActive = !cancelled && ACTIVE_STATUSES.has(String(task.status || "").toUpperCase());
   LIFECYCLE_STEPS.forEach((step, idx) => {
     const li = document.createElement("li");
-    const state = idx < current ? "done" : idx === current ? "current" : "pending";
-    li.className = `lc-step lc-${state}${cancelled && idx === current ? " lc-cancelled" : ""}`;
+    const stepState = idx < current ? "done" : idx === current ? "current" : "pending";
+    const reached = idx <= current;
+    const isViewed = reached && step.key === viewedStepKey;
+    const isRunning = stepState === "current" && isActive;
+    li.className = `lc-step lc-${stepState}${cancelled && idx === current ? " lc-cancelled" : ""}${isViewed ? " lc-viewed" : ""}${isRunning ? " lc-running" : ""}`;
     const rolesHtml = (step.roles || []).map((r) => `
       <span class="lc-role lc-role-${escapeHtml(r.key)}" title="${escapeHtml(r.label)}">
         <span class="lc-role-icon">${escapeHtml(r.icon)}</span>
         <span class="lc-role-label">${escapeHtml(r.label)}</span>
       </span>`).join("");
+    const tip = reached
+      ? (isViewed ? `Viewing ${step.label}` : `Click to view ${step.label}`)
+      : "Not started yet";
     li.innerHTML = `
-      <button type="button" class="lc-btn" data-tab="${step.tab}" data-state="${state}" ${state === "pending" ? "disabled" : ""} title="${escapeHtml(state === "pending" ? "Not started yet" : step.sub)}">
-        <span class="lc-dot">${idx < current ? "✓" : idx + 1}</span>
-        <span class="lc-text">
-          <span class="lc-label">${escapeHtml(step.label)}</span>
-          <span class="lc-sub">${escapeHtml(step.sub)}</span>
-          ${rolesHtml ? `<span class="lc-roles">${rolesHtml}</span>` : ""}
+      <button type="button" class="lc-btn" data-tab="${step.tab}" data-step="${escapeHtml(step.key)}" data-state="${stepState}" ${reached ? "" : "disabled"} aria-pressed="${isViewed ? "true" : "false"}" title="${escapeHtml(tip)}">
+        <span class="lc-label">${escapeHtml(step.label)}</span>
+        <span class="lc-body">
+          <span class="lc-dot">${idx < current ? "✓" : idx + 1}</span>
+          <span class="lc-text">
+            <span class="lc-sub">${escapeHtml(step.sub)}</span>
+            ${rolesHtml ? `<span class="lc-roles">${rolesHtml}</span>` : ""}
+          </span>
         </span>
       </button>`;
     root.appendChild(li);
@@ -223,6 +264,12 @@ function renderLifecycle(task) {
     const tab = btn.dataset.tab;
     [...$("detailTabs").querySelectorAll("button")].forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
     [...document.querySelectorAll(".tab-panel")].forEach((panel) => panel.classList.toggle("active", panel.id === `${tab}Tab`));
+    const stepKey = btn.dataset.step;
+    const targetPhase = stepKey ? STEP_TO_PHASE[stepKey] : null;
+    if (targetPhase && state.detail) {
+      state.viewPhase[state.detail.state.task_id] = targetPhase;
+      renderDetail();
+    }
   };
 }
 
@@ -287,12 +334,15 @@ function configurePrimaryAction(detail) {
 
 function closeMoreMenu() { /* no-op kept for callsite safety */ }
 
-function renderOverviewCta(detail) {
+function renderOverviewCta(detail, phase) {
   const cta = $("overviewCta");
   if (!cta) return;
   const status = String(detail.state.status || "").toUpperCase();
   const approveEnabled = detail.actions?.approve?.enabled;
-  if (status === "WAITING_FOR_ALIGNMENT" && approveEnabled) {
+  // Only surface the floating CTA while the user is viewing the approval (or running)
+  // phase — never under framing or research.
+  const allowedPhase = phase === "approval" || phase === "running";
+  if (allowedPhase && status === "WAITING_FOR_ALIGNMENT" && approveEnabled) {
     cta.classList.remove("hidden");
     cta.innerHTML = `
       <div class="overview-cta-text">
@@ -302,7 +352,7 @@ function renderOverviewCta(detail) {
       <button type="button" class="primary" id="overviewApproveBtn">Approve &amp; run →</button>`;
     $("overviewApproveBtn").onclick = () => approveAndRun();
     $("overviewApproveBtn").disabled = state.busy;
-  } else if (status === "READY_TO_START" && detail.actions?.run?.enabled) {
+  } else if (allowedPhase && status === "READY_TO_START" && detail.actions?.run?.enabled) {
     cta.classList.remove("hidden");
     cta.innerHTML = `
       <div class="overview-cta-text">
@@ -321,10 +371,7 @@ function renderOverviewCta(detail) {
 function renderDetail() {
   const detail = state.detail;
   const task = detail.state;
-  const isCancelled = String(task.status || "").toUpperCase() === "CANCELLED";
-  const phase = isCancelled
-    ? currentPhase(task.cancelled_from || task.status)
-    : currentPhase(task.status);
+  const phase = resolveViewPhase(task);
   $("taskIdLabel").textContent = task.task_id;
   $("taskTitle").textContent = task.title || task.task_id;
   $("taskMeta").innerHTML = `<span class="${statusClass(task.status)}">${escapeHtml(task.status)}</span> ${escapeHtml(task.current_phase || "-")} · ${task.iteration ?? "-"}/${task.max_iterations ?? "-"} · updated ${escapeHtml(task.updated_at || "-")}`;
@@ -332,10 +379,10 @@ function renderDetail() {
   if (basicSub) basicSub.textContent = PHASE_LABELS[phase] || "current phase";
   const basicPanel = $("basicTab");
   if (basicPanel) basicPanel.dataset.phase = phase;
-  renderLifecycle(task);
+  renderLifecycle(task, phase);
   configurePrimaryAction(detail);
   renderBasic(detail, phase);
-  renderOverviewCta(detail);
+  renderOverviewCta(detail, phase);
   renderArtifacts(detail);
   renderConfig(detail);
   renderRuntime(detail);
@@ -345,6 +392,17 @@ function renderDetail() {
 function renderBasic(detail, phase) {
   const task = detail.state;
   const isCancelled = String(task.status || "").toUpperCase() === "CANCELLED";
+  // Detach sections we may have embedded back to their safe parent (basicTab) BEFORE
+  // running sub-renderers that wipe panel innerHTML — otherwise the embedded nodes
+  // get destroyed when their host panel re-renders.
+  const basicTabEl = $("basicTab");
+  ["phaseArtifactSection", "acceptanceSection"].forEach((id) => {
+    const node = document.getElementById(id);
+    if (node && basicTabEl && node.parentElement !== basicTabEl) {
+      basicTabEl.appendChild(node);
+      node.classList.remove("is-embedded-in-approval");
+    }
+  });
   // gate sub-panels: each render*() already toggles its own hidden class based on detail
   // but we additionally force-hide ones that don't belong to current phase
   const gate = (id, allowed) => {
@@ -367,13 +425,79 @@ function renderBasic(detail, phase) {
   const goalSec = $("goalSection");
   const accSec = $("acceptanceSection");
   if (goalSec) goalSec.classList.toggle("hidden", phase === "done");
-  if (accSec) accSec.classList.toggle("hidden", phase === "framing" || phase === "done");
+  // In approval phase, the acceptance list is gated by the "Acceptance" card selection.
+  // Research phase mirrors that behavior with researchSelection.
+  // Other phases keep the previous default (hidden in framing/done, visible otherwise).
+  const approvalSelected = phase === "approval" ? resolveApprovalSelection(detail) : null;
+  const researchSelected = phase === "research" ? state.researchSelection[detail.state.task_id] || null : null;
+  const accVisibleInApproval = approvalSelected === "acceptance.md";
+  const accVisibleInResearch = researchSelected === "acceptance.md";
+  if (accSec) {
+    if (phase === "approval") {
+      accSec.classList.toggle("hidden", !accVisibleInApproval);
+    } else if (phase === "research") {
+      accSec.classList.toggle("hidden", !accVisibleInResearch);
+    } else {
+      accSec.classList.toggle("hidden", phase === "framing" || phase === "done");
+    }
+  }
   // Acceptance content
   renderAcceptance(task);
-  // Phase-specific artifact preview (for cancelled tasks in framing phase, surface framing.md
-  // since the interactive panel is hidden; other phases already list artifacts via PHASE_ARTIFACTS)
-  const wantedOverride = isCancelled && phase === "framing" ? ["framing.md"] : null;
+  // Phase-specific artifact preview:
+  // - approval phase: only show the artifact selected via the approval cards,
+  //   except the Acceptance card which delegates to the structured AC list above
+  // - research phase: mirror approval — show only the selected card's file
+  let wantedOverride = null;
+  if (phase === "approval") {
+    wantedOverride = approvalSelected && !accVisibleInApproval ? [approvalSelected] : [];
+  } else if (phase === "research") {
+    wantedOverride = researchSelected && !accVisibleInResearch ? [researchSelected] : [];
+  }
   renderPhaseArtifacts(detail, phase, wantedOverride);
+  // Embed the selected artifact preview (or acceptance list) INSIDE the host phase panel
+  // (right under the design-package cards) for both research and approval phases.
+  const phaseSection = $("phaseArtifactSection");
+  const approvalPanel = $("executionApprovalPanel");
+  const researchPanel = $("researchProgressPanel");
+  const basicTab = $("basicTab");
+  const acceptanceAnchor = $("acceptanceSection");
+  let host = null;
+  if (phase === "approval" && approvalPanel) host = approvalPanel;
+  else if (phase === "research" && researchPanel) host = researchPanel;
+  // Move the artifact preview section
+  if (phaseSection && basicTab) {
+    if (host && !phaseSection.classList.contains("hidden")) {
+      if (phaseSection.parentElement !== host) host.appendChild(phaseSection);
+      phaseSection.classList.add("is-embedded-in-approval");
+    } else {
+      phaseSection.classList.remove("is-embedded-in-approval");
+      if (phaseSection.parentElement !== basicTab) {
+        if (acceptanceAnchor && acceptanceAnchor.parentElement === basicTab) {
+          basicTab.insertBefore(phaseSection, acceptanceAnchor.nextSibling);
+        } else {
+          basicTab.appendChild(phaseSection);
+        }
+      }
+    }
+  }
+  // Move the acceptance section into the same host when the Acceptance card is selected
+  if (acceptanceAnchor && basicTab) {
+    const acceptanceSelected = (phase === "approval" && accVisibleInApproval) || (phase === "research" && accVisibleInResearch);
+    if (host && acceptanceSelected && !acceptanceAnchor.classList.contains("hidden")) {
+      if (acceptanceAnchor.parentElement !== host) host.appendChild(acceptanceAnchor);
+      acceptanceAnchor.classList.add("is-embedded-in-approval");
+    } else {
+      acceptanceAnchor.classList.remove("is-embedded-in-approval");
+      if (acceptanceAnchor.parentElement !== basicTab) {
+        const goalSec = $("goalSection");
+        if (goalSec && goalSec.parentElement === basicTab) {
+          basicTab.insertBefore(acceptanceAnchor, goalSec.nextSibling);
+        } else {
+          basicTab.appendChild(acceptanceAnchor);
+        }
+      }
+    }
+  }
   // Done placeholder
   const empty = $("basicEmpty");
   if (empty) empty.classList.toggle("hidden", phase !== "done");
@@ -529,11 +653,38 @@ function renderGoal(task) {
   const parts = [
     `<div class="goal-section"><div class="goal-label">Problem statement</div><p>${escapeHtml(statement)}</p></div>`,
   ];
+  // Keep non-goals / assumptions expanded while the user is still framing the
+  // problem (they need that context to answer open questions). Once framing is
+  // done, collapse them to save space — a summary line lists the counts.
+  const phase = currentPhase(task.status);
+  const collapse = phase !== "framing";
+  const extras = [];
   if (nonGoals.length) {
-    parts.push(`<div class="goal-section"><div class="goal-label">Non-goals</div><ul>${nonGoals.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`);
+    extras.push({
+      label: "Non-goals",
+      count: nonGoals.length,
+      html: `<ul>${nonGoals.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>`,
+    });
   }
   if (assumptions.length) {
-    parts.push(`<div class="goal-section"><div class="goal-label">Assumptions</div><ul>${assumptions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`);
+    extras.push({
+      label: "Assumptions",
+      count: assumptions.length,
+      html: `<ul>${assumptions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>`,
+    });
+  }
+  if (extras.length) {
+    if (collapse) {
+      const summary = extras.map((e) => `${e.count} ${e.label.toLowerCase()}`).join(" · ");
+      const body = extras
+        .map((e) => `<div class="goal-section"><div class="goal-label">${escapeHtml(e.label)}</div>${e.html}</div>`)
+        .join("");
+      parts.push(`<details class="goal-extras"><summary>Show ${escapeHtml(summary)}</summary>${body}</details>`);
+    } else {
+      for (const e of extras) {
+        parts.push(`<div class="goal-section"><div class="goal-label">${escapeHtml(e.label)}</div>${e.html}</div>`);
+      }
+    }
   }
   if (raw && raw !== statement) {
     parts.push(`<details class="goal-raw"><summary>Original request</summary><pre>${escapeHtml(raw)}</pre></details>`);
@@ -571,11 +722,19 @@ function renderFramingReview(detail) {
     return;
   }
   const questions = Array.isArray(review.questions) ? review.questions : [];
+  // Show open (unanswered) questions first so the user always sees what still
+  // needs their attention; answered ones move to the bottom for reference.
+  const sortedQuestions = questions.slice().sort((a, b) => {
+    const aOpen = isQuestionOpen(a) ? 0 : 1;
+    const bOpen = isQuestionOpen(b) ? 0 : 1;
+    if (aOpen !== bOpen) return aOpen - bOpen;
+    return 0;
+  });
   const blocking = review.blocking_count || 0;
   const ready = !!review.ready_for_research;
   const badge = ready ? "READY FOR RESEARCH" : (blocking ? `${blocking} BLOCKING` : "NEEDS REVIEW");
   const badgeClass = ready ? "status-READY_TO_START" : "status-FRAMING_REVIEW";
-  const signature = `review:${ready ? 1 : 0}:${blocking}:${questions.map((q) => `${q.id}|${q.question}|${q.blocking ? 1 : 0}|${q.answer || ""}`).join("§")}`;
+  const signature = `review:${ready ? 1 : 0}:${blocking}:${sortedQuestions.map((q) => `${q.id}|${q.question}|${q.blocking ? 1 : 0}|${q.answer || ""}`).join("§")}`;
   panel.classList.remove("hidden");
   if (panel.dataset.signature === signature) {
     // Same content — keep existing DOM so the user's in-progress typing is preserved.
@@ -591,10 +750,10 @@ function renderFramingReview(detail) {
       <span class="badge ${badgeClass}">${escapeHtml(badge)}</span>
     </div>
     <div class="question-list">
-      ${questions.length ? questions.map(renderFramingQuestion).join("") : '<div class="task-sub">No open questions. Click "Start research" to continue.</div>'}
+      ${sortedQuestions.length ? sortedQuestions.map(renderFramingQuestion).join("") : '<div class="task-sub">No open questions. Click "Start research" to continue.</div>'}
     </div>
     <div class="framing-review-actions">
-      <button id="submitFramingBtn" class="secondary" type="button">Submit answers</button>
+      <button id="submitFramingBtn" class="secondary" type="button" ${ready ? "hidden" : ""}>Submit answers</button>
       <button id="startResearchBtn" class="primary" type="button" ${ready ? "" : "disabled"} title="${ready ? "" : "Answer the required questions first"}">Start research →</button>
     </div>`;
   $("submitFramingBtn").addEventListener("click", submitFramingAnswers);
@@ -605,6 +764,12 @@ function renderFramingReview(detail) {
 }
 
 const PLACEHOLDER_ANSWERS = new Set(["", "unanswered", "n/a", "na", "tbd", "none"]);
+
+function isQuestionOpen(question) {
+  if (!question) return true;
+  const raw = String(question.answer || "").trim().toLowerCase();
+  return PLACEHOLDER_ANSWERS.has(raw);
+}
 
 function refreshFramingReadiness(questions) {
   const panel = $("framingReviewPanel");
@@ -626,14 +791,28 @@ function refreshFramingReadiness(questions) {
     badgeEl.textContent = ready ? "READY FOR RESEARCH" : `${blocking} BLOCKING`;
     badgeEl.className = `badge ${ready ? "status-READY_TO_START" : "status-FRAMING_REVIEW"}`;
   }
+  const submitBtn = panel.querySelector("#submitFramingBtn");
+  if (submitBtn) submitBtn.hidden = ready;
+  const startBtn = panel.querySelector("#startResearchBtn");
+  if (startBtn) {
+    startBtn.disabled = !ready;
+    startBtn.title = ready ? "" : "Answer the required questions first";
+  }
 }
 
 function renderFramingQuestion(question) {
   const required = question.blocking ? "required" : "optional";
   const raw = String(question.answer || "").trim();
   const answer = raw.toLowerCase() === "unanswered" ? "" : raw;
-  return `<label class="question-item">
-    <span class="question-top"><strong>${escapeHtml(question.id || "Q")}</strong><em>${escapeHtml(required)}</em></span>
+  const open = isQuestionOpen(question);
+  const stateClass = open ? "is-open" : "is-answered";
+  const stateLabel = open ? "open" : "answered";
+  return `<label class="question-item ${stateClass}">
+    <span class="question-top">
+      <strong>${escapeHtml(question.id || "Q")}</strong>
+      <em>${escapeHtml(required)}</em>
+      <span class="question-state-pill ${stateClass}">${stateLabel}</span>
+    </span>
     <span>${escapeHtml(question.question || "Open question")}</span>
     ${question.reason ? `<small>${escapeHtml(question.reason)}</small>` : ""}
     <textarea data-question-id="${escapeHtml(question.id || "")}" rows="2" placeholder="${question.blocking ? "Required answer" : "Optional — leave blank to use Framer assumptions"}">${escapeHtml(answer)}</textarea>
@@ -686,6 +865,9 @@ async function startResearch() {
   showBanner("Starting research…");
   try {
     state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/start-research`, { method: "POST", body: JSON.stringify({ by: "ui" }) });
+    activateDetailTab("execlog");
+    state.iterationIndex = state.detail.runtime?.latest_iteration ?? null;
+    state.runtimeIndex = 0;
     await loadTasks(true);
     showBanner(null);
   } catch (error) {
@@ -696,25 +878,88 @@ async function startResearch() {
   }
 }
 
+function activateDetailTab(tab) {
+  [...$("detailTabs").querySelectorAll("button")].forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  [...document.querySelectorAll(".tab-panel")].forEach((panel) => panel.classList.toggle("active", panel.id === `${tab}Tab`));
+}
+
 function renderResearchProgress(detail) {
   const panel = $("researchProgressPanel");
   if (!panel) return;
   const status = String(detail.state.status || "").toUpperCase();
-  if (!["INVESTIGATING", "DESIGNING"].includes(status)) {
+  const stillRunning = ["INVESTIGATING", "DESIGNING"].includes(status);
+  const artifacts = detail.artifacts || [];
+  const byName = new Map(artifacts.map((a) => [String(a.name || "").toLowerCase(), a]));
+  const items = [
+    { file: "research.md", name: "Research", description: "Investigator's dossier of current state." },
+    { file: "proposal.md", name: "Proposal", description: "Architect's design proposal." },
+    { file: "acceptance.md", name: "Acceptance", description: "Acceptance criteria for the implementation." },
+    { file: "test-plan.md", name: "Test plan", description: "How the implementation will be verified." },
+  ].map((it) => ({ ...it, ready: byName.has(it.file.toLowerCase()) }));
+  if (!items.some((it) => it.ready) && !stillRunning) {
     panel.classList.add("hidden");
     panel.innerHTML = "";
     return;
   }
-  const stage = status === "INVESTIGATING" ? "Investigating current state" : "Drafting proposal, acceptance & test plan";
+  const selected = resolveResearchSelection(detail, items);
   panel.classList.remove("hidden");
+  const stage = status === "INVESTIGATING"
+    ? "Investigating current state"
+    : status === "DESIGNING"
+      ? "Drafting proposal, acceptance & test plan"
+      : "Research outputs";
+  const badge = stillRunning
+    ? `<span class="badge status-${escapeHtml(status)}">${escapeHtml(status)}</span>`
+    : `<span class="badge status-READY_TO_START">RESEARCH COMPLETE</span>`;
   panel.innerHTML = `
     <div class="research-progress-head">
       <div>
         <h3>Researching</h3>
         <p>${escapeHtml(stage)}</p>
       </div>
-      <span class="badge status-${escapeHtml(status)}">${escapeHtml(status)}</span>
-    </div>`;
+      ${badge}
+    </div>
+    <div class="design-package-cards" role="tablist">
+      ${items.map((item) => {
+        const isSelected = item.ready && item.file === selected;
+        const classes = [
+          "design-package-card",
+          item.ready ? "is-ready" : "is-missing",
+          isSelected ? "is-selected" : "",
+        ].filter(Boolean).join(" ");
+        const stateLabel = item.ready ? (isSelected ? "Viewing" : "Ready") : (stillRunning ? "Generating…" : "Missing");
+        return `
+        <button type="button" class="${classes}" data-file="${escapeHtml(item.file)}" ${item.ready ? "" : "disabled"} role="tab" aria-selected="${isSelected ? "true" : "false"}">
+          <div class="dpc-head">
+            <strong>${escapeHtml(item.name)}</strong>
+            <em>${escapeHtml(stateLabel)}</em>
+          </div>
+          <p>${escapeHtml(item.description)}</p>
+          <code>${escapeHtml(item.file)}</code>
+        </button>`;
+      }).join("")}
+    </div>
+    ${stillRunning ? `<div class="framing-loading"><span class="spinner" aria-hidden="true"></span> ${escapeHtml(stage)}…</div>` : ""}`;
+  panel.querySelectorAll(".design-package-card[data-file]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      const file = btn.dataset.file;
+      if (!file) return;
+      state.researchSelection[detail.state.task_id] = file;
+      renderBasic(detail, "research");
+    });
+  });
+}
+
+function resolveResearchSelection(detail, items) {
+  const ready = items.filter((it) => it.ready).map((it) => it.file);
+  if (!ready.length) return null;
+  const taskId = detail.state.task_id;
+  const remembered = state.researchSelection[taskId];
+  if (remembered && ready.includes(remembered)) return remembered;
+  const preferred = ready.includes("research.md") ? "research.md" : ready[0];
+  state.researchSelection[taskId] = preferred;
+  return preferred;
 }
 
 function renderExecutionApproval(detail) {
@@ -727,6 +972,7 @@ function renderExecutionApproval(detail) {
   }
   const pkg = Array.isArray(approval.design_package) ? approval.design_package : [];
   const missing = Array.isArray(approval.missing_artifacts) ? approval.missing_artifacts : [];
+  const selected = resolveApprovalSelection(detail);
   panel.classList.remove("hidden");
   panel.innerHTML = `
     <div class="execution-approval-head">
@@ -736,22 +982,49 @@ function renderExecutionApproval(detail) {
       </div>
       <span class="badge status-WAITING_FOR_ALIGNMENT">READY TO RUN</span>
     </div>
-    <div class="design-package-cards">
-      ${pkg.map((item) => `
-        <div class="design-package-card ${item.ready ? "is-ready" : "is-missing"}">
+    <div class="design-package-cards" role="tablist">
+      ${pkg.map((item) => {
+        const isSelected = item.ready && item.file === selected;
+        const classes = [
+          "design-package-card",
+          item.ready ? "is-ready" : "is-missing",
+          isSelected ? "is-selected" : "",
+        ].filter(Boolean).join(" ");
+        return `
+        <button type="button" class="${classes}" data-file="${escapeHtml(item.file)}" ${item.ready ? "" : "disabled"} role="tab" aria-selected="${isSelected ? "true" : "false"}">
           <div class="dpc-head">
             <strong>${escapeHtml(item.name)}</strong>
-            <em>${item.ready ? "Ready" : "Missing"}</em>
+            <em>${item.ready ? (isSelected ? "Viewing" : "Ready") : "Missing"}</em>
           </div>
           <p>${escapeHtml(item.description || "")}</p>
           <code>${escapeHtml(item.file)}</code>
-        </div>`).join("")}
+        </button>`;
+      }).join("")}
     </div>
-    ${missing.length ? `<div class="dialog-error">Missing approval artifacts: ${escapeHtml(missing.join(", "))}</div>` : ""}
-    <div class="execution-approval-actions">
-      <button id="approveFromPanelBtn" class="primary" type="button" ${detail.actions.approve?.enabled ? "" : "disabled"}>Approve and run</button>
-    </div>`;
-  $("approveFromPanelBtn").addEventListener("click", () => approveAndRun());
+    ${missing.length ? `<div class="dialog-error">Missing approval artifacts: ${escapeHtml(missing.join(", "))}</div>` : ""}`;
+  panel.querySelectorAll(".design-package-card[data-file]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      const file = btn.dataset.file;
+      if (!file) return;
+      state.approvalSelection[detail.state.task_id] = file;
+      renderBasic(detail, "approval");
+    });
+  });
+}
+
+function resolveApprovalSelection(detail) {
+  const approval = detail.execution_approval;
+  if (!approval?.required) return null;
+  const pkg = Array.isArray(approval.design_package) ? approval.design_package : [];
+  const ready = pkg.filter((item) => item.ready).map((item) => item.file);
+  if (!ready.length) return null;
+  const taskId = detail.state.task_id;
+  const remembered = state.approvalSelection[taskId];
+  if (remembered && ready.includes(remembered)) return remembered;
+  const preferred = ready.includes("proposal.md") ? "proposal.md" : ready[0];
+  state.approvalSelection[taskId] = preferred;
+  return preferred;
 }
 
 function renderHumanReview(detail) {
@@ -833,7 +1106,7 @@ async function resumeHumanReview() {
 function artifactPhase(name) {
   const n = String(name || "").toLowerCase();
   if (n.startsWith("framing.")) return "Framing";
-  if (n === "dossier.md") return "Research";
+  if (n === "research.md") return "Research";
   if (n === "proposal.md" || n.startsWith("acceptance.") || n === "test-plan.md") return "Design";
   if (/^review-.*\.json$/i.test(name)) return "Reviews";
   if (n === "final-report.md") return "Final";
@@ -1179,6 +1452,8 @@ function addCommandRow(value = "") {
 
 function renderRuntime(detail) {
   const rt = detail.runtime || {};
+  const status = String(detail?.state?.status || "").toUpperCase();
+  const isRunning = ["INVESTIGATING", "DESIGNING", "IMPLEMENTING_AND_TESTING", "REVIEWING"].includes(status);
   let byIter = rt.by_iteration || [];
   const latest = rt.latest_iteration ?? null;
   if (!byIter.length && ((rt.agents || []).length || (rt.tests || []).length)) {
@@ -1197,7 +1472,9 @@ function renderRuntime(detail) {
   content.innerHTML = "";
 
   if (!byIter.length) {
-    content.innerHTML = '<div class="task-sub">No runtime output yet.</div>';
+    content.innerHTML = isRunning
+      ? `<div class="runtime-loading"><span class="spinner"></span><span>${escapeHtml(status.toLowerCase().replaceAll("_", " "))} — waiting for first output…</span></div>`
+      : '<div class="task-sub">No runtime output yet.</div>';
     return;
   }
   if (state.iterationIndex == null || !byIter.some((it) => it.iteration === state.iterationIndex)) {
@@ -1228,7 +1505,9 @@ function renderRuntime(detail) {
     ...(current.tests || []).map((test) => ({ type: "test", label: test.name, data: test })),
   ];
   if (!entries.length) {
-    content.innerHTML = `<div class="task-sub">Iteration ${currentDisplayNum} has no agent or test output.</div>`;
+    content.innerHTML = isRunning
+      ? `<div class="runtime-loading"><span class="spinner"></span><span>${escapeHtml(status.toLowerCase().replaceAll("_", " "))} — starting agent…</span></div>`
+      : `<div class="task-sub">Iteration ${currentDisplayNum} has no agent or test output.</div>`;
     return;
   }
   if (state.runtimeIndex >= entries.length) state.runtimeIndex = 0;
@@ -1257,7 +1536,9 @@ function renderRuntime(detail) {
   const agent = selected.data;
   const stdout = agent.stdout || {};
   const stderr = agent.stderr || {};
-  content.innerHTML = `<div class="runtime-meta"><span>${escapeHtml(agent.runtime || "runtime")}</span><span>exit ${escapeHtml(agent.exit_code ?? "-")}</span><span>${escapeHtml(agent.duration_ms ?? "-")} ms</span><span>${escapeHtml(agent.command || "manual")}</span></div><h3>stdout</h3><pre class="log-block">${escapeHtml(stdout.content || (stdout.missing ? "Missing stdout log" : ""))}</pre><h3>stderr</h3><pre class="log-block">${escapeHtml(stderr.content || (stderr.missing ? "Missing stderr log" : ""))}</pre>`;
+  const agentRunning = isRunning && (agent.exit_code == null);
+  const liveTag = agentRunning ? '<span class="runtime-live"><span class="spinner"></span>live</span>' : "";
+  content.innerHTML = `<div class="runtime-meta"><span>${escapeHtml(agent.runtime || "runtime")}</span><span>exit ${escapeHtml(agent.exit_code ?? "-")}</span><span>${escapeHtml(agent.duration_ms ?? "-")} ms</span><span>${escapeHtml(agent.command || "manual")}</span>${liveTag}</div><h3>stdout</h3><pre class="log-block">${escapeHtml(stdout.content || (stdout.missing ? "Missing stdout log" : (agentRunning ? "Waiting for output…" : "")))}</pre><h3>stderr</h3><pre class="log-block">${escapeHtml(stderr.content || (stderr.missing ? "Missing stderr log" : ""))}</pre>`;
 }
 
 function renderContext(detail) {

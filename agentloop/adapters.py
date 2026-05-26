@@ -60,6 +60,7 @@ def run_role(
     required_artifacts: list[str],
     task_id: str | None = None,
     session_id: str | None = None,
+    resume: bool = False,
 ) -> AdapterResult:
     runtime_name, runtime = runtime_for_role(config, role)
     adapter = runtime.get("adapter", "command")
@@ -77,6 +78,7 @@ def run_role(
             task_id,
             exec_cwd=exec_cwd,
             session_id=session_id,
+            resume=resume,
         )
     raise WorkspaceError(f"Unsupported adapter for runtime {runtime_name}: {adapter}")
 
@@ -133,6 +135,7 @@ def run_command_role(
     task_id: str | None = None,
     exec_cwd: Path | None = None,
     session_id: str | None = None,
+    resume: bool = False,
 ) -> AdapterResult:
     from .sessions import extract_session_id, runtime_supports_resume
 
@@ -142,12 +145,16 @@ def run_command_role(
 
     stdout_log, stderr_log = role_log_paths(root, iteration, role, task_id)
     prompt_path = role_prompt_path(root, role)
-    resuming = bool(session_id) and runtime_supports_resume(runtime)
+    resuming = resume and bool(session_id) and runtime_supports_resume(runtime)
+    prompt_text = ""
+    if prompt_path.exists():
+        prompt_text = prompt_path.read_text(encoding="utf-8")
     values = {
         "cwd": str(root),
         "role": role,
         "iteration": str(iteration),
         "prompt_file": str(prompt_path),
+        "prompt_text": prompt_text,
         "session_id": session_id or "",
         "task_id": task_id or "",
     }
@@ -200,8 +207,10 @@ def run_command_role(
         raise WorkspaceError(f"Role {role} did not produce required artifacts: {', '.join(missing)}")
 
     new_session_id = extract_session_id(runtime, completed.stdout, completed.stderr)
-    # If resume was attempted and runtime gave us no fresh id, keep the prior id.
-    if resuming and not new_session_id:
+    # When the runtime did not echo a session id back, keep whatever id we
+    # already had (either a prior session being resumed, or the pre-generated
+    # id we injected for a new session).
+    if session_id and not new_session_id:
         new_session_id = session_id
 
     return AdapterResult(

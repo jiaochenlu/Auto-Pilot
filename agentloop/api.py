@@ -313,8 +313,7 @@ def build_research_status(state: dict[str, Any]) -> dict[str, Any]:
 def build_design_package(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_name = {str(item.get("name")): item for item in artifacts}
     package = [
-        {"name": "Framing", "file": "framing.md", "description": "Problem statement, non-goals, assumptions."},
-        {"name": "Dossier", "file": "dossier.md", "description": "Current-state research and affected code."},
+        {"name": "Research", "file": "research.md", "description": "Current-state research and affected code."},
         {"name": "Proposal", "file": "proposal.md", "description": "Recommended approach, alternatives, risks."},
         {"name": "Acceptance", "file": "acceptance.md", "description": "Acceptance criteria the implementation must satisfy."},
         {"name": "Test plan", "file": "test-plan.md", "description": "How the work will be verified."},
@@ -330,11 +329,11 @@ def build_execution_approval(state: dict[str, Any], artifacts: list[dict[str, An
     if state.get("status") != "WAITING_FOR_ALIGNMENT":
         return None
     artifact_names = {str(item.get("name")) for item in artifacts}
-    required_artifacts = ["framing.md", "dossier.md", "proposal.md", "acceptance.md", "acceptance.json", "test-plan.md"]
+    required_artifacts = ["research.md", "proposal.md", "acceptance.md", "acceptance.json", "test-plan.md"]
     missing = [name for name in required_artifacts if name not in artifact_names]
     return {
         "required": True,
-        "meaning": "Review the framing, dossier, proposal, acceptance, and test plan before execution starts.",
+        "meaning": "Review the research, proposal, acceptance, and test plan before execution starts.",
         "primary_action": "Approve and run",
         "missing_artifacts": missing,
         "design_package": build_design_package(artifacts),
@@ -852,7 +851,7 @@ def read_artifact(root: Path, task_id: str, name: str) -> dict[str, Any]:
     return payload
 
 
-_EDITABLE_ARTIFACT_NAMES = {"proposal.md", "acceptance.md", "acceptance.json", "test-plan.md", "dossier.md"}
+_EDITABLE_ARTIFACT_NAMES = {"proposal.md", "acceptance.md", "acceptance.json", "test-plan.md", "research.md"}
 
 
 def _edited_name(base: str) -> str:

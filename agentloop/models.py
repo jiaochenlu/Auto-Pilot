@@ -71,7 +71,7 @@ def default_state() -> dict[str, Any]:
             },
             "investigation": {
                 "status": "pending",
-                "artifact": ".agentloop/artifacts/dossier.md",
+                "artifact": ".agentloop/artifacts/research.md",
             },
             "proposal": {
                 "status": "pending",
@@ -118,7 +118,7 @@ def next_action(state: dict[str, Any]) -> str:
     if status == "FRAMING_REVIEW":
         return f"Answer the open questions in `{framing_ref}`, then click \"Start research\"."
     if status in {"INVESTIGATING", "DESIGNING"}:
-        return "Research in progress — wait for the dossier, proposal, acceptance, and test plan."
+        return "Research in progress — wait for the research, proposal, acceptance, and test plan."
     if status == "WAITING_FOR_ALIGNMENT":
         return f"Review the design package and acceptance (`{acceptance_ref}`), then run `agentloop approve`."
     if status == "READY_TO_START":
