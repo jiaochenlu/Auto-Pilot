@@ -1008,6 +1008,26 @@ def _finalize_framing_state(root: Path, state: dict[str, Any], task_id: str) -> 
     state["updated_at"] = utc_now_iso()
 
 
+def _read_role_stderr_tail(root: Path, state: dict[str, Any], role: str,
+                            max_lines: int = 40) -> str:
+    for entry in reversed(state.get("agents") or []):
+        if not isinstance(entry, dict) or entry.get("role") != role:
+            continue
+        log_rel = entry.get("stderr_log")
+        if not log_rel:
+            return ""
+        path = root / log_rel
+        if not path.exists():
+            return ""
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+        lines = [ln for ln in text.splitlines() if ln.strip()]
+        return "\n".join(lines[-max_lines:])
+    return ""
+
+
 def _run_framer_in_background(root: Path, task_id: str) -> None:
     from .tasks import effective_config, load_task_state, save_task_state
 
@@ -1015,6 +1035,29 @@ def _run_framer_in_background(root: Path, task_id: str) -> None:
         state = load_task_state(root, task_id)
         config = effective_config(root, task_id)
         _run_framer(root, state, config, task_id)
+        # Detect silent runtime failure: framer process exited cleanly but
+        # produced no handoff JSON for this turn. Without this check the task
+        # would loop forever — _finalize_framing_state would reread the stale
+        # framing.json, push the same questions, and bounce back to FRAMING_REVIEW.
+        last_log = next(
+            (e for e in reversed(state.get("context_log") or [])
+             if isinstance(e, dict) and e.get("role") == "framer"),
+            None,
+        )
+        if last_log and not last_log.get("handoff_present"):
+            stderr_tail = _read_role_stderr_tail(root, state, "framer")
+            state["framing_running"] = False
+            state["status"] = "FRAMING_REVIEW"
+            state["current_phase"] = "framing_review"
+            state["framing_error"] = (
+                "Framer runtime exited without writing a handoff JSON "
+                "(likely a silent runtime failure). Check the runtime config "
+                "or switch the framer role to a different runtime, then resubmit."
+                + (f"\n\nstderr tail:\n{stderr_tail}" if stderr_tail else "")
+            )
+            state["updated_at"] = utc_now_iso()
+            save_task_state(root, task_id, state)
+            return
         _finalize_framing_state(root, state, task_id)
         save_task_state(root, task_id, state)
     except Exception as exc:  # pragma: no cover - reported through state
@@ -1366,6 +1409,29 @@ def run_one_iteration(root: Path, task_id: str | None = None) -> dict[str, Any]:
     )
     record_agent_result(state, _run_role_with_session(root, state, config, "implementer", iteration, [], task_id=tid))
     _post_role_handoff(root, state, config, "implementer", fallback_summary="Implementer applied approved changes.")
+    # Detect silent runtime failure: implementer process exited cleanly but
+    # produced no handoff JSON. Without this, tester/reviewer would keep seeing
+    # an unchanged tree and bounce CHANGES_REQUIRED back to implementer until
+    # max_iterations, wasting turns and obscuring the real failure.
+    last_impl_log = next(
+        (e for e in reversed(state.get("context_log") or [])
+         if isinstance(e, dict) and e.get("role") == "implementer"),
+        None,
+    )
+    if last_impl_log and not last_impl_log.get("handoff_present"):
+        stderr_tail = _read_role_stderr_tail(root, state, "implementer")
+        runtime_name = last_impl_log.get("runtime") or "?"
+        state["status"] = "BLOCKED"
+        state["current_phase"] = "blocked"
+        state["phases"]["implementation"]["status"] = "blocked"
+        state["blocked_reason"] = (
+            f"Implementer ({runtime_name}) exited without writing handoff JSON "
+            f"on iteration {iteration} (likely a silent runtime failure)."
+            + (f"\n\nstderr tail:\n{stderr_tail}" if stderr_tail else "")
+        )
+        state["updated_at"] = utc_now_iso()
+        save_task_state(root, tid, state)
+        return state
     state["phases"]["implementation"]["status"] = "completed"
     state["current_phase"] = "testing"
     state["phases"]["testing"]["status"] = "in_progress"

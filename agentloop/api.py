@@ -659,6 +659,9 @@ def build_task_detail(root: Path, task_id: str) -> dict[str, Any]:
         merged = {}
         errors.append(str(exc))
     artifacts = list_task_artifacts(root, task_id)
+    blocked_reason = state.get("blocked_reason")
+    if blocked_reason:
+        errors.insert(0, str(blocked_reason))
     return {
         "state": {
             "task_id": task_id,
@@ -677,6 +680,7 @@ def build_task_detail(root: Path, task_id: str) -> dict[str, Any]:
             "cancelled_from": state.get("cancelled_from"),
             "cancelled_by": state.get("cancelled_by"),
             "cancelled_at": state.get("cancelled_at"),
+            "blocked_reason": blocked_reason,
         },
         "config": {"override": override, "effective": merged},
         "actions": available_actions(state, lock_reason),
@@ -888,3 +892,223 @@ def edit_artifact_api(root: Path, task_id: str, payload: dict[str, Any]) -> dict
 def error_payload(exc: Exception) -> dict[str, Any]:
     code = "lock_held" if isinstance(exc, LockHeld) else "workspace_error"
     return {"error": {"code": code, "message": str(exc)}}
+
+
+# ---------- chat module ----------
+
+from . import chats as _chats  # noqa: E402
+from . import chat_runtime as _chat_runtime  # noqa: E402
+
+
+def _chat_row(state: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "chat_id": state.get("chat_id"),
+        "title": state.get("title") or state.get("chat_id"),
+        "runtime": state.get("runtime"),
+        "status": state.get("status") or "idle",
+        "message_count": len(state.get("messages") or []),
+        "preview": _chats.message_preview(state),
+        "updated_at": state.get("updated_at"),
+        "created_at": state.get("created_at"),
+    }
+
+
+def build_chat_list(root: Path) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for chat_id in _chats.list_chat_ids(root):
+        try:
+            state = _chats.load_chat_state(root, chat_id)
+            rows.append(_chat_row(state))
+        except WorkspaceError as exc:
+            rows.append({
+                "chat_id": chat_id,
+                "title": chat_id,
+                "runtime": None,
+                "status": "error",
+                "message_count": 0,
+                "preview": "",
+                "updated_at": None,
+                "error": str(exc),
+            })
+    rows.sort(key=lambda item: str(item.get("updated_at") or ""), reverse=True)
+    return {"chats": rows}
+
+
+def _available_chat_runtimes(root: Path) -> list[str]:
+    try:
+        config = load_config(root)
+    except WorkspaceError:
+        return []
+    runtimes = config.get("runtimes", {}) if isinstance(config, dict) else {}
+    return sorted(name for name in runtimes if name not in HIDDEN_UI_RUNTIMES)
+
+
+def build_chat_detail(root: Path, chat_id: str) -> dict[str, Any]:
+    state = _chats.load_chat_state(root, chat_id)
+    return {
+        "state": state,
+        "available_runtimes": _available_chat_runtimes(root),
+    }
+
+
+def create_chat_api(root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    runtime = payload.get("runtime")
+    if not isinstance(runtime, str) or not runtime.strip():
+        try:
+            runtime = (load_config(root).get("default_runtime") or "manual")
+        except WorkspaceError:
+            runtime = "manual"
+    available = _available_chat_runtimes(root)
+    if available and runtime not in available:
+        raise WorkspaceError(f"Unknown runtime: {runtime}")
+    title = payload.get("title")
+    system_prompt = payload.get("system_prompt")
+    working_dir = payload.get("working_dir")
+    state = _chats.create_chat(
+        root,
+        title=title if isinstance(title, str) else None,
+        runtime=runtime,
+        system_prompt=system_prompt if isinstance(system_prompt, str) else None,
+        working_dir=working_dir if isinstance(working_dir, str) else None,
+    )
+    return build_chat_detail(root, str(state["chat_id"]))
+
+
+def patch_chat_api(root: Path, chat_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    state = _chats.load_chat_state(root, chat_id)
+    if "title" in payload:
+        title = payload["title"]
+        if not isinstance(title, str) or not title.strip():
+            raise WorkspaceError("title must be a non-empty string.")
+        state["title"] = title.strip()[:120]
+    if "runtime" in payload:
+        runtime = payload["runtime"]
+        available = _available_chat_runtimes(root)
+        if not isinstance(runtime, str) or (available and runtime not in available):
+            raise WorkspaceError(f"Unknown runtime: {runtime}")
+        if runtime != state.get("runtime"):
+            # session_id is CLI-local (claude-code resume id ≠ codex resume id).
+            # Clearing forces the next turn to start a fresh session under the
+            # new runtime and rebuild context from messages / compact_summary.
+            state["session_id"] = None
+        state["runtime"] = runtime
+    if "system_prompt" in payload:
+        sp = payload["system_prompt"]
+        if sp is not None and not isinstance(sp, str):
+            raise WorkspaceError("system_prompt must be a string.")
+        state["system_prompt"] = sp or ""
+    if "working_dir" in payload:
+        wd = payload["working_dir"]
+        if wd is not None and not isinstance(wd, str):
+            raise WorkspaceError("working_dir must be a string.")
+        state["working_dir"] = wd or ""
+    _chats.save_chat_state(root, chat_id, state)
+    return build_chat_detail(root, chat_id)
+
+
+def delete_chat_api(root: Path, chat_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    _chats.delete_chat(root, chat_id)
+    return {"deleted": True, "chat_id": chat_id}
+
+
+def send_chat_message_api(root: Path, chat_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    content = payload.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise WorkspaceError("content must be a non-empty string.")
+    _chat_runtime.send_message(root, chat_id, content)
+    return build_chat_detail(root, chat_id)
+
+
+def delete_chat_message_api(root: Path, chat_id: str, message_id: str) -> dict[str, Any]:
+    state = _chats.load_chat_state(root, chat_id)
+    idx = _chats.find_message_index(state, message_id)
+    del state["messages"][idx]
+    _chats.save_chat_state(root, chat_id, state)
+    return build_chat_detail(root, chat_id)
+
+
+def retry_chat_message_api(root: Path, chat_id: str, message_id: str) -> dict[str, Any]:
+    """Truncate history up to (but not including) the target user message,
+    then resend that message's content."""
+
+    state = _chats.load_chat_state(root, chat_id)
+    idx = _chats.find_message_index(state, message_id)
+    msg = state["messages"][idx]
+    if msg.get("role") != "user":
+        raise WorkspaceError("Only user messages can be retried.")
+    content = str(msg.get("content") or "")
+    state["messages"] = state["messages"][:idx]
+    state["session_id"] = None  # force a fresh runtime turn
+    _chats.save_chat_state(root, chat_id, state)
+    _chat_runtime.send_message(root, chat_id, content)
+    return build_chat_detail(root, chat_id)
+
+
+def add_manual_reply_api(root: Path, chat_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    content = payload.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise WorkspaceError("content must be a non-empty string.")
+    state = _chats.load_chat_state(root, chat_id)
+    _chats.append_message(state, "assistant", content, meta={"runtime": "manual"})
+    state["status"] = "idle"
+    state["last_error"] = None
+    _chats.save_chat_state(root, chat_id, state)
+    return build_chat_detail(root, chat_id)
+
+
+COMPACT_PROMPT = (
+    "You are about to hand off this conversation to a different assistant runtime. "
+    "Produce a compact, faithful summary of the conversation so the next runtime can "
+    "continue without the full transcript.\n\n"
+    "Include:\n"
+    "- The user's goal(s) and any constraints they've stated.\n"
+    "- Key facts, decisions, and conclusions reached so far.\n"
+    "- Open questions or work that is still in progress.\n"
+    "- Any code, file paths, identifiers, or values the next turn will need verbatim.\n\n"
+    "Write the summary in third person, as a briefing for the next runtime. "
+    "Do not address the user. Do not include greetings, sign-offs, or meta commentary. "
+    "Output only the summary text."
+)
+
+
+def compact_chat_api(root: Path, chat_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Ask the current runtime to summarize the conversation. Store the
+    summary in state so future turns (under any runtime) send the summary
+    instead of the raw pre-cutoff messages."""
+
+    state = _chats.load_chat_state(root, chat_id)
+    msgs = state.get("messages") or []
+    if not msgs:
+        raise WorkspaceError("Nothing to compact: chat has no messages.")
+    if state.get("status") == "streaming":
+        raise WorkspaceError("Cannot compact while a turn is streaming.")
+
+    runtime_name = (payload.get("runtime") if isinstance(payload, dict) else None) or state.get("runtime")
+    if not runtime_name:
+        raise WorkspaceError("No runtime configured for this chat.")
+
+    # Build a prompt that contains the existing history (respecting any prior
+    # compact) followed by the summarization instruction as the user turn.
+    prompt = _chat_runtime.build_prompt(state, COMPACT_PROMPT)
+    summary = _chat_runtime.run_one_shot(
+        root, chat_id, runtime_name, prompt, label="compact",
+    )
+    if not summary:
+        raise WorkspaceError("Runtime returned an empty compact summary.")
+
+    last_msg_id = msgs[-1].get("id")
+    _chats.apply_compact(state, summary, last_msg_id, runtime_name)
+    _chats.save_chat_state(root, chat_id, state)
+    return build_chat_detail(root, chat_id)
+
+
+def add_manual_reply_api(root: Path, chat_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    content = payload.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise WorkspaceError("content must be a non-empty string.")
+    state = _chats.load_chat_state(root, chat_id)
+    _chats.append_message(state, "assistant", content, meta={"runtime": "manual"})
+    state["status"] = "idle"
+    state["last_error"] = None
+    _chats.save_chat_state(root, chat_id, state)
+    return build_chat_detail(root, chat_id)

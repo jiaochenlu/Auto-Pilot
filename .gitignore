@@ -11,6 +11,8 @@ env/
 # AgentLoop runtime / ephemeral state
 .agentloop/runs/
 .agentloop/tasks/
+.agentloop/chats/
+.agentloop/prompts/
 .agentloop/artifacts/
 .agentloop/state.json
 .agentloop/*.log

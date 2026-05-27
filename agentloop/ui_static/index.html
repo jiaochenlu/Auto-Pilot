@@ -7,22 +7,25 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="shell">
+    <div class="mode-switch" id="modeSwitch">
+      <div class="brand">AgentLoop</div>
+      <div class="mode-switch-group">
+        <button data-mode="tasks" class="active">Tasks</button>
+        <button data-mode="chats">Chats</button>
+      </div>
+      <button id="settingsBtn" class="mode-switch-settings icon-button" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="shell" id="tasksShell">
       <aside class="sidebar">
-        <header class="sidebar-header">
-          <div>
-            <h1>AgentLoop</h1>
-            <p>Task Console</p>
-          </div>
-          <div class="header-actions">
-            <button id="settingsBtn" class="icon-button" title="Settings">⚙</button>
-            <button id="refreshBtn" class="icon-button" title="Refresh">↻</button>
-          </div>
-        </header>
-
         <div class="toolbar">
           <button id="newTaskBtn" class="primary">New task</button>
           <input id="searchInput" type="search" placeholder="Search tasks" />
+          <button id="refreshBtn" class="icon-button toolbar-refresh" title="Refresh">↻</button>
         </div>
 
         <div class="segments" id="statusFilter">
@@ -112,6 +115,113 @@
         </section>
       </main>
     </div>
+
+    <div class="shell hidden" id="chatsShell">
+      <aside class="sidebar">
+        <div class="toolbar">
+          <button id="newChatBtn" class="primary">New chat</button>
+          <input id="chatSearchInput" type="search" placeholder="Search chats" />
+          <button id="chatRefreshBtn" class="icon-button toolbar-refresh" title="Refresh">↻</button>
+        </div>
+        <div id="chatList" class="task-list" aria-live="polite"></div>
+      </aside>
+
+      <main class="main">
+        <section class="detail-panel chat-detail" id="chatDetailPanel">
+          <div id="chatBanner" class="banner hidden"></div>
+          <header class="detail-header">
+            <div class="detail-header-info">
+              <div class="eyebrow" id="chatIdLabel">No chat selected</div>
+              <h2 id="chatTitleHeader">Select a chat</h2>
+              <div class="meta" id="chatMeta"></div>
+            </div>
+            <div class="actions">
+              <select id="chatRuntimeSelect" title="Runtime" hidden></select>
+              <button id="chatCompactBtn" title="Summarize and compact history" hidden>Compact</button>
+              <button id="chatRenameBtn" hidden>Rename</button>
+              <button id="chatDeleteBtn" class="danger" hidden>Delete</button>
+            </div>
+          </header>
+          <div id="chatMessages" class="chat-messages"></div>
+          <div id="chatComposer" class="chat-composer hidden">
+            <textarea id="chatInputBox" rows="3" placeholder="Send a message (Enter = send, Shift+Enter = newline)"></textarea>
+            <div class="chat-composer-row">
+              <span class="task-sub" id="chatStatusHint"></span>
+              <button id="chatSendBtn" class="primary" type="button">Send</button>
+            </div>
+          </div>
+          <div id="chatEmpty" class="chat-empty">
+            <p class="task-sub">No chat selected. Create one to start a conversation with a runtime.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="newChatDialog">
+      <form id="newChatForm" class="dialog-form">
+        <div class="dialog-title-row">
+          <h3>New chat</h3>
+          <button type="button" class="icon-button" title="Close" onclick="this.closest('dialog').close()">×</button>
+        </div>
+        <div id="newChatError" class="dialog-error hidden"></div>
+        <label class="dialog-field-label" for="newChatTitleInput">Title</label>
+        <input id="newChatTitleInput" type="text" placeholder="Untitled chat" />
+        <label class="dialog-field-label" for="newChatRuntimeSelect" style="margin-top:12px;">Runtime</label>
+        <select id="newChatRuntimeSelect"></select>
+        <label class="dialog-field-label" for="newChatWorkingDir" style="margin-top:12px;">
+          <span>Working directory</span>
+          <span class="task-sub">optional · absolute path</span>
+        </label>
+        <input id="newChatWorkingDir" type="text" placeholder="(workspace root)" />
+        <label class="dialog-field-label" for="newChatSystemPrompt" style="margin-top:12px;">
+          <span>System prompt</span>
+          <span class="task-sub">optional</span>
+        </label>
+        <textarea id="newChatSystemPrompt" rows="4" placeholder="You are a helpful assistant..."></textarea>
+        <menu>
+          <button type="button" value="cancel" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary">Create</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="renameChatDialog">
+      <form id="renameChatForm" class="dialog-form">
+        <div class="dialog-title-row">
+          <h3>Rename chat</h3>
+          <button type="button" class="icon-button" title="Close" onclick="this.closest('dialog').close()">×</button>
+        </div>
+        <label class="dialog-field-label" for="renameChatInput">Title</label>
+        <input id="renameChatInput" type="text" />
+        <menu>
+          <button type="button" value="cancel" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="switchRuntimeDialog">
+      <form method="dialog" class="dialog-form">
+        <div class="dialog-title-row">
+          <h3>Switch runtime</h3>
+          <button type="button" class="icon-button" title="Close" onclick="this.closest('dialog').close('cancel')">×</button>
+        </div>
+        <p id="switchRuntimeMsg" class="switch-runtime-msg" style="margin-top:0;"></p>
+        <div class="switch-runtime-choices">
+          <button type="button" class="switch-runtime-choice" data-choice="continue">
+            <strong>Continue this conversation</strong>
+            <span class="switch-runtime-desc">Summarize the history with the current runtime, then keep chatting here under the new runtime.</span>
+          </button>
+          <button type="button" class="switch-runtime-choice" data-choice="new">
+            <strong>Start a new chat</strong>
+            <span class="switch-runtime-desc">Create a fresh chat with the new runtime. This chat stays untouched.</span>
+          </button>
+        </div>
+        <menu>
+          <button type="button" value="cancel" onclick="this.closest('dialog').close('cancel')">Cancel</button>
+        </menu>
+      </form>
+    </dialog>
 
     <dialog id="taskSettingsDialog">
       <form id="configForm" class="dialog-form config-form">

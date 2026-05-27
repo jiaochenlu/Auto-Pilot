@@ -159,11 +159,11 @@ function renderEmptyDetail() {
 }
 
 const LIFECYCLE_STEPS = [
-  { key: "framing", label: "Framing", sub: "clarify the problem", tab: "basic", match: ["CREATED", "FRAMING_REVIEW"], roles: [{ key: "framer", label: "Framer", icon: "?" }] },
-  { key: "research", label: "Researching", sub: "investigate & design", tab: "basic", match: ["INVESTIGATING", "DESIGNING"], roles: [{ key: "investigator", label: "Investigator", icon: "I" }, { key: "architect", label: "Architect", icon: "A" }] },
-  { key: "approve", label: "Awaiting approval", sub: "review the plan", tab: "basic", match: ["WAITING_FOR_ALIGNMENT"], roles: [{ key: "human", label: "You", icon: "@" }] },
-  { key: "run", label: "Running", sub: "iterations executing", tab: "execlog", match: ["READY_TO_START", "RUNNING", "EXECUTING", "IMPLEMENTING_AND_TESTING", "REVIEWING", "WAITING_FOR_HUMAN"], roles: [{ key: "implementer", label: "Implementer", icon: "⚙" }, { key: "tester", label: "Tester", icon: "✓" }, { key: "reviewer", label: "Reviewer", icon: "👁" }] },
-  { key: "done", label: "Done", sub: "task complete", tab: "basic", match: ["DONE", "CANCELLED", "FAILED"], roles: [{ key: "integrator", label: "Integrator", icon: "★" }] },
+  { key: "framing", label: "Framing", sub: "clarify the problem", tab: "basic", match: ["CREATED", "FRAMING_REVIEW"], roles: [{ key: "framer", label: "Framer", icon: "FR" }] },
+  { key: "research", label: "Researching", sub: "investigate & design", tab: "basic", match: ["INVESTIGATING", "DESIGNING"], roles: [{ key: "investigator", label: "Investigator", icon: "IN" }, { key: "architect", label: "Architect", icon: "AR" }] },
+  { key: "approve", label: "Awaiting approval", sub: "review the plan", tab: "basic", match: ["WAITING_FOR_ALIGNMENT"], roles: [{ key: "human", label: "You", icon: "YOU" }] },
+  { key: "run", label: "Running", sub: "iterations executing", tab: "execlog", match: ["READY_TO_START", "RUNNING", "EXECUTING", "IMPLEMENTING_AND_TESTING", "REVIEWING", "WAITING_FOR_HUMAN"], roles: [{ key: "implementer", label: "Implementer", icon: "IM" }, { key: "tester", label: "Tester", icon: "TS" }, { key: "reviewer", label: "Reviewer", icon: "RV" }] },
+  { key: "done", label: "Done", sub: "task complete", tab: "basic", match: ["DONE", "CANCELLED", "FAILED"], roles: [{ key: "integrator", label: "Integrator", icon: "IT" }] },
 ];
 
 function lifecycleIndex(status) {
@@ -239,22 +239,24 @@ function renderLifecycle(task, viewedPhase) {
     li.className = `lc-step lc-${stepState}${cancelled && idx === current ? " lc-cancelled" : ""}${isViewed ? " lc-viewed" : ""}${isRunning ? " lc-running" : ""}`;
     const rolesHtml = (step.roles || []).map((r) => `
       <span class="lc-role lc-role-${escapeHtml(r.key)}" title="${escapeHtml(r.label)}">
-        <span class="lc-role-icon">${escapeHtml(r.icon)}</span>
-        <span class="lc-role-label">${escapeHtml(r.label)}</span>
+        <span class="lc-role-icon" aria-hidden="true">${escapeHtml(r.icon)}</span>
+        <span class="sr-only">${escapeHtml(r.label)}</span>
       </span>`).join("");
     const tip = reached
       ? (isViewed ? `Viewing ${step.label}` : `Click to view ${step.label}`)
       : "Not started yet";
+    const dotText = idx < current ? "✓" : (cancelled && step.key === "done" && idx > current ? "-" : idx + 1);
     li.innerHTML = `
       <button type="button" class="lc-btn" data-tab="${step.tab}" data-step="${escapeHtml(step.key)}" data-state="${stepState}" ${reached ? "" : "disabled"} aria-pressed="${isViewed ? "true" : "false"}" title="${escapeHtml(tip)}">
-        <span class="lc-label">${escapeHtml(step.label)}</span>
-        <span class="lc-body">
-          <span class="lc-dot">${idx < current ? "✓" : idx + 1}</span>
-          <span class="lc-text">
-            <span class="lc-sub">${escapeHtml(step.sub)}</span>
-            ${rolesHtml ? `<span class="lc-roles">${rolesHtml}</span>` : ""}
-          </span>
+        <span class="lc-rail">
+          <span class="lc-line lc-line-left"></span>
+          <span class="lc-dot">${dotText}</span>
+          <span class="lc-line lc-line-right"></span>
+          <span class="lc-working">working</span>
         </span>
+        <span class="lc-label">${escapeHtml(step.label)}</span>
+        <span class="lc-sub">${escapeHtml(step.sub)}</span>
+        ${rolesHtml ? `<span class="lc-roles">${rolesHtml}</span>` : ""}
       </button>`;
     root.appendChild(li);
   });
@@ -734,7 +736,8 @@ function renderFramingReview(detail) {
   const ready = !!review.ready_for_research;
   const badge = ready ? "READY FOR RESEARCH" : (blocking ? `${blocking} BLOCKING` : "NEEDS REVIEW");
   const badgeClass = ready ? "status-READY_TO_START" : "status-FRAMING_REVIEW";
-  const signature = `review:${ready ? 1 : 0}:${blocking}:${sortedQuestions.map((q) => `${q.id}|${q.question}|${q.blocking ? 1 : 0}|${q.answer || ""}`).join("§")}`;
+  const errorText = review.error ? String(review.error) : "";
+  const signature = `review:${ready ? 1 : 0}:${blocking}:${errorText}:${sortedQuestions.map((q) => `${q.id}|${q.question}|${q.blocking ? 1 : 0}|${q.answer || ""}`).join("§")}`;
   panel.classList.remove("hidden");
   if (panel.dataset.signature === signature) {
     // Same content — keep existing DOM so the user's in-progress typing is preserved.
@@ -749,6 +752,7 @@ function renderFramingReview(detail) {
       </div>
       <span class="badge ${badgeClass}">${escapeHtml(badge)}</span>
     </div>
+    ${errorText ? `<div class="dialog-error"><strong>Framer failed.</strong><pre class="framing-error-pre">${escapeHtml(errorText)}</pre></div>` : ""}
     <div class="question-list">
       ${sortedQuestions.length ? sortedQuestions.map(renderFramingQuestion).join("") : '<div class="task-sub">No open questions. Click "Start research" to continue.</div>'}
     </div>
@@ -1450,10 +1454,73 @@ function addCommandRow(value = "") {
   $("commandsList").appendChild(row);
 }
 
+function formatRuntimeDuration(ms) {
+  if (ms == null) return "duration -";
+  const n = Number(ms);
+  if (!Number.isFinite(n)) return `${ms} ms`;
+  if (n < 1000) return `${Math.round(n)} ms`;
+  return `${Math.round(n / 100) / 10}s`;
+}
+
+function lifecycleRole(role) {
+  const key = String(role || "").toLowerCase();
+  for (const step of LIFECYCLE_STEPS) {
+    const found = (step.roles || []).find((r) => r.key === key || r.label.toLowerCase() === key);
+    if (found) return found;
+  }
+  return { key, label: role || "agent", icon: String(role || "AG").slice(0, 2).toUpperCase() };
+}
+
+function runtimeMetaHtml(items) {
+  return `<div class="runtime-meta">${items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`;
+}
+
+function runtimeDetailRow(label, value) {
+  if (!value) return "";
+  return `
+    <div class="runtime-detail-row">
+      <span class="runtime-detail-key">${escapeHtml(label)}</span>
+      <code class="runtime-detail-value" title="${escapeHtml(value)}">${escapeHtml(value)}</code>
+      <button type="button" class="runtime-copy-btn" data-copy="${escapeHtml(value)}">copy</button>
+    </div>`;
+}
+
+function runtimeLogSection(id, title, text, log) {
+  const body = text || "";
+  const truncated = log?.truncated ? `<span class="runtime-truncated" title="Log exceeded the read limit${log.path ? `; open ${escapeHtml(log.path)} on disk` : ""}">truncated ${escapeHtml(log.bytes_returned ?? "?")}/${escapeHtml(log.bytes_total ?? "?")} bytes</span>` : "";
+  return `
+    <div class="runtime-log-head">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="runtime-log-actions">
+        ${truncated}
+        <button type="button" data-copy="${escapeHtml(body)}">copy</button>
+        <button type="button" data-log-bottom="${escapeHtml(id)}">bottom</button>
+        <button type="button" data-log-wrap="${escapeHtml(id)}" aria-pressed="false">wrap</button>
+      </div>
+    </div>
+    <pre id="${escapeHtml(id)}" class="log-block">${escapeHtml(body)}</pre>`;
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text || "");
+    return;
+  }
+  const area = document.createElement("textarea");
+  area.value = text || "";
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand("copy");
+  area.remove();
+}
+
 function renderRuntime(detail) {
   const rt = detail.runtime || {};
   const status = String(detail?.state?.status || "").toUpperCase();
-  const isRunning = ["INVESTIGATING", "DESIGNING", "IMPLEMENTING_AND_TESTING", "REVIEWING"].includes(status);
+  const isRunning = ["INVESTIGATING", "DESIGNING", "READY_TO_START", "RUNNING", "EXECUTING", "IMPLEMENTING_AND_TESTING", "REVIEWING"].includes(status);
   let byIter = rt.by_iteration || [];
   const latest = rt.latest_iteration ?? null;
   if (!byIter.length && ((rt.agents || []).length || (rt.tests || []).length)) {
@@ -1481,13 +1548,13 @@ function renderRuntime(detail) {
     state.iterationIndex = latest != null ? latest : byIter[byIter.length - 1].iteration;
   }
 
-  byIter.forEach((it, idx) => {
+  byIter.forEach((it) => {
     const chip = document.createElement("button");
     chip.className = `iter-chip ${it.iteration === state.iterationIndex ? "active" : ""}${it.iteration === latest ? " is-latest" : ""}`;
     const failBadge = it.tests_failed ? `<span class="iter-chip-fail">${it.tests_failed}</span>` : "";
     const passBadge = it.tests_passed ? `<span class="iter-chip-pass">${it.tests_passed}</span>` : "";
     chip.innerHTML = `
-      <span class="iter-chip-num">Iteration ${idx + 1}</span>
+      <span class="iter-chip-num">Iteration ${escapeHtml(it.iteration)}</span>
       <span class="iter-chip-meta">${it.agent_count} agent${it.agent_count === 1 ? "" : "s"} · ${it.test_count} test${it.test_count === 1 ? "" : "s"}</span>
       ${passBadge}${failBadge}`;
     chip.addEventListener("click", () => {
@@ -1499,15 +1566,18 @@ function renderRuntime(detail) {
   });
 
   const current = byIter.find((it) => it.iteration === state.iterationIndex) || byIter[byIter.length - 1];
-  const currentDisplayNum = (byIter.findIndex((it) => it.iteration === current.iteration) + 1) || 1;
   const entries = [
     ...(current.agents || []).map((agent) => ({ type: "agent", label: agent.role || "agent", data: agent })),
     ...(current.tests || []).map((test) => ({ type: "test", label: test.name, data: test })),
   ];
+  const summary = document.createElement("div");
+  summary.className = "runtime-iteration-summary";
+  summary.textContent = `Iteration ${current.iteration} · ${current.agent_count ?? (current.agents || []).length} agent${(current.agent_count ?? (current.agents || []).length) === 1 ? "" : "s"} · ${current.test_count ?? (current.tests || []).length} test${(current.test_count ?? (current.tests || []).length) === 1 ? "" : "s"}`;
+  bar.prepend(summary);
   if (!entries.length) {
     content.innerHTML = isRunning
       ? `<div class="runtime-loading"><span class="spinner"></span><span>${escapeHtml(status.toLowerCase().replaceAll("_", " "))} — starting agent…</span></div>`
-      : `<div class="task-sub">Iteration ${currentDisplayNum} has no agent or test output.</div>`;
+      : `<div class="task-sub">Iteration ${escapeHtml(current.iteration)} has no agent or test output.</div>`;
     return;
   }
   if (state.runtimeIndex >= entries.length) state.runtimeIndex = 0;
@@ -1516,8 +1586,19 @@ function renderRuntime(detail) {
     const button = document.createElement("button");
     const isTest = entry.type === "test";
     const exit = isTest ? entry.data.exit_code : entry.data.exit_code;
-    const dot = exit === 0 ? "ok" : (typeof exit === "number" ? "fail" : "muted");
-    button.innerHTML = `<span class="dot dot-${dot}"></span><span class="rt-label">${escapeHtml(entry.label)}</span><span class="rt-iter">Iteration ${currentDisplayNum}</span><span class="rt-kind">${entry.type}</span>`;
+    const live = entry.type === "agent" && isRunning && exit == null;
+    const dot = exit === 0 ? "ok" : (typeof exit === "number" ? "fail" : (live ? "live" : "pending"));
+    const duration = formatRuntimeDuration(entry.data.duration_ms);
+    const role = isTest ? null : lifecycleRole(entry.data.role || entry.label);
+    const roleIcon = role ? `<span class="rt-role" title="${escapeHtml(role.label)}">${escapeHtml(role.icon)}</span>` : "";
+    const exitTag = isTest && exit != null ? `<span class="rt-exit">exit ${escapeHtml(exit)}</span>` : "";
+    button.innerHTML = `
+      <span class="dot dot-${dot}"></span>
+      ${roleIcon}
+      <span class="rt-main">
+        <span class="rt-label">${escapeHtml(entry.label || entry.type)}</span>
+        <span class="rt-subline"><span>${escapeHtml(duration)}</span>${exitTag}<span class="rt-kind">${entry.type}</span></span>
+      </span>`;
     button.className = index === state.runtimeIndex ? "active" : "";
     button.addEventListener("click", () => { state.runtimeIndex = index; renderRuntime(detail); });
     tabs.appendChild(button);
@@ -1527,10 +1608,14 @@ function renderRuntime(detail) {
   if (selected.type === "test") {
     const log = selected.data.log || {};
     const exitCode = selected.data.exit_code ?? "unknown";
-    const duration = selected.data.duration_ms == null ? "unknown" : `${selected.data.duration_ms} ms`;
+    const duration = formatRuntimeDuration(selected.data.duration_ms);
     const command = selected.data.command || "Command unknown";
     const logText = log.content || (log.missing ? "Missing test log" : "");
-    content.innerHTML = `<div class="runtime-meta"><span>test</span><span>${escapeHtml(log.path || selected.label)}</span><span>exit ${escapeHtml(exitCode)}</span><span>${escapeHtml(duration)}</span>${log.truncated ? `<span>truncated ${log.bytes_returned}/${log.bytes_total} bytes</span>` : ""}</div><h3>command</h3><pre class="command-block">${escapeHtml(command)}</pre><h3>log</h3><pre class="log-block">${escapeHtml(logText)}</pre>`;
+    content.innerHTML = `
+      ${runtimeMetaHtml(["test", `exit ${exitCode}`, duration])}
+      ${runtimeDetailRow("command", command)}
+      ${runtimeDetailRow("log path", log.path || selected.label || "")}
+      ${runtimeLogSection("runtime-log-main", "log", logText, log)}`;
     return;
   }
   const agent = selected.data;
@@ -1538,7 +1623,17 @@ function renderRuntime(detail) {
   const stderr = agent.stderr || {};
   const agentRunning = isRunning && (agent.exit_code == null);
   const liveTag = agentRunning ? '<span class="runtime-live"><span class="spinner"></span>live</span>' : "";
-  content.innerHTML = `<div class="runtime-meta"><span>${escapeHtml(agent.runtime || "runtime")}</span><span>exit ${escapeHtml(agent.exit_code ?? "-")}</span><span>${escapeHtml(agent.duration_ms ?? "-")} ms</span><span>${escapeHtml(agent.command || "manual")}</span>${liveTag}</div><h3>stdout</h3><pre class="log-block">${escapeHtml(stdout.content || (stdout.missing ? "Missing stdout log" : (agentRunning ? "Waiting for output…" : "")))}</pre><h3>stderr</h3><pre class="log-block">${escapeHtml(stderr.content || (stderr.missing ? "Missing stderr log" : ""))}</pre>`;
+  const stdoutText = stdout.content || (stdout.missing ? "Missing stdout log" : (agentRunning ? "Waiting for output…" : ""));
+  const stderrText = stderr.content || (stderr.missing ? "Missing stderr log" : "");
+  const stderrHtml = stderrText ? runtimeLogSection("runtime-log-stderr", "stderr", stderrText, stderr) : "";
+  content.innerHTML = `
+    ${runtimeMetaHtml([agent.runtime || "runtime", `exit ${agent.exit_code ?? "-"}`, formatRuntimeDuration(agent.duration_ms)])}
+    ${liveTag}
+    ${runtimeDetailRow("command", agent.command || "manual")}
+    ${runtimeDetailRow("stdout path", stdout.path || "")}
+    ${stderr.path ? runtimeDetailRow("stderr path", stderr.path) : ""}
+    ${runtimeLogSection("runtime-log-stdout", "stdout", stdoutText, stdout)}
+    ${stderrHtml}`;
 }
 
 function renderContext(detail) {
@@ -1724,6 +1819,26 @@ function wireEvents() {
     [...$("detailTabs").querySelectorAll("button")].forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
     [...document.querySelectorAll(".tab-panel")].forEach((panel) => panel.classList.toggle("active", panel.id === `${tab}Tab`));
   });
+  $("runtimeContent").addEventListener("click", async (event) => {
+    const copyBtn = event.target.closest("button[data-copy]");
+    if (copyBtn) {
+      await copyText(copyBtn.dataset.copy || "");
+      return;
+    }
+    const bottomBtn = event.target.closest("button[data-log-bottom]");
+    if (bottomBtn) {
+      const pre = document.getElementById(bottomBtn.dataset.logBottom);
+      if (pre) pre.scrollTop = pre.scrollHeight;
+      return;
+    }
+    const wrapBtn = event.target.closest("button[data-log-wrap]");
+    if (wrapBtn) {
+      const pre = document.getElementById(wrapBtn.dataset.logWrap);
+      if (!pre) return;
+      const wrapped = pre.classList.toggle("is-wrapped");
+      wrapBtn.setAttribute("aria-pressed", wrapped ? "true" : "false");
+    }
+  });
   $("createForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const request = $("requestInput").value.trim();
@@ -1809,6 +1924,886 @@ function wireEvents() {
   });
 }
 
-wireEvents();
-startAutoRefresh();
-loadTasks(false).catch((error) => showBanner(error.message));
+if ($("refreshBtn")) {
+  wireEvents();
+  startAutoRefresh();
+  loadTasks(false).catch((error) => showBanner(error.message));
+}
+
+// ============================================================
+// Chat module (independent from tasks)
+// ============================================================
+
+const chatState = {
+  chats: [],
+  selectedId: null,
+  detail: null,
+  busy: false,
+  pollTimer: null,
+  search: "",
+  abortController: null,
+};
+
+const CHAT_REFRESH_MS = 4000;
+
+function chatShowBanner(message) {
+  const banner = $("chatBanner");
+  if (!message) {
+    banner.classList.add("hidden");
+    banner.textContent = "";
+    return;
+  }
+  banner.textContent = message;
+  banner.classList.remove("hidden");
+}
+
+async function loadChats(keepSelection = true) {
+  try {
+    const data = await apiFetch("/api/chats");
+    chatState.chats = data.chats || [];
+    // Only fall back to chats[0] when explicitly told to drop selection,
+    // or when nothing is selected. Do NOT clobber a non-null selectedId
+    // that's missing from the list — a freshly-created chat may be in
+    // flight, or a stale polled response may have arrived after a newer
+    // create. The next poll will reconcile.
+    if (!keepSelection || !chatState.selectedId) {
+      chatState.selectedId = chatState.chats[0]?.chat_id || null;
+    }
+    renderChatList();
+    if (chatState.selectedId && !chatState.detail) {
+      await loadChatDetail(chatState.selectedId);
+    } else {
+      renderChatDetail();
+    }
+  } catch (error) {
+    chatShowBanner(error.message);
+  }
+}
+
+function renderChatList() {
+  const search = ($("chatSearchInput").value || "").toLowerCase().trim();
+  const list = $("chatList");
+  list.innerHTML = "";
+  const filtered = chatState.chats.filter((c) => {
+    if (!search) return true;
+    const text = `${c.chat_id} ${c.title || ""} ${c.preview || ""}`.toLowerCase();
+    return text.includes(search);
+  });
+  if (!filtered.length) {
+    list.innerHTML = '<div class="task-sub">No chats yet. Click "New chat" to start one.</div>';
+    return;
+  }
+  for (const chat of filtered) {
+    const button = document.createElement("button");
+    button.className = `task-row ${chat.chat_id === chatState.selectedId ? "active" : ""}`;
+    const statusBadge = chat.status && chat.status !== "idle"
+      ? `<span class="badge status-${escapeHtml(chat.status)}">${escapeHtml(chat.status)}</span>`
+      : "";
+    const isError = chat.status === "error" || chat.error;
+    const inlineDelete = isError
+      ? `<span class="row-delete" data-delete="${escapeHtml(chat.chat_id)}" title="Delete this chat">×</span>`
+      : "";
+    button.innerHTML = `
+      <div class="task-row-top">
+        <span class="task-title">${escapeHtml(chat.title || chat.chat_id)}</span>
+        ${statusBadge}
+        ${inlineDelete}
+      </div>
+      <div class="task-sub">
+        <span>${escapeHtml(chat.runtime || "?")}</span>
+        <span>${chat.message_count || 0} msgs</span>
+        <span>${escapeHtml(chat.updated_at || "")}</span>
+      </div>
+      <div class="task-sub chat-preview">${escapeHtml(chat.preview || "")}</div>`;
+    button.addEventListener("click", async (e) => {
+      const del = e.target.closest("[data-delete]");
+      if (del) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = del.dataset.delete;
+        if (!confirm("Delete this chat permanently?")) return;
+        try {
+          await apiFetch(`/api/chats/${encodeURIComponent(id)}`, { method: "DELETE" });
+          if (chatState.selectedId === id) {
+            chatState.selectedId = null;
+            chatState.detail = null;
+          }
+          await loadChats(true);
+          renderChatDetail();
+        } catch (error) {
+          chatShowBanner(error.message);
+        }
+        return;
+      }
+      selectChat(chat.chat_id);
+    });
+    list.appendChild(button);
+  }
+}
+
+async function selectChat(chatId) {
+  chatState.selectedId = chatId;
+  renderChatList();
+  await loadChatDetail(chatId);
+}
+
+async function loadChatDetail(chatId) {
+  try {
+    chatState.detail = await apiFetch(`/api/chats/${encodeURIComponent(chatId)}`);
+    renderChatDetail();
+    chatShowBanner(null);
+  } catch (error) {
+    chatShowBanner(error.message);
+  }
+}
+
+function renderChatDetail() {
+  const empty = $("chatEmpty");
+  const composer = $("chatComposer");
+  const messages = $("chatMessages");
+  const runtimeSelect = $("chatRuntimeSelect");
+  const renameBtn = $("chatRenameBtn");
+  const deleteBtn = $("chatDeleteBtn");
+  const compactBtn = $("chatCompactBtn");
+
+  if (!chatState.detail) {
+    $("chatIdLabel").textContent = "No chat selected";
+    $("chatTitleHeader").textContent = "Select a chat";
+    $("chatMeta").textContent = "";
+    messages.innerHTML = "";
+    composer.classList.add("hidden");
+    empty.classList.remove("hidden");
+    runtimeSelect.hidden = true;
+    renameBtn.hidden = true;
+    deleteBtn.hidden = true;
+    compactBtn.hidden = true;
+    return;
+  }
+
+  const s = chatState.detail.state;
+  $("chatIdLabel").textContent = s.chat_id;
+  $("chatTitleHeader").textContent = s.title || s.chat_id;
+  $("chatMeta").innerHTML = `
+    <span>runtime: ${escapeHtml(s.runtime || "?")}</span>
+    <span>messages: ${(s.messages || []).length}</span>
+    <span>status: ${escapeHtml(s.status || "idle")}</span>
+    ${s.working_dir ? `<span>cwd: ${escapeHtml(s.working_dir)}</span>` : ""}`;
+
+  // Runtime selector
+  runtimeSelect.hidden = false;
+  renameBtn.hidden = false;
+  deleteBtn.hidden = false;
+  compactBtn.hidden = false;
+  compactBtn.disabled = !(s.messages || []).length || s.status === "streaming" || chatState.compacting;
+  compactBtn.textContent = chatState.compacting ? "Compacting…" : "Compact";
+  const available = chatState.detail.available_runtimes || [];
+  runtimeSelect.innerHTML = available.map(
+    (rt) => `<option value="${escapeHtml(rt)}" ${rt === s.runtime ? "selected" : ""}>${escapeHtml(rt)}</option>`
+  ).join("");
+
+  // Messages
+  empty.classList.add("hidden");
+  composer.classList.remove("hidden");
+  messages.innerHTML = "";
+  const isStreaming = s.status === "streaming";
+  const msgs = s.messages || [];
+  const compactCut = s.compact_up_to_message_id || null;
+  const compactSummary = s.compact_summary || "";
+  for (let mi = 0; mi < msgs.length; mi++) {
+    const msg = msgs[mi];
+    const wrap = document.createElement("div");
+    wrap.className = `chat-msg chat-msg-${msg.role}`;
+    const meta = msg.meta || {};
+    const metaParts = [];
+    if (meta.duration_ms) metaParts.push(`${Math.round(meta.duration_ms / 100) / 10}s`);
+    if (meta.cancelled) metaParts.push('<span class="chat-msg-cancelled">cancelled</span>');
+    const metaLine = metaParts.length ? `<span class="task-sub">${metaParts.join(" · ")}</span>` : "";
+    const roleLabel = msg.role === "assistant" && meta.runtime ? meta.runtime : msg.role;
+    wrap.innerHTML = `
+      <div class="chat-msg-head">
+        <span class="chat-msg-role">${escapeHtml(roleLabel)}</span>
+        <span class="task-sub">${escapeHtml(msg.ts || "")}</span>
+        ${metaLine}
+      </div>
+      <div class="chat-msg-body"></div>
+      <div class="chat-msg-actions"></div>`;
+    const body = wrap.querySelector(".chat-msg-body");
+    const isLast = mi === msgs.length - 1;
+    const isLiveAssistant = isStreaming && isLast && msg.role === "assistant";
+    if (msg.role === "assistant" && !isLiveAssistant) {
+      // Render markdown + syntax highlight for completed assistant messages.
+      body.classList.add("markdown-body");
+      body.innerHTML = renderMarkdown(msg.content || "");
+      highlightCodeBlocks(body);
+    } else if (isLiveAssistant) {
+      // Streaming bubble: plain text, with a typing indicator while empty.
+      if (msg.content) {
+        body.textContent = msg.content;
+      } else {
+        body.innerHTML = '<span class="typing-indicator"><span></span><span></span><span></span></span>';
+      }
+    } else {
+      // User messages: plain text.
+      body.textContent = msg.content || "";
+    }
+    const actions = wrap.querySelector(".chat-msg-actions");
+    const copyBtn = document.createElement("button");
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", () => navigator.clipboard.writeText(msg.content || ""));
+    actions.appendChild(copyBtn);
+    if (msg.role === "user") {
+      const retryBtn = document.createElement("button");
+      retryBtn.textContent = "Retry";
+      retryBtn.addEventListener("click", () => retryFromMessage(msg.id));
+      actions.appendChild(retryBtn);
+    }
+    const delBtn = document.createElement("button");
+    delBtn.className = "danger-link";
+    delBtn.textContent = "Delete";
+    delBtn.addEventListener("click", () => deleteMessage(msg.id));
+    actions.appendChild(delBtn);
+    messages.appendChild(wrap);
+    if (compactCut && msg.id === compactCut) {
+      const divider = document.createElement("div");
+      divider.className = "chat-compact-divider";
+      divider.innerHTML = `
+        <div class="chat-compact-line">
+          <span>— context compacted: runtime sees a summary of everything above —</span>
+          <button type="button" class="chat-compact-toggle">View summary</button>
+        </div>
+        <pre class="chat-compact-summary hidden"></pre>`;
+      divider.querySelector(".chat-compact-summary").textContent = compactSummary;
+      const toggle = divider.querySelector(".chat-compact-toggle");
+      const pre = divider.querySelector(".chat-compact-summary");
+      toggle.addEventListener("click", () => {
+        const hidden = pre.classList.toggle("hidden");
+        toggle.textContent = hidden ? "View summary" : "Hide summary";
+      });
+      messages.appendChild(divider);
+    }
+  }
+  messages.scrollTop = messages.scrollHeight;
+
+  // Status hint + composer
+  const hint = $("chatStatusHint");
+  if (s.status === "streaming") {
+    hint.textContent = "Waiting for runtime…";
+  } else if (s.status === "error") {
+    hint.textContent = s.last_error || "Last turn failed.";
+  } else {
+    hint.textContent = "";
+  }
+  $("chatSendBtn").disabled = chatState.busy ? false : (s.status === "streaming");
+}
+
+async function sendChatMessage() {
+  if (!chatState.selectedId) return;
+  if (chatState.busy) {
+    // Stop button: abort the in-flight stream. Server will detect the
+    // disconnect, kill the runtime subprocess, and persist a partial
+    // assistant message marked cancelled.
+    if (chatState.abortController) chatState.abortController.abort();
+    return;
+  }
+  const input = $("chatInputBox");
+  const content = input.value.trim();
+  if (!content) return;
+  chatState.busy = true;
+  setSendButtonStop(true);
+  input.value = "";
+
+  const detail = chatState.detail;
+  if (!detail?.state) {
+    chatState.busy = false;
+    setSendButtonStop(false);
+    return;
+  }
+  const placeholderUser = { id: "tmp-user", role: "user", content, ts: "" };
+  const placeholderAsst = { id: "tmp-asst", role: "assistant", content: "", ts: "", meta: { streaming: true } };
+  detail.state.messages = [...(detail.state.messages || []), placeholderUser, placeholderAsst];
+  detail.state.status = "streaming";
+  renderChatDetail();
+
+  const chatId = chatState.selectedId;
+  const controller = new AbortController();
+  chatState.abortController = controller;
+  let buf = "";
+  let assistantText = "";
+  let gotError = null;
+  let aborted = false;
+
+  try {
+    const response = await fetch(`/api/chats/${encodeURIComponent(chatId)}/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+      body: JSON.stringify({ content }),
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) !== -1) {
+        const raw = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const ev = parseSseEvent(raw);
+        if (!ev) continue;
+        if (ev.event === "chunk") {
+          assistantText += ev.data.delta || "";
+          updateStreamingMessage(assistantText);
+        } else if (ev.event === "user_message") {
+          const real = ev.data.message;
+          if (real && detail.state.messages) {
+            const tu = detail.state.messages.find((m) => m.id === "tmp-user");
+            if (tu) { tu.id = real.id; tu.ts = real.ts; }
+          }
+        } else if (ev.event === "done") {
+          chatState.detail = { ...chatState.detail, state: ev.data.state };
+        } else if (ev.event === "error") {
+          gotError = ev.data.message || "Stream error";
+        }
+      }
+    }
+  } catch (error) {
+    if (error.name === "AbortError") {
+      aborted = true;
+    } else {
+      gotError = error.message;
+    }
+  } finally {
+    chatState.busy = false;
+    chatState.abortController = null;
+    setSendButtonStop(false);
+    if (gotError) {
+      chatShowBanner(gotError);
+      await loadChatDetail(chatId);
+    } else if (aborted) {
+      // Refresh authoritative state: server saved a partial cancelled message.
+      await loadChatDetail(chatId);
+    } else {
+      renderChatDetail();
+    }
+    loadChats(true);
+  }
+}
+
+function setSendButtonStop(streaming) {
+  const btn = $("chatSendBtn");
+  if (streaming) {
+    btn.textContent = "Stop";
+    btn.classList.add("danger");
+    btn.classList.remove("primary");
+    btn.disabled = false;
+  } else {
+    btn.textContent = "Send";
+    btn.classList.add("primary");
+    btn.classList.remove("danger");
+    btn.disabled = false;
+  }
+}
+
+function parseSseEvent(raw) {
+  let event = "message";
+  const dataLines = [];
+  for (const line of raw.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+  }
+  if (!dataLines.length) return null;
+  try {
+    return { event, data: JSON.parse(dataLines.join("\n")) };
+  } catch (e) {
+    return null;
+  }
+}
+
+function updateStreamingMessage(text) {
+  // Cheap in-place update of the placeholder assistant message body without
+  // re-rendering the entire pane (avoids flicker and scroll jumps).
+  const messages = $("chatMessages");
+  const last = messages.querySelector(".chat-msg-assistant:last-of-type .chat-msg-body");
+  if (last) {
+    last.textContent = text;  // wipes the typing indicator on first chunk
+    messages.scrollTop = messages.scrollHeight;
+  }
+  // Keep state in sync for any subsequent renderChatDetail()
+  const d = chatState.detail?.state?.messages;
+  if (d && d.length) {
+    const lastMsg = d[d.length - 1];
+    if (lastMsg.role === "assistant") lastMsg.content = text;
+  }
+}
+
+async function retryFromMessage(messageId) {
+  if (!chatState.selectedId) return;
+  try {
+    chatState.detail = await apiFetch(
+      `/api/chats/${encodeURIComponent(chatState.selectedId)}/messages/${encodeURIComponent(messageId)}/retry`,
+      { method: "POST", body: "{}" },
+    );
+    renderChatDetail();
+    loadChats(true);
+  } catch (error) {
+    chatShowBanner(error.message);
+  }
+}
+
+async function deleteMessage(messageId) {
+  if (!chatState.selectedId) return;
+  if (!confirm("Delete this message?")) return;
+  try {
+    chatState.detail = await apiFetch(
+      `/api/chats/${encodeURIComponent(chatState.selectedId)}/messages/${encodeURIComponent(messageId)}`,
+      { method: "DELETE" },
+    );
+    renderChatDetail();
+  } catch (error) {
+    chatShowBanner(error.message);
+  }
+}
+
+async function openNewChatDialog() {
+  // Populate runtime list from settings.
+  try {
+    const settings = await apiFetch("/api/settings");
+    const runtimes = (settings.runtime?.runtimes || [])
+      .filter((r) => r.status === "active" || r.status === "manual_fallback")
+      .map((r) => r.name);
+    const fallback = settings.runtime?.default_runtime ? [settings.runtime.default_runtime] : ["manual"];
+    const options = (runtimes.length ? runtimes : fallback);
+    $("newChatRuntimeSelect").innerHTML = options.map(
+      (rt) => `<option value="${escapeHtml(rt)}">${escapeHtml(rt)}</option>`
+    ).join("");
+  } catch (error) {
+    $("newChatRuntimeSelect").innerHTML = '<option value="manual">manual</option>';
+  }
+  $("newChatTitleInput").value = "";
+  $("newChatWorkingDir").value = "";
+  $("newChatSystemPrompt").value = "";
+  $("newChatError").classList.add("hidden");
+  $("newChatDialog").showModal();
+}
+
+async function createChat(event) {
+  event.preventDefault();
+  const payload = {
+    title: $("newChatTitleInput").value.trim() || null,
+    runtime: $("newChatRuntimeSelect").value,
+    working_dir: $("newChatWorkingDir").value.trim() || null,
+    system_prompt: $("newChatSystemPrompt").value || null,
+  };
+  try {
+    const data = await apiFetch("/api/chats", { method: "POST", body: JSON.stringify(payload) });
+    $("newChatDialog").close();
+    chatState.selectedId = data.state.chat_id;
+    chatState.detail = data;
+    await loadChats(true);
+    renderChatDetail();
+  } catch (error) {
+    const err = $("newChatError");
+    err.textContent = error.message;
+    err.classList.remove("hidden");
+  }
+}
+
+async function changeChatRuntime() {
+  if (!chatState.selectedId || !chatState.detail) return;
+  const select = $("chatRuntimeSelect");
+  const newRuntime = select.value;
+  const s = chatState.detail.state;
+  const oldRuntime = s.runtime;
+  if (!newRuntime || newRuntime === oldRuntime) return;
+
+  const hasMessages = (s.messages || []).length > 0;
+  if (!hasMessages) {
+    // Empty chat — just switch silently.
+    try {
+      chatState.detail = await apiFetch(
+        `/api/chats/${encodeURIComponent(chatState.selectedId)}`,
+        { method: "PATCH", body: JSON.stringify({ runtime: newRuntime }) },
+      );
+      renderChatDetail();
+      loadChats(true);
+    } catch (error) {
+      chatShowBanner(error.message);
+      select.value = oldRuntime;
+    }
+    return;
+  }
+
+  // Ask the user how to handle the switch.
+  const dlg = $("switchRuntimeDialog");
+  $("switchRuntimeMsg").textContent = `From "${oldRuntime}" to "${newRuntime}".`;
+  const handler = async (event) => {
+    const btn = event.target.closest(".switch-runtime-choice");
+    if (!btn) return;
+    event.preventDefault();
+    dlg.removeEventListener("click", handler);
+    const choice = btn.dataset.choice;
+    dlg.close(choice);
+    if (choice === "continue") {
+      await switchRuntimeContinue(oldRuntime, newRuntime);
+    } else if (choice === "new") {
+      await switchRuntimeNewChat(newRuntime, s);
+    }
+  };
+  dlg.addEventListener("click", handler);
+  dlg.addEventListener("close", function onClose() {
+    dlg.removeEventListener("close", onClose);
+    dlg.removeEventListener("click", handler);
+    if (dlg.returnValue === "cancel" || dlg.returnValue === "") {
+      // User cancelled — revert dropdown to the actual chat runtime.
+      select.value = oldRuntime;
+    }
+  }, { once: false });
+  dlg.returnValue = "";
+  dlg.showModal();
+}
+
+async function switchRuntimeContinue(oldRuntime, newRuntime) {
+  // 1) Compact under the OLD runtime so it produces the summary.
+  // 2) PATCH runtime — server clears session_id automatically.
+  // 3) Next user message goes to the new runtime with the summary as context.
+  chatState.compacting = true;
+  chatState.busy = true;
+  renderChatDetail();
+  try {
+    chatState.detail = await apiFetch(
+      `/api/chats/${encodeURIComponent(chatState.selectedId)}/compact`,
+      { method: "POST", body: JSON.stringify({ runtime: oldRuntime }) },
+    );
+    chatState.detail = await apiFetch(
+      `/api/chats/${encodeURIComponent(chatState.selectedId)}`,
+      { method: "PATCH", body: JSON.stringify({ runtime: newRuntime }) },
+    );
+    loadChats(true);
+  } catch (error) {
+    chatShowBanner(error.message);
+    // Revert dropdown on failure.
+    $("chatRuntimeSelect").value = oldRuntime;
+  } finally {
+    chatState.compacting = false;
+    chatState.busy = false;
+    renderChatDetail();
+  }
+}
+
+async function switchRuntimeNewChat(newRuntime, sourceState) {
+  // Create a fresh chat using the new runtime, inheriting title/cwd/system prompt.
+  const baseTitle = (sourceState.title || "New chat").replace(/\s*\((cont|new)\).*$/, "");
+  const payload = {
+    title: `${baseTitle} (${newRuntime})`.slice(0, 120),
+    runtime: newRuntime,
+    working_dir: sourceState.working_dir || null,
+    system_prompt: sourceState.system_prompt || null,
+  };
+  // Block the poll timer so a stale in-flight GET /api/chats can't clobber
+  // selectedId after we point it at the new chat.
+  chatState.busy = true;
+  try {
+    const data = await apiFetch("/api/chats", { method: "POST", body: JSON.stringify(payload) });
+    chatState.selectedId = data.state.chat_id;
+    chatState.detail = data;
+    await loadChats(true);
+    renderChatDetail();
+    const input = $("chatInputBox");
+    if (input) input.focus();
+  } catch (error) {
+    chatShowBanner(error.message);
+    // Revert the original chat's dropdown to its true runtime.
+    $("chatRuntimeSelect").value = sourceState.runtime;
+  } finally {
+    chatState.busy = false;
+  }
+}
+
+function openRenameChat() {
+  if (!chatState.detail?.state) return;
+  $("renameChatInput").value = chatState.detail.state.title || "";
+  $("renameChatDialog").showModal();
+}
+
+async function submitRenameChat(event) {
+  event.preventDefault();
+  const title = $("renameChatInput").value.trim();
+  if (!title || !chatState.selectedId) return;
+  try {
+    chatState.detail = await apiFetch(
+      `/api/chats/${encodeURIComponent(chatState.selectedId)}`,
+      { method: "PATCH", body: JSON.stringify({ title }) },
+    );
+    $("renameChatDialog").close();
+    renderChatDetail();
+    loadChats(true);
+  } catch (error) {
+    chatShowBanner(error.message);
+  }
+}
+
+async function deleteCurrentChat() {
+  if (!chatState.selectedId) return;
+  if (!confirm("Delete this chat permanently?")) return;
+  try {
+    await apiFetch(`/api/chats/${encodeURIComponent(chatState.selectedId)}`, { method: "DELETE" });
+    chatState.selectedId = null;
+    chatState.detail = null;
+    await loadChats(false);
+  } catch (error) {
+    chatShowBanner(error.message);
+  }
+}
+
+async function compactCurrentChat() {
+  if (!chatState.selectedId || chatState.compacting) return;
+  const s = chatState.detail?.state;
+  if (!s || !(s.messages || []).length) return;
+  if (!confirm(
+    "Ask the current runtime to summarize the conversation and compact history?\n\n" +
+    "Future turns will send the summary instead of the raw messages above. " +
+    "All messages stay visible in this UI."
+  )) return;
+  chatState.compacting = true;
+  renderChatDetail();
+  try {
+    chatState.detail = await apiFetch(
+      `/api/chats/${encodeURIComponent(chatState.selectedId)}/compact`,
+      { method: "POST", body: JSON.stringify({}) },
+    );
+  } catch (error) {
+    chatShowBanner(error.message);
+  } finally {
+    chatState.compacting = false;
+    renderChatDetail();
+  }
+}
+
+function setMode(mode) {
+  const tasksShell = $("tasksShell");
+  const chatsShell = $("chatsShell");
+  const buttons = $("modeSwitch").querySelectorAll("button");
+  buttons.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  if (mode === "chats") {
+    tasksShell.classList.add("hidden");
+    chatsShell.classList.remove("hidden");
+    if (!chatState.pollTimer) {
+      chatState.pollTimer = setInterval(() => {
+        if (chatState.busy) return;
+        loadChats(true);
+      }, CHAT_REFRESH_MS);
+    }
+    loadChats(false);
+  } else {
+    chatsShell.classList.add("hidden");
+    tasksShell.classList.remove("hidden");
+    if (chatState.pollTimer) {
+      clearInterval(chatState.pollTimer);
+      chatState.pollTimer = null;
+    }
+  }
+  try { location.hash = mode; } catch (e) {}
+}
+
+function wireChatEvents() {
+  $("modeSwitch").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-mode]");
+    if (btn) setMode(btn.dataset.mode);
+  });
+  $("newChatBtn").addEventListener("click", openNewChatDialog);
+  $("newChatForm").addEventListener("submit", createChat);
+  $("renameChatForm").addEventListener("submit", submitRenameChat);
+  $("chatRefreshBtn").addEventListener("click", () => loadChats(true));
+  $("chatSearchInput").addEventListener("input", renderChatList);
+  $("chatSendBtn").addEventListener("click", sendChatMessage);
+  $("chatInputBox").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
+  $("chatRuntimeSelect").addEventListener("change", changeChatRuntime);
+  $("chatRenameBtn").addEventListener("click", openRenameChat);
+  $("chatDeleteBtn").addEventListener("click", deleteCurrentChat);
+  $("chatCompactBtn").addEventListener("click", compactCurrentChat);
+}
+
+// ----------------------------------------------------------
+// Minimal multi-language syntax highlighter for fenced code.
+// Tokens: comment, string, keyword, number, function-call.
+// Covers js/ts, py, json, html/xml, css, bash/sh, sql, go, rust, java.
+// Not a full parser — just regex passes good enough for chat output.
+// ----------------------------------------------------------
+
+const HL_KEYWORDS = {
+  js: "var let const function return if else for while do switch case break continue new delete typeof instanceof in of class extends super this null undefined true false async await yield throw try catch finally import export from default void as static get set",
+  ts: "var let const function return if else for while do switch case break continue new delete typeof instanceof in of class extends super this null undefined true false async await yield throw try catch finally import export from default void as static get set interface type enum implements public private protected readonly abstract namespace declare keyof infer never unknown",
+  py: "def class return if elif else for while break continue pass import from as with try except finally raise lambda yield global nonlocal in is not and or None True False async await match case",
+  go: "func var const type struct interface map chan return if else for switch case break continue defer go select package import range nil true false",
+  rust: "fn let mut const static struct enum impl trait pub use mod return if else for while loop match break continue self Self where as move ref true false None Some Ok Err",
+  java: "public private protected class interface extends implements return if else for while do switch case break continue new this super null true false static final void int long double float boolean char String byte short throw throws try catch finally package import abstract synchronized",
+  sql: "select from where group by order having limit offset insert into values update set delete create table drop alter index view as join inner left right outer on union all distinct case when then end and or not null is in like between",
+  bash: "if then else elif fi for in do done while case esac function return local export readonly declare unset echo printf cd pwd ls true false",
+  css: "important inherit initial unset auto none",
+  json: "true false null",
+};
+HL_KEYWORDS.sh = HL_KEYWORDS.bash;
+HL_KEYWORDS.shell = HL_KEYWORDS.bash;
+HL_KEYWORDS.javascript = HL_KEYWORDS.js;
+HL_KEYWORDS.jsx = HL_KEYWORDS.js;
+HL_KEYWORDS.tsx = HL_KEYWORDS.ts;
+HL_KEYWORDS.typescript = HL_KEYWORDS.ts;
+HL_KEYWORDS.python = HL_KEYWORDS.py;
+HL_KEYWORDS.golang = HL_KEYWORDS.go;
+
+const HL_COMMENTS = {
+  js: [["//", "\n"], ["/*", "*/"]],
+  ts: [["//", "\n"], ["/*", "*/"]],
+  go: [["//", "\n"], ["/*", "*/"]],
+  rust: [["//", "\n"], ["/*", "*/"]],
+  java: [["//", "\n"], ["/*", "*/"]],
+  css: [["/*", "*/"]],
+  py: [["#", "\n"]],
+  bash: [["#", "\n"]],
+  sql: [["--", "\n"], ["/*", "*/"]],
+  html: [["<!--", "-->"]],
+  xml: [["<!--", "-->"]],
+};
+HL_COMMENTS.sh = HL_COMMENTS.bash;
+HL_COMMENTS.shell = HL_COMMENTS.bash;
+HL_COMMENTS.javascript = HL_COMMENTS.js;
+HL_COMMENTS.jsx = HL_COMMENTS.js;
+HL_COMMENTS.tsx = HL_COMMENTS.ts;
+HL_COMMENTS.typescript = HL_COMMENTS.ts;
+HL_COMMENTS.python = HL_COMMENTS.py;
+HL_COMMENTS.golang = HL_COMMENTS.go;
+
+function highlightCode(src, lang) {
+  const text = String(src);
+  const keywords = (HL_KEYWORDS[lang] || "").split(/\s+/).filter(Boolean);
+  const comments = HL_COMMENTS[lang] || [];
+  // Tokenize by scanning. We emit a list of [type, text] segments and join
+  // at the end. Tokens are: 'plain', 'comment', 'string', 'number', 'kw', 'fn'.
+  const out = [];
+  let i = 0;
+  const n = text.length;
+
+  const isWord = (c) => /[A-Za-z0-9_$]/.test(c);
+  const startsWith = (s, off) => text.startsWith(s, off);
+
+  while (i < n) {
+    let matched = false;
+
+    // Comments
+    for (const [open, close] of comments) {
+      if (startsWith(open, i)) {
+        const end = close === "\n"
+          ? (text.indexOf("\n", i + open.length) === -1 ? n : text.indexOf("\n", i + open.length))
+          : (text.indexOf(close, i + open.length) === -1 ? n : text.indexOf(close, i + open.length) + close.length);
+        out.push(["comment", text.slice(i, end)]);
+        i = end;
+        matched = true;
+        break;
+      }
+    }
+    if (matched) continue;
+
+    // Strings: ", ', `
+    const ch = text[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const quote = ch;
+      let j = i + 1;
+      while (j < n) {
+        if (text[j] === "\\" && j + 1 < n) { j += 2; continue; }
+        if (text[j] === quote) { j++; break; }
+        j++;
+      }
+      out.push(["string", text.slice(i, j)]);
+      i = j;
+      continue;
+    }
+
+    // Numbers
+    if (/[0-9]/.test(ch) && (i === 0 || !isWord(text[i - 1]))) {
+      let j = i;
+      while (j < n && /[0-9a-fA-FxXoObB._]/.test(text[j])) j++;
+      out.push(["number", text.slice(i, j)]);
+      i = j;
+      continue;
+    }
+
+    // Identifiers / keywords / function calls
+    if (isWord(ch) && !/[0-9]/.test(ch)) {
+      let j = i;
+      while (j < n && isWord(text[j])) j++;
+      const word = text.slice(i, j);
+      // peek next non-space for "(" => function call
+      let k = j;
+      while (k < n && /\s/.test(text[k])) k++;
+      if (keywords.includes(word)) {
+        out.push(["kw", word]);
+      } else if (text[k] === "(") {
+        out.push(["fn", word]);
+      } else {
+        out.push(["plain", word]);
+      }
+      i = j;
+      continue;
+    }
+
+    // HTML/XML tags (very rough): <tag ...>
+    if ((lang === "html" || lang === "xml") && ch === "<") {
+      const close = text.indexOf(">", i);
+      if (close !== -1) {
+        out.push(["kw", text.slice(i, close + 1)]);
+        i = close + 1;
+        continue;
+      }
+    }
+
+    out.push(["plain", ch]);
+    i++;
+  }
+
+  return out.map(([type, t]) => {
+    const esc = escapeHtml(t);
+    if (type === "plain") return esc;
+    return `<span class="hl-${type}">${esc}</span>`;
+  }).join("");
+}
+
+function highlightCodeBlocks(root) {
+  const blocks = root.querySelectorAll("pre.md-pre > code");
+  for (const code of blocks) {
+    const cls = code.className || "";
+    const m = cls.match(/lang-([\w+-]+)/);
+    const lang = m ? m[1].toLowerCase() : "";
+    if (!lang) continue;
+    // Header bar with language label + copy button
+    const pre = code.parentElement;
+    if (!pre.querySelector(".md-pre-head")) {
+      const head = document.createElement("div");
+      head.className = "md-pre-head";
+      head.innerHTML = `<span class="md-pre-lang">${escapeHtml(lang)}</span>`;
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "md-pre-copy";
+      copy.textContent = "Copy";
+      copy.addEventListener("click", () => navigator.clipboard.writeText(code.textContent || ""));
+      head.appendChild(copy);
+      pre.insertBefore(head, code);
+    }
+    // Render syntax-highlighted HTML
+    code.innerHTML = highlightCode(code.textContent || "", lang);
+  }
+}
+
+if ($("modeSwitch")) {
+  wireChatEvents();
+  if (location.hash === "#chats") setMode("chats");
+}
