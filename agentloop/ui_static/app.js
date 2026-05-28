@@ -184,25 +184,25 @@ function currentPhase(status) {
   const s = String(status || "").toUpperCase();
   if (["FRAMING", "FRAMING_REVIEW", "CREATED"].includes(s)) return "framing";
   if (["INVESTIGATING", "DESIGNING"].includes(s)) return "research";
-  if (s === "WAITING_FOR_ALIGNMENT") return "approval";
+  if (s === "WAITING_FOR_ALIGNMENT") return "alignment";
   if (["IMPLEMENTING_AND_TESTING", "REVIEWING", "WAITING_FOR_HUMAN", "READY_TO_START"].includes(s)) return "running";
   if (["DONE", "INTEGRATING"].includes(s)) return "done";
   if (s === "CANCELLED") return "done";
   return "framing";
 }
 
-const PHASE_LABELS = { framing: "Framing", research: "Researching", approval: "Awaiting approval", running: "Running", done: "Done" };
+const PHASE_LABELS = { framing: "Framing", research: "Researching", alignment: "Awaiting approval", running: "Running", done: "Done" };
 const PHASE_ARTIFACTS = {
   framing: [],
   research: ["research.md", "proposal.md", "acceptance.md", "test-plan.md"],
-  approval: ["research.md", "proposal.md", "acceptance.md", "test-plan.md"],
+  alignment: ["research.md", "proposal.md", "acceptance.md", "test-plan.md"],
   running: ["final-report.md"],
   done: ["final-report.md"],
 };
 
 // Map between lifecycle step keys and renderBasic phase identifiers.
-const STEP_TO_PHASE = { framing: "framing", research: "research", approve: "approval", run: "running", done: "done" };
-const PHASE_TO_STEP = { framing: "framing", research: "research", approval: "approve", running: "run", done: "done" };
+const STEP_TO_PHASE = { framing: "framing", research: "research", approve: "alignment", run: "running", done: "done" };
+const PHASE_TO_STEP = { framing: "framing", research: "research", alignment: "approve", running: "run", done: "done" };
 
 function reachedPhases(task) {
   const cancelled = String(task.status || "").toUpperCase() === "CANCELLED";
@@ -356,7 +356,7 @@ function renderOverviewCta(detail, phase) {
   const approveEnabled = detail.actions?.approve?.enabled;
   // Only surface the floating CTA while the user is viewing the approval (or running)
   // phase — never under framing or research.
-  const allowedPhase = phase === "approval" || phase === "running";
+  const allowedPhase = phase === "alignment" || phase === "running";
   if (allowedPhase && status === "WAITING_FOR_ALIGNMENT" && approveEnabled) {
     cta.classList.remove("hidden");
     cta.innerHTML = `
@@ -434,7 +434,7 @@ function renderBasic(detail, phase) {
   // Then phase-gate (interactive panels hide entirely for cancelled tasks)
   gate("framingReviewPanel", !isCancelled && phase === "framing");
   gate("researchProgressPanel", !isCancelled && phase === "research");
-  gate("executionApprovalPanel", !isCancelled && phase === "approval");
+  gate("executionApprovalPanel", !isCancelled && phase === "alignment");
   gate("humanReviewPanel", !isCancelled && phase === "running");
   // Goal & acceptance visibility
   const goalSec = $("goalSection");
@@ -443,12 +443,12 @@ function renderBasic(detail, phase) {
   // In approval phase, the acceptance list is gated by the "Acceptance" card selection.
   // Research phase mirrors that behavior with researchSelection.
   // Other phases keep the previous default (hidden in framing/done, visible otherwise).
-  const approvalSelected = phase === "approval" ? resolveApprovalSelection(detail) : null;
+  const approvalSelected = phase === "alignment" ? resolveApprovalSelection(detail) : null;
   const researchSelected = phase === "research" ? state.researchSelection[detail.state.task_id] || null : null;
   const accVisibleInApproval = approvalSelected === "acceptance.md";
   const accVisibleInResearch = researchSelected === "acceptance.md";
   if (accSec) {
-    if (phase === "approval") {
+    if (phase === "alignment") {
       accSec.classList.toggle("hidden", !accVisibleInApproval);
     } else if (phase === "research") {
       accSec.classList.toggle("hidden", !accVisibleInResearch);
@@ -463,7 +463,7 @@ function renderBasic(detail, phase) {
   //   except the Acceptance card which delegates to the structured AC list above
   // - research phase: mirror approval — show only the selected card's file
   let wantedOverride = null;
-  if (phase === "approval") {
+  if (phase === "alignment") {
     wantedOverride = approvalSelected && !accVisibleInApproval ? [approvalSelected] : [];
   } else if (phase === "research") {
     wantedOverride = researchSelected && !accVisibleInResearch ? [researchSelected] : [];
@@ -477,7 +477,7 @@ function renderBasic(detail, phase) {
   const basicTab = $("basicTab");
   const acceptanceAnchor = $("acceptanceSection");
   let host = null;
-  if (phase === "approval" && approvalPanel) host = approvalPanel;
+  if (phase === "alignment" && approvalPanel) host = approvalPanel;
   else if (phase === "research" && researchPanel) host = researchPanel;
   // Move the artifact preview section
   if (phaseSection && basicTab) {
@@ -497,7 +497,7 @@ function renderBasic(detail, phase) {
   }
   // Move the acceptance section into the same host when the Acceptance card is selected
   if (acceptanceAnchor && basicTab) {
-    const acceptanceSelected = (phase === "approval" && accVisibleInApproval) || (phase === "research" && accVisibleInResearch);
+    const acceptanceSelected = (phase === "alignment" && accVisibleInApproval) || (phase === "research" && accVisibleInResearch);
     if (host && acceptanceSelected && !acceptanceAnchor.classList.contains("hidden")) {
       if (acceptanceAnchor.parentElement !== host) host.appendChild(acceptanceAnchor);
       acceptanceAnchor.classList.add("is-embedded-in-approval");
@@ -562,7 +562,7 @@ function renderPhaseArtifacts(detail, phase, wantedOverride) {
   const heading = $("phaseArtifactHeading");
   if (!section || !body) return;
   const wanted = wantedOverride || PHASE_ARTIFACTS[phase] || [];
-  const editable = phase === "approval" && !wantedOverride;
+  const editable = phase === "alignment" && !wantedOverride;
   const all = detail.artifacts || [];
   const byName = new Map(all.map((a) => [String(a.name || "").toLowerCase(), a]));
   // For approval, prefer .edited.* if present
@@ -582,7 +582,7 @@ function renderPhaseArtifacts(detail, phase, wantedOverride) {
   }
   section.classList.remove("hidden");
   if (heading) {
-    heading.textContent = phase === "approval" ? "Design package — editable" : phase === "research" ? "Research outputs" : phase === "framing" ? "Framing" : "Outputs";
+    heading.textContent = phase === "alignment" ? "Design package — editable" : phase === "research" ? "Research outputs" : phase === "framing" ? "Framing" : "Outputs";
   }
   body.innerHTML = "";
   for (const { artifact, isEdited } of items) {
@@ -1025,7 +1025,7 @@ function renderExecutionApproval(detail) {
       const file = btn.dataset.file;
       if (!file) return;
       state.approvalSelection[detail.state.task_id] = file;
-      renderBasic(detail, "approval");
+      renderBasic(detail, "alignment");
     });
   });
 }
