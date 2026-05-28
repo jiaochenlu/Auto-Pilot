@@ -184,7 +184,7 @@ function currentPhase(status) {
 
 const PHASE_LABELS = { framing: "Framing", research: "Researching", approval: "Awaiting approval", running: "Running", done: "Done" };
 const PHASE_ARTIFACTS = {
-  framing: ["framing.md"],
+  framing: [],
   research: ["research.md", "proposal.md", "acceptance.md", "test-plan.md"],
   approval: ["research.md", "proposal.md", "acceptance.md", "test-plan.md"],
   running: ["final-report.md"],
