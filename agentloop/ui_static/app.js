@@ -195,7 +195,7 @@ const PHASE_LABELS = { framing: "Framing", research: "Researching", alignment: "
 const PHASE_ARTIFACTS = {
   framing: [],
   research: ["research.md", "proposal.md", "acceptance.md", "test-plan.md"],
-  alignment: ["research.md", "proposal.md", "acceptance.md", "test-plan.md"],
+  alignment: [],
   running: ["final-report.md"],
   done: ["final-report.md"],
 };
