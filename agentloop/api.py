@@ -326,7 +326,12 @@ def build_design_package(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]
 
 
 def build_execution_approval(state: dict[str, Any], artifacts: list[dict[str, Any]]) -> dict[str, Any] | None:
-    if state.get("status") != "WAITING_FOR_ALIGNMENT":
+    status = state.get("status")
+    phases = state.get("phases") or {}
+    alignment_phase = phases.get("alignment", {}) if isinstance(phases.get("alignment"), dict) else {}
+    # Show approval panel when status is WAITING_FOR_ALIGNMENT,
+    # or when BLOCKED but alignment phase was reached (i.e., has any status)
+    if status != "WAITING_FOR_ALIGNMENT" and not (status == "BLOCKED" and alignment_phase.get("status")):
         return None
     artifact_names = {str(item.get("name")) for item in artifacts}
     required_artifacts = ["research.md", "proposal.md", "acceptance.md", "acceptance.json", "test-plan.md"]
