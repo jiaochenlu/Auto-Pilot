@@ -171,6 +171,15 @@ function lifecycleIndex(status) {
   return idx === -1 ? 0 : idx;
 }
 
+function lifecycleIndexFromPhases(task) {
+  const phases = task.phases || {};
+  if (phases.implementation?.status || phases.testing?.status || phases.review?.status) return 3;
+  if (phases.alignment?.status) return 2;
+  if (phases.investigation?.status || phases.proposal?.status) return 1;
+  if (phases.framing?.status || phases.framing_review?.status) return 0;
+  return 0;
+}
+
 function currentPhase(status) {
   const s = String(status || "").toUpperCase();
   if (["FRAMING", "FRAMING_REVIEW", "CREATED"].includes(s)) return "framing";
@@ -219,7 +228,9 @@ function renderLifecycle(task, viewedPhase) {
   // and the cancelled phase is marked red. Steps after stay gray.
   const current = cancelled
     ? lifecycleIndex(task.cancelled_from || "FRAMING_REVIEW")
-    : lifecycleIndex(task.status);
+    : (String(task.status || "").toUpperCase() === "BLOCKED"
+      ? lifecycleIndexFromPhases(task)
+      : lifecycleIndex(task.status));
   const viewedStepKey = viewedPhase ? PHASE_TO_STEP[viewedPhase] : null;
   // A phase is "actively running" when an agent is working and the UI is not blocking
   // on a human prompt. These statuses keep the current lifecycle dot pulsing.

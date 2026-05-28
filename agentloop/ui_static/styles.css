@@ -1970,7 +1970,7 @@ menu { display: flex; justify-content: flex-end; gap: 8px; margin: 6px 0 0; padd
 .context-session .ctx-runtime { font-size: 0.85em; opacity: 0.75; }
 .context-session .ctx-session-id { font-family: monospace; font-size: 0.8em; opacity: 0.6; }
 
-.context-layout { display: grid; grid-template-columns: minmax(280px, 1fr) 2fr; gap: 12px; align-items: start; }
+.context-layout { display: grid; grid-template-columns: minmax(280px, 300px) 1fr; gap: 12px; align-items: start; }
 .context-timeline-list { display: flex; flex-direction: column; gap: 4px; max-height: 70vh; overflow-y: auto; }
 .context-row { display: grid; grid-template-columns: 32px 90px 80px 1fr; column-gap: 6px; row-gap: 2px; align-items: center; padding: 6px 8px; border: 1px solid transparent; border-radius: 5px; background: transparent; text-align: left; cursor: pointer; font: inherit; }
 .context-row:hover { background: var(--hover, #f0f0f0); }
