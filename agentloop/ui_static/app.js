@@ -208,7 +208,9 @@ function reachedPhases(task) {
   const cancelled = String(task.status || "").toUpperCase() === "CANCELLED";
   const currentIdx = cancelled
     ? lifecycleIndex(task.cancelled_from || task.status)
-    : lifecycleIndex(task.status);
+    : (String(task.status || "").toUpperCase() === "BLOCKED"
+      ? lifecycleIndexFromPhases(task)
+      : lifecycleIndex(task.status));
   return LIFECYCLE_STEPS.slice(0, currentIdx + 1).map((s) => STEP_TO_PHASE[s.key]);
 }
 
