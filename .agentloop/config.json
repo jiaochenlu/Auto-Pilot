@@ -93,6 +93,9 @@
     "framer": {
       "runtime": "claude-code"
     },
+    "scanner": {
+      "runtime": "claude-code"
+    },
     "investigator": {
       "runtime": "claude-code"
     }

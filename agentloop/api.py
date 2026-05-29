@@ -41,8 +41,6 @@ ACTION_STATUSES_FOR_RUN = {"READY_TO_START", "IMPLEMENTING_AND_TESTING"}
 ROLE_ORDER = ["framer", "investigator", "architect", "implementer", "tester", "reviewer", "integrator"]
 HIDDEN_UI_RUNTIMES = {"example-agent"}
 
-RESEARCH_RUNNING_STATUSES = {"INVESTIGATING", "DESIGNING"}
-
 
 def _title_from_state(state: dict[str, Any], task_id: str) -> str:
     goal = state.get("goal") if isinstance(state.get("goal"), dict) else {}
@@ -274,7 +272,10 @@ def available_actions(state: dict[str, Any], lock_reason: str | None = None) -> 
 
 def build_framing_review(state: dict[str, Any]) -> dict[str, Any] | None:
     status = state.get("status")
-    if status not in ("FRAMING_REVIEW", "FRAMING"):
+    phases = state.get("phases") or {}
+    framing_review_phase = phases.get("framing_review", {}) if isinstance(phases.get("framing_review"), dict) else {}
+    # Show when status indicates framing/review, or when BLOCKED but framing_review phase was reached.
+    if status not in ("FRAMING_REVIEW", "FRAMING") and not (status == "BLOCKED" and framing_review_phase.get("status")):
         return None
     questions = state.get("framing_questions") if isinstance(state.get("framing_questions"), list) else []
     blocking = _blocking_count(questions)
@@ -289,25 +290,30 @@ def build_framing_review(state: dict[str, Any]) -> dict[str, Any] | None:
         "framing": framing,
         "running": running,
         "error": state.get("framing_error"),
+        "blocked_reason": state.get("blocked_reason") if status == "BLOCKED" else None,
     }
 
 
 def build_research_status(state: dict[str, Any]) -> dict[str, Any]:
-    status = state.get("status")
     phases = state.get("phases") if isinstance(state.get("phases"), dict) else {}
     investigation = phases.get("investigation", {}) if isinstance(phases.get("investigation"), dict) else {}
     proposal = phases.get("proposal", {}) if isinstance(phases.get("proposal"), dict) else {}
-    if status in RESEARCH_RUNNING_STATUSES:
-        stage = "investigating" if status == "INVESTIGATING" else "designing"
-        return {"state": "running", "stage": stage}
-    if status == "FRAMING_REVIEW":
-        return {"state": "pending", "stage": None}
-    if status in {"WAITING_FOR_ALIGNMENT", "READY_TO_START", "IMPLEMENTING_AND_TESTING", "REVIEWING", "WAITING_FOR_HUMAN", "DONE"}:
+    inv_status = investigation.get("status")
+    prop_status = proposal.get("status")
+    # Derive UI state from phase statuses so history is preserved even when task is BLOCKED.
+    if inv_status == "in_progress":
+        return {"state": "running", "stage": "investigating"}
+    if prop_status == "in_progress":
+        return {"state": "running", "stage": "designing"}
+    if prop_status == "completed" or inv_status == "completed":
         return {"state": "done", "stage": None}
-    return {
-        "state": "pending" if investigation.get("status") in {None, "pending"} else "done",
-        "stage": None,
-    }
+    if inv_status == "blocked" or prop_status == "blocked":
+        return {
+            "state": "blocked",
+            "stage": None,
+            "blocked_reason": state.get("blocked_reason"),
+        }
+    return {"state": "pending", "stage": None}
 
 
 def build_design_package(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -329,20 +335,41 @@ def build_execution_approval(state: dict[str, Any], artifacts: list[dict[str, An
     status = state.get("status")
     phases = state.get("phases") or {}
     alignment_phase = phases.get("alignment", {}) if isinstance(phases.get("alignment"), dict) else {}
-    # Show approval panel when status is WAITING_FOR_ALIGNMENT,
-    # or when BLOCKED but alignment phase was reached (i.e., has any status)
-    if status != "WAITING_FOR_ALIGNMENT" and not (status == "BLOCKED" and alignment_phase.get("status")):
+    alignment_status = alignment_phase.get("status")
+    # Show whenever the alignment phase has been reached (any status), or when explicitly waiting.
+    # This keeps the design package visible as historical context after the task moves past alignment.
+    if status != "WAITING_FOR_ALIGNMENT" and not alignment_status:
         return None
+    if status == "WAITING_FOR_ALIGNMENT":
+        view_state = "waiting"
+    elif status == "BLOCKED":
+        view_state = "blocked"
+    elif alignment_status == "approved":
+        view_state = "approved"
+    else:
+        view_state = "waiting"
+    meaning = {
+        "waiting": "Review the research, proposal, acceptance, and test plan before execution starts.",
+        "approved": "Design package approved. Shown here for reference.",
+        "blocked": "Task is blocked at the alignment stage. Review the design package and the blocker below.",
+    }[view_state]
     artifact_names = {str(item.get("name")) for item in artifacts}
     required_artifacts = ["research.md", "proposal.md", "acceptance.md", "acceptance.json", "test-plan.md"]
     missing = [name for name in required_artifacts if name not in artifact_names]
     return {
         "required": True,
-        "meaning": "Review the research, proposal, acceptance, and test plan before execution starts.",
-        "primary_action": "Approve and run",
-        "missing_artifacts": missing,
+        "state": view_state,
+        "meaning": meaning,
+        "primary_action": "Approve and run" if view_state == "waiting" else None,
+        "missing_artifacts": missing if view_state == "waiting" else [],
         "design_package": build_design_package(artifacts),
+        "approved_by": alignment_phase.get("approved_by"),
+        "approved_at": alignment_phase.get("approved_at"),
+        "blocked_reason": state.get("blocked_reason") if view_state == "blocked" else None,
     }
+
+
+HIDDEN_ARTIFACTS = {"pre-scan.md"}
 
 
 def list_task_artifacts(root: Path, task_id: str) -> list[dict[str, Any]]:
@@ -351,6 +378,8 @@ def list_task_artifacts(root: Path, task_id: str) -> list[dict[str, Any]]:
         return []
     artifacts: list[dict[str, Any]] = []
     for path in sorted(item for item in base.iterdir() if item.is_file()):
+        if path.name in HIDDEN_ARTIFACTS:
+            continue
         artifacts.append(
             {
                 "name": path.name,
@@ -453,7 +482,11 @@ def latest_review_summary(root: Path, task_id: str) -> dict[str, Any] | None:
 
 
 def build_human_review(root: Path, task_id: str, state: dict[str, Any]) -> dict[str, Any] | None:
-    if state.get("status") != "WAITING_FOR_HUMAN":
+    status = state.get("status")
+    phases = state.get("phases") or {}
+    review_phase = phases.get("review", {}) if isinstance(phases.get("review"), dict) else {}
+    # Show when waiting for human, or when BLOCKED but review phase was reached.
+    if status != "WAITING_FOR_HUMAN" and not (status == "BLOCKED" and review_phase.get("status")):
         return None
     review = latest_review_summary(root, task_id)
     return {
@@ -461,6 +494,7 @@ def build_human_review(root: Path, task_id: str, state: dict[str, Any]) -> dict[
         "meaning": "AgentLoop paused because the reviewer marked this task as blocked. Automatic iteration will not continue until a human reviews the blocker and resumes the task.",
         "review": review,
         "history": state.get("human_reviews") if isinstance(state.get("human_reviews"), list) else [],
+        "blocked_reason": state.get("blocked_reason") if status == "BLOCKED" else None,
     }
 
 
@@ -550,14 +584,19 @@ def latest_runtime_summary(root: Path, state: dict[str, Any]) -> dict[str, Any]:
     )
 
     agents_by_iter: dict[int, list[dict[str, Any]]] = {n: [] for n in iterations}
+    attempt_counter: dict[tuple[int, str], int] = {}
     for agent in state.get("agents") or []:
         if not isinstance(agent, dict):
             continue
         agent_iter = _agent_iteration(agent)
         if agent_iter is None:
             agent_iter = latest
+        role = str(agent.get("role") or "agent")
+        attempt_key = (agent_iter, role)
+        attempt_counter[attempt_key] = attempt_counter.get(attempt_key, 0) + 1
         entry = {
             "role": agent.get("role"),
+            "attempt": attempt_counter[attempt_key],
             "runtime": agent.get("runtime"),
             "adapter": agent.get("adapter"),
             "command": agent.get("command"),
@@ -842,6 +881,39 @@ def resume_task_api(root: Path, task_id: str, payload: dict[str, Any]) -> dict[s
         state["status"] = "IMPLEMENTING_AND_TESTING"
         state["current_phase"] = "implementation"
         state["requires_human_approval"] = False
+        state["updated_at"] = now
+        save_task_state(root, task_id, state)
+    return build_task_detail(root, task_id)
+
+
+def mark_done_task_api(root: Path, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    from .tasks import save_task_state
+    from .models import utc_now_iso
+
+    note = payload.get("note") if isinstance(payload.get("note"), str) else ""
+    by = payload.get("by") if isinstance(payload.get("by"), str) else "ui"
+    with task_lock(root, task_id, blocking=False):
+        state = load_task_state(root, task_id)
+        if state.get("status") != "WAITING_FOR_HUMAN":
+            raise WorkspaceError(f"Cannot mark done while status is {state.get('status')}.")
+        now = utc_now_iso()
+        latest_review = latest_review_summary(root, task_id)
+        state.setdefault("human_reviews", []).append(
+            {
+                "at": now,
+                "by": by,
+                "action": "mark_done",
+                "note": note.strip(),
+                "from_review": latest_review.get("artifact") if latest_review else None,
+            }
+        )
+        state["status"] = "DONE"
+        state["current_phase"] = "done"
+        state["requires_human_approval"] = False
+        phases = state.get("phases") if isinstance(state.get("phases"), dict) else {}
+        review_phase = phases.get("review") if isinstance(phases.get("review"), dict) else None
+        if isinstance(review_phase, dict):
+            review_phase["status"] = "approved"
         state["updated_at"] = now
         save_task_state(root, task_id, state)
     return build_task_detail(root, task_id)

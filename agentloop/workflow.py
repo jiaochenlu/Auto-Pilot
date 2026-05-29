@@ -451,6 +451,54 @@ def write_role_prompt(root: Path, role: str, content: str) -> None:
     write_text(agentloop_path(root) / "prompts" / f"{role}.md", content)
 
 
+def _load_pre_scan_text(root: Path, state: dict[str, Any]) -> str:
+    task_id = task_id_or_error(state)
+    path = task_artifact_path(root, task_id, "pre-scan.md")
+    if not path.exists():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def prepare_scanner_prompt(root: Path, state: dict[str, Any]) -> None:
+    request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
+    pre_scan_ref = artifact_ref(state, "pre-scan.md")
+    task_id = task_id_or_error(state)
+    turn = next_turn_for_role(state, "scanner")
+    kind = (state.get("goal", {}) or {}).get("code_path_kind") or "directory"
+    scope_hint = (
+        "The code path is a single file. Read that file plus its closest neighbors "
+        "(same directory, files it imports, files that import it). Do not wander further unless clearly needed."
+        if kind == "file"
+        else "The code path is a directory. Start with the file tree (top 2-3 levels), then read the most relevant files."
+    )
+    body = (
+        "# Scanner Prompt\n\n"
+        f"{language_directive(state)}"
+        f"{code_path_directive(state)}"
+        f"Task request:\n{request}\n\n"
+        "You are a pre-framing scanner. Your job is to ground the framer in the actual codebase "
+        "so it can ask sharp, file-specific clarifying questions instead of generic ones. "
+        "Do NOT propose a solution, do NOT frame the problem, do NOT write framing questions.\n\n"
+        f"{scope_hint}\n\n"
+        "Budget: read at most ~15 files, keep your output under ~30k characters total. "
+        "Prefer README, package manifests (package.json / pyproject.toml / Cargo.toml / etc.), "
+        "obvious entry points, files named or implied in the task request, and recently-modified files.\n\n"
+        "Required output:\n"
+        f"- Write `{pre_scan_ref}` with the following markdown sections (in this order):\n"
+        "  1. `## Project overview` — what this project is, language/stack, one paragraph.\n"
+        "  2. `## Key files & purpose` — bullet list of the files you read and one line on each.\n"
+        "  3. `## Patterns & conventions observed` — naming, structure, testing style, anything a contributor needs to respect.\n"
+        "  4. `## Files most relevant to this task` — the subset the framer/investigator should focus on, with one line of justification each.\n"
+        "  5. `## Open uncertainties for the framer` — concrete unknowns the framer should ask the requester about (do NOT answer them yourself).\n\n"
+        "Keep it dense and specific. Quote file paths verbatim. No filler sentences.\n\n"
+        f"{handoff_output_contract(task_id, 'scanner', turn)}"
+    )
+    write_role_prompt(root, "scanner", body)
+
+
 def prepare_framer_prompt(root: Path, state: dict[str, Any], mode: str = "initial") -> None:
     request = state.get("goal", {}).get("raw_request") or state.get("title") or "Untitled task"
     framing_ref = artifact_ref(state, "framing.md")
@@ -485,10 +533,18 @@ def prepare_framer_prompt(root: Path, state: dict[str, Any], mode: str = "initia
             f"{handoff_output_contract_brief(task_id, 'framer', turn)}"
         )
     else:
+        pre_scan_text = _load_pre_scan_text(root, state)
+        pre_scan_block = (
+            "Codebase context (auto-generated pre-scan — treat as ground truth about what's in the code):\n"
+            f"{pre_scan_text}\n\n"
+            if pre_scan_text
+            else ""
+        )
         body = (
             "# Framer Prompt\n\n"
             f"{language_directive(state)}"
             f"{code_path_directive(state)}"
+            f"{pre_scan_block}"
             f"{upstream_block}"
             f"Task request:\n{request}\n\n"
             "Frame the problem so research and implementation can later proceed without ambiguity. Do NOT propose a solution yet.\n\n"
@@ -971,10 +1027,35 @@ def load_acceptance_criteria(path: Path) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
+def _run_scanner(root: Path, state: dict[str, Any], config: dict[str, Any], task_id: str) -> None:
+    """Run the codebase pre-scanner before framing. Non-fatal: errors are recorded but do not abort framing."""
+    code_path = (state.get("goal", {}) or {}).get("code_path") or ""
+    if not str(code_path).strip():
+        return
+    if task_artifact_path(root, task_id, "pre-scan.md").exists():
+        return
+    if role_uses_manual(config, "scanner"):
+        return
+    pre_scan_ref = task_artifact_ref(task_id, "pre-scan.md")
+    try:
+        prepare_scanner_prompt(root, state)
+        record_agent_result(
+            state,
+            _run_role_with_session(root, state, config, "scanner", 0, [pre_scan_ref], task_id=task_id),
+        )
+    except Exception as exc:  # pragma: no cover - non-fatal pre-step
+        record_agent_result(
+            state,
+            {"role": "scanner", "error": f"{exc.__class__.__name__}: {exc}"},
+        )
+
+
 def _run_framer(root: Path, state: dict[str, Any], config: dict[str, Any], task_id: str) -> None:
+    framer_mode = prompt_mode_for_role(state, config, "framer")
+    if framer_mode == "initial":
+        _run_scanner(root, state, config, task_id)
     framing_ref = task_artifact_ref(task_id, "framing.md")
     framing_json_ref = task_artifact_ref(task_id, "framing.json")
-    framer_mode = prompt_mode_for_role(state, config, "framer")
     prepare_framer_prompt(root, state, mode=framer_mode)
     if role_uses_manual(config, "framer"):
         framing_path = task_artifact_path(root, task_id, "framing.md")

@@ -138,6 +138,9 @@ class AgentLoopUIHandler(BaseHTTPRequestHandler):
                 if op == "resume":
                     self._send_json(200, api.resume_task_api(self.root, task_id, payload))
                     return
+                if op == "mark-done":
+                    self._send_json(200, api.mark_done_task_api(self.root, task_id, payload))
+                    return
                 if op == "edit-artifact":
                     self._send_json(200, api.edit_artifact_api(self.root, task_id, payload))
                     return

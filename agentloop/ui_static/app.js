@@ -12,6 +12,7 @@ const state = {
   approvalSelection: {},
   researchSelection: {},
   viewPhase: {},
+  runtimeAttemptSelection: {},
 };
 
 const REFRESH_INTERVAL_MS = 3000;
@@ -137,6 +138,7 @@ async function loadDetail(taskId) {
   try {
     state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}`);
     state.runtimeIndex = 0;
+    state.runtimeAttemptSelection = {};
     state.iterationIndex = state.detail.runtime?.latest_iteration ?? null;
     renderDetail();
     showBanner((state.detail.errors || []).join("; "));
@@ -165,6 +167,7 @@ const LIFECYCLE_STEPS = [
   { key: "run", label: "Running", sub: "iterations executing", tab: "execlog", match: ["READY_TO_START", "RUNNING", "EXECUTING", "IMPLEMENTING_AND_TESTING", "REVIEWING", "WAITING_FOR_HUMAN"], roles: [{ key: "implementer", label: "Implementer", icon: "IM" }, { key: "tester", label: "Tester", icon: "TS" }, { key: "reviewer", label: "Reviewer", icon: "RV" }] },
   { key: "done", label: "Done", sub: "task complete", tab: "basic", match: ["DONE", "CANCELLED", "FAILED"], roles: [{ key: "integrator", label: "Integrator", icon: "IT" }] },
 ];
+const ROLE_ORDER = ["framer", "investigator", "architect", "implementer", "tester", "reviewer", "integrator"];
 
 function lifecycleIndex(status) {
   const idx = LIFECYCLE_STEPS.findIndex((step) => step.match.includes(String(status || "").toUpperCase()));
@@ -398,7 +401,6 @@ function renderDetail() {
   configurePrimaryAction(detail);
   renderBasic(detail, phase);
   renderOverviewCta(detail, phase);
-  renderArtifacts(detail);
   renderConfig(detail);
   renderRuntime(detail);
   renderContext(detail);
@@ -990,15 +992,34 @@ function renderExecutionApproval(detail) {
   const pkg = Array.isArray(approval.design_package) ? approval.design_package : [];
   const missing = Array.isArray(approval.missing_artifacts) ? approval.missing_artifacts : [];
   const selected = resolveApprovalSelection(detail);
+  const viewState = approval.state || "waiting";
+  const headTitle = viewState === "approved"
+    ? "Design approved"
+    : viewState === "blocked"
+      ? "Alignment blocked"
+      : "Awaiting approval";
+  const headBadge = viewState === "approved"
+    ? `<span class="badge status-DONE">APPROVED</span>`
+    : viewState === "blocked"
+      ? `<span class="badge status-BLOCKED">BLOCKED</span>`
+      : `<span class="badge status-WAITING_FOR_ALIGNMENT">READY TO RUN</span>`;
+  const approvedMeta = (viewState === "approved" && (approval.approved_by || approval.approved_at))
+    ? `<div class="task-sub">Approved${approval.approved_by ? ` by ${escapeHtml(approval.approved_by)}` : ""}${approval.approved_at ? ` at ${escapeHtml(approval.approved_at)}` : ""}</div>`
+    : "";
+  const blockedBanner = (viewState === "blocked" && approval.blocked_reason)
+    ? `<div class="dialog-error">${escapeHtml(approval.blocked_reason)}</div>`
+    : "";
   panel.classList.remove("hidden");
   panel.innerHTML = `
     <div class="execution-approval-head">
       <div>
-        <h3>Awaiting approval</h3>
+        <h3>${headTitle}</h3>
         <p>${escapeHtml(approval.meaning || "Review the design package below, then approve to start the implementation loop.")}</p>
+        ${approvedMeta}
       </div>
-      <span class="badge status-WAITING_FOR_ALIGNMENT">READY TO RUN</span>
+      ${headBadge}
     </div>
+    ${blockedBanner}
     <div class="design-package-cards" role="tablist">
       ${pkg.map((item) => {
         const isSelected = item.ready && item.file === selected;
@@ -1056,6 +1077,11 @@ function renderHumanReview(detail) {
   const comments = Array.isArray(latest.comments) ? latest.comments : [];
   const tests = Array.isArray(latest.test_results) ? latest.test_results : [];
   const failedTests = tests.filter((test) => typeof test.exit_code === "number" && test.exit_code !== 0);
+  const prevNote = $("resumeNoteInput");
+  const preservedValue = prevNote ? prevNote.value : "";
+  const preservedFocus = prevNote && document.activeElement === prevNote;
+  const preservedStart = preservedFocus ? prevNote.selectionStart : null;
+  const preservedEnd = preservedFocus ? prevNote.selectionEnd : null;
   panel.classList.remove("hidden");
   panel.innerHTML = `
     <div class="human-review-head">
@@ -1075,6 +1101,7 @@ function renderHumanReview(detail) {
         <h3>Resume</h3>
         <textarea id="resumeNoteInput" rows="4" placeholder="What did you change or decide?"></textarea>
         <button id="resumeTaskBtn" class="primary" type="button">Resume automatic loop</button>
+        <button id="markDoneBtn" class="secondary" type="button">Mark as done</button>
       </section>
     </div>
     <div class="human-review-grid">
@@ -1088,6 +1115,17 @@ function renderHumanReview(detail) {
       </section>
     </div>`;
   $("resumeTaskBtn").addEventListener("click", resumeHumanReview);
+  $("markDoneBtn").addEventListener("click", markHumanReviewDone);
+  const nextNote = $("resumeNoteInput");
+  if (nextNote) {
+    if (preservedValue) nextNote.value = preservedValue;
+    if (preservedFocus) {
+      nextNote.focus();
+      if (preservedStart !== null && preservedEnd !== null) {
+        try { nextNote.setSelectionRange(preservedStart, preservedEnd); } catch (_) {}
+      }
+    }
+  }
 }
 
 function renderReviewComment(comment) {
@@ -1120,6 +1158,25 @@ async function resumeHumanReview() {
   }
 }
 
+async function markHumanReviewDone() {
+  if (!state.selectedTaskId) return;
+  const btn = $("markDoneBtn");
+  const note = $("resumeNoteInput")?.value || "";
+  if (!confirm("Mark this task as done? Automatic iteration will stop.")) return;
+  btn.disabled = true;
+  btn.textContent = "Marking...";
+  showBanner("Marking task as done...");
+  try {
+    state.detail = await apiFetch(`/api/tasks/${encodeURIComponent(state.selectedTaskId)}/mark-done`, { method: "POST", body: JSON.stringify({ by: "ui", note }) });
+    await loadTasks(true);
+    showBanner(null);
+  } catch (error) {
+    showBanner(error.message);
+    btn.disabled = false;
+    btn.textContent = "Mark as done";
+  }
+}
+
 function artifactPhase(name) {
   const n = String(name || "").toLowerCase();
   if (n.startsWith("framing.")) return "Framing";
@@ -1134,6 +1191,7 @@ const ARTIFACT_PHASE_ORDER = ["Framing", "Research", "Design", "Reviews", "Final
 
 function renderArtifacts(detail) {
   const list = $("artifactList");
+  if (!list) return;
   list.innerHTML = "";
   const mdArtifacts = (detail.artifacts || []).filter((a) => /\.md$/i.test(a.name || ""));
   if (!mdArtifacts.length) {
@@ -1514,6 +1572,140 @@ function runtimeLogSection(id, title, text, log) {
     <pre id="${escapeHtml(id)}" class="log-block">${escapeHtml(body)}</pre>`;
 }
 
+function compactArtifactSize(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n)) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 102.4) / 10} KB`;
+  return `${Math.round(n / 104857.6) / 10} MB`;
+}
+
+function artifactByName(detail) {
+  const map = new Map();
+  for (const artifact of detail.artifacts || []) {
+    const name = String(artifact.name || "");
+    if (name) map.set(name.toLowerCase(), artifact);
+  }
+  return map;
+}
+
+function uniqueArtifactNames(names) {
+  const seen = new Set();
+  const out = [];
+  for (const name of names || []) {
+    const value = String(name || "").split(/[\\/]/).pop() || "";
+    if (value.toLowerCase() === "pre-scan.md") continue;
+    const key = value.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+  return out;
+}
+
+function approvedSnapshotNames(detail) {
+  return (detail.artifacts || [])
+    .map((artifact) => String(artifact.name || ""))
+    .filter((name) => /\.approved\.md$/i.test(name))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function reviewArtifactName(iteration, detail) {
+  const expected = `review-${String(iteration).padStart(3, "0")}.json`;
+  const names = new Set((detail.artifacts || []).map((artifact) => String(artifact.name || "").toLowerCase()));
+  return names.has(expected.toLowerCase()) ? expected : null;
+}
+
+function groupRuntimeEntries(current, detail) {
+  const roleGroups = new Map();
+  for (const agent of current.agents || []) {
+    const role = lifecycleRole(agent.role || "agent");
+    const roleKey = String(role.key || agent.role || "agent").toLowerCase();
+    if (!roleGroups.has(roleKey)) {
+      roleGroups.set(roleKey, { type: "agent", roleKey, label: role.label, icon: role.icon, attempts: [] });
+    }
+    roleGroups.get(roleKey).attempts.push(agent);
+  }
+  for (const group of roleGroups.values()) {
+    group.attempts.sort((a, b) => (Number(a.attempt || 0) - Number(b.attempt || 0)));
+  }
+  const roleOrder = new Map(ROLE_ORDER.map((role, index) => [role, index]));
+  const groups = [...roleGroups.values()].sort((a, b) => {
+    const ai = roleOrder.has(a.roleKey) ? roleOrder.get(a.roleKey) : 99;
+    const bi = roleOrder.has(b.roleKey) ? roleOrder.get(b.roleKey) : 99;
+    return ai - bi || a.label.localeCompare(b.label);
+  });
+  for (const test of [...(current.tests || [])].sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))) {
+    groups.push({ type: "test", label: test.name || "test", data: test });
+  }
+  return groups;
+}
+
+function artifactNamesForAgent(agent, group, current, detail) {
+  const names = uniqueArtifactNames(agent.artifacts || []);
+  if (group.roleKey === "reviewer") {
+    const reviewName = reviewArtifactName(current.iteration, detail);
+    if (reviewName) names.push(reviewName);
+  }
+  return uniqueArtifactNames(names);
+}
+
+function renderRuntimeArtifactCard(name, artifact, options = {}) {
+  const isMarkdown = /\.md$/i.test(name);
+  const hasPreview = artifact?.preview?.content != null;
+  const size = artifact ? compactArtifactSize(artifact.size) : "missing";
+  const path = artifact?.path || name;
+  const truncated = artifact?.preview?.truncated ? ` · truncated ${artifact.preview.bytes_returned}/${artifact.preview.bytes_total} bytes` : "";
+  const openAttr = options.open ? " open" : "";
+  const body = options.suppressPreview
+    ? `<div class="runtime-artifact-hidden"><span>${escapeHtml(options.notice || "preview hidden")}</span><button type="button" data-artifact-show="${escapeHtml(name)}">show preview</button></div>`
+    : isMarkdown && hasPreview
+    ? `<div class="runtime-artifact-body markdown-body${options.locked ? " is-collapsed" : ""}">${renderMarkdown(artifact.preview.content || "")}</div>
+       <button type="button" class="runtime-artifact-expand" data-artifact-expand>expand</button>`
+    : `<div class="runtime-artifact-meta-row"><code>${escapeHtml(path)}</code><button type="button" data-copy="${escapeHtml(path)}">copy path</button></div>`;
+  const notice = options.notice && !options.suppressPreview ? `<div class="task-sub runtime-artifact-notice">${escapeHtml(options.notice)}</div>` : "";
+  return `
+    <details class="runtime-artifact" data-artifact-row="${escapeHtml(name)}"${openAttr}>
+      <summary>
+        <span>${escapeHtml(name)}</span>
+        <small>${escapeHtml(size)}${escapeHtml(truncated)}</small>
+      </summary>
+      ${notice}
+      ${body}
+    </details>`;
+}
+
+function renderRoleArtifacts(agent, group, current, detail) {
+  const byName = artifactByName(detail);
+  const names = artifactNamesForAgent(agent, group, current, detail);
+  const snapshotNames = group.roleKey === "architect" ? approvedSnapshotNames(detail) : [];
+  if (!names.length && !snapshotNames.length) return "";
+  const currentPhase = String(detail.state?.current_phase || detail.state?.lifecycle?.current_phase || "").toLowerCase();
+  const isFramingPhase = currentPhase === "framing" || currentPhase === "framing_review";
+  const cards = names.map((name, index) => {
+    const artifact = byName.get(String(name).toLowerCase());
+    const hideFraming = group.roleKey === "framer" && String(name).toLowerCase() === "framing.md" && isFramingPhase;
+    return renderRuntimeArtifactCard(name, artifact, {
+      open: index === 0 && !hideFraming,
+      locked: true,
+      notice: hideFraming ? "hidden during framing phase" : "",
+      suppressPreview: hideFraming,
+    });
+  }).join("");
+  const snapshots = snapshotNames.length
+    ? `<div class="runtime-artifact-subhead">approved snapshots</div>${snapshotNames.map((name) => renderRuntimeArtifactCard(name, byName.get(name.toLowerCase()), { locked: true })).join("")}`
+    : "";
+  return `
+    <section class="runtime-artifacts-inline" data-artifact-group>
+      <h3>Artifacts produced <span class="task-sub">${names.length + snapshotNames.length}</span></h3>
+      ${cards}${snapshots}
+    </section>`;
+}
+
+function runtimeAttemptKey(iteration, roleKey) {
+  return `${iteration}:${roleKey}`;
+}
+
 async function copyText(text) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text || "");
@@ -1568,7 +1760,7 @@ function renderRuntime(detail) {
     const passBadge = it.tests_passed ? `<span class="iter-chip-pass">${it.tests_passed}</span>` : "";
     chip.innerHTML = `
       <span class="iter-chip-num">Iteration ${escapeHtml(it.iteration)}</span>
-      <span class="iter-chip-meta">${it.agent_count} agent${it.agent_count === 1 ? "" : "s"} · ${it.test_count} test${it.test_count === 1 ? "" : "s"}</span>
+      <span class="iter-chip-meta">${it.agent_count}ag · ${it.test_count}test</span>
       ${passBadge}${failBadge}`;
     chip.addEventListener("click", () => {
       state.iterationIndex = it.iteration;
@@ -1579,13 +1771,10 @@ function renderRuntime(detail) {
   });
 
   const current = byIter.find((it) => it.iteration === state.iterationIndex) || byIter[byIter.length - 1];
-  const entries = [
-    ...(current.agents || []).map((agent) => ({ type: "agent", label: agent.role || "agent", data: agent })),
-    ...(current.tests || []).map((test) => ({ type: "test", label: test.name, data: test })),
-  ];
+  const entries = groupRuntimeEntries(current, detail);
   const summary = document.createElement("div");
   summary.className = "runtime-iteration-summary";
-  summary.textContent = `Iteration ${current.iteration} · ${current.agent_count ?? (current.agents || []).length} agent${(current.agent_count ?? (current.agents || []).length) === 1 ? "" : "s"} · ${current.test_count ?? (current.tests || []).length} test${(current.test_count ?? (current.tests || []).length) === 1 ? "" : "s"}`;
+  summary.textContent = `Iteration ${current.iteration} · ${current.agent_count ?? (current.agents || []).length}ag · ${current.test_count ?? (current.tests || []).length}test`;
   bar.prepend(summary);
   if (!entries.length) {
     content.innerHTML = isRunning
@@ -1598,18 +1787,20 @@ function renderRuntime(detail) {
   entries.forEach((entry, index) => {
     const button = document.createElement("button");
     const isTest = entry.type === "test";
-    const exit = isTest ? entry.data.exit_code : entry.data.exit_code;
+    const activeAttempt = isTest ? null : entry.attempts[entry.attempts.length - 1];
+    const data = isTest ? entry.data : activeAttempt;
+    const exit = data?.exit_code;
     const live = entry.type === "agent" && isRunning && exit == null;
     const dot = exit === 0 ? "ok" : (typeof exit === "number" ? "fail" : (live ? "live" : "pending"));
-    const duration = formatRuntimeDuration(entry.data.duration_ms);
-    const role = isTest ? null : lifecycleRole(entry.data.role || entry.label);
-    const roleIcon = role ? `<span class="rt-role" title="${escapeHtml(role.label)}">${escapeHtml(role.icon)}</span>` : "";
-    const exitTag = isTest && exit != null ? `<span class="rt-exit">exit ${escapeHtml(exit)}</span>` : "";
+    const duration = formatRuntimeDuration(data?.duration_ms);
+    const roleIcon = isTest ? "" : `<span class="rt-role" title="${escapeHtml(entry.label)}">${escapeHtml(entry.icon)}</span>`;
+    const exitTag = exit != null ? `<span class="rt-exit">exit ${escapeHtml(exit)}</span>` : "";
+    const countTag = !isTest && entry.attempts.length > 1 ? `<span class="rt-count" title="This role ran ${entry.attempts.length} times in this iteration">×${entry.attempts.length}</span>` : "";
     button.innerHTML = `
       <span class="dot dot-${dot}"></span>
       ${roleIcon}
       <span class="rt-main">
-        <span class="rt-label">${escapeHtml(entry.label || entry.type)}</span>
+        <span class="rt-label">${escapeHtml(entry.label || entry.type)}${countTag}</span>
         <span class="rt-subline"><span>${escapeHtml(duration)}</span>${exitTag}<span class="rt-kind">${entry.type}</span></span>
       </span>`;
     button.className = index === state.runtimeIndex ? "active" : "";
@@ -1631,7 +1822,11 @@ function renderRuntime(detail) {
       ${runtimeLogSection("runtime-log-main", "log", logText, log)}`;
     return;
   }
-  const agent = selected.data;
+  const attemptKey = runtimeAttemptKey(current.iteration, selected.roleKey);
+  const savedAttempt = state.runtimeAttemptSelection[attemptKey];
+  const selectedAttempt = Number.isInteger(savedAttempt) ? savedAttempt : selected.attempts.length - 1;
+  const attemptIndex = Math.max(0, Math.min(selected.attempts.length - 1, selectedAttempt));
+  const agent = selected.attempts[attemptIndex];
   const stdout = agent.stdout || {};
   const stderr = agent.stderr || {};
   const agentRunning = isRunning && (agent.exit_code == null);
@@ -1639,14 +1834,29 @@ function renderRuntime(detail) {
   const stdoutText = stdout.content || (stdout.missing ? "Missing stdout log" : (agentRunning ? "Waiting for output…" : ""));
   const stderrText = stderr.content || (stderr.missing ? "Missing stderr log" : "");
   const stderrHtml = stderrText ? runtimeLogSection("runtime-log-stderr", "stderr", stderrText, stderr) : "";
+  const attemptSelector = selected.attempts.length > 1 ? `
+    <div class="runtime-attempts" role="group" aria-label="Attempts" data-attempt-select>
+      ${selected.attempts.map((item, index) => `<button type="button" class="${index === attemptIndex ? "active" : ""}" data-attempt-index="${index}"${index === attemptIndex ? ` data-attempt-active="${escapeHtml(item.attempt || index + 1)}"` : ""}>#${escapeHtml(item.attempt || index + 1)}</button>`).join("")}
+    </div>` : "";
+  const overwritten = selected.attempts.length > 1 && attemptIndex < selected.attempts.length - 1
+    ? '<div class="runtime-attempt-note">log overwritten by latest attempt; transcript_ref preserves per-attempt history — open Context tab.</div>'
+    : "";
   content.innerHTML = `
-    ${runtimeMetaHtml([agent.runtime || "runtime", `exit ${agent.exit_code ?? "-"}`, formatRuntimeDuration(agent.duration_ms)])}
+    <div class="runtime-detail-head">
+      <div>
+        <h3>${escapeHtml(selected.label)}</h3>
+        ${attemptSelector}
+      </div>
+      ${runtimeMetaHtml([agent.runtime || "runtime", `exit ${agent.exit_code ?? "-"}`, formatRuntimeDuration(agent.duration_ms)])}
+    </div>
     ${liveTag}
+    ${overwritten}
     ${runtimeDetailRow("command", agent.command || "manual")}
     ${runtimeDetailRow("stdout path", stdout.path || "")}
     ${stderr.path ? runtimeDetailRow("stderr path", stderr.path) : ""}
     ${runtimeLogSection("runtime-log-stdout", "stdout", stdoutText, stdout)}
-    ${stderrHtml}`;
+    ${stderrHtml}
+    ${renderRoleArtifacts(agent, selected, current, detail)}`;
 }
 
 function renderContext(detail) {
@@ -1850,6 +2060,36 @@ function wireEvents() {
       if (!pre) return;
       const wrapped = pre.classList.toggle("is-wrapped");
       wrapBtn.setAttribute("aria-pressed", wrapped ? "true" : "false");
+      return;
+    }
+    const attemptBtn = event.target.closest("button[data-attempt-index]");
+    if (attemptBtn && state.detail) {
+      const index = Number(attemptBtn.dataset.attemptIndex);
+      const selectedIteration = state.iterationIndex;
+      const current = (state.detail.runtime?.by_iteration || []).find((it) => it.iteration === selectedIteration);
+      const group = current ? groupRuntimeEntries(current, state.detail)[state.runtimeIndex] : null;
+      if (group?.type === "agent" && Number.isInteger(index)) {
+        state.runtimeAttemptSelection[runtimeAttemptKey(selectedIteration, group.roleKey)] = index;
+        renderRuntime(state.detail);
+      }
+      return;
+    }
+    const expandBtn = event.target.closest("button[data-artifact-expand]");
+    if (expandBtn) {
+      const body = expandBtn.parentElement?.querySelector(".runtime-artifact-body");
+      if (!body) return;
+      const collapsed = body.classList.toggle("is-collapsed");
+      expandBtn.textContent = collapsed ? "expand" : "collapse";
+      return;
+    }
+    const showBtn = event.target.closest("button[data-artifact-show]");
+    if (showBtn && state.detail) {
+      const name = showBtn.dataset.artifactShow || "";
+      const artifact = artifactByName(state.detail).get(name.toLowerCase());
+      const host = showBtn.closest(".runtime-artifact-hidden");
+      if (artifact && host) {
+        host.outerHTML = `<div class="runtime-artifact-body markdown-body is-collapsed">${renderMarkdown(artifact.preview?.content || "")}</div><button type="button" class="runtime-artifact-expand" data-artifact-expand>expand</button>`;
+      }
     }
   });
   $("createForm").addEventListener("submit", async (event) => {
